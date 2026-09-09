@@ -1,0 +1,627 @@
+[
+  {
+    "relativePath": "2026/EXP-2026-000004/01-Contrato/SOW-2026-000006.pdf",
+    "size": 114134,
+    "sha256": "830f456b22903b6467a0467dd1ddd74d471a578d723fe16d7cfd893f377e60f2"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/01-Contrato/SOW-BANK-8743.pdf",
+    "size": 49948,
+    "sha256": "80a1a08e15364fc2ed5d3f14005ab8fc3a7f7cdba1dbff555c80cb35ebfa9e32"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/01-Contrato/SOW-ENT-8743.pdf",
+    "size": 55071,
+    "sha256": "d54bcc5477753a8aee96372660c2b637f6d1131c9fcc63429873867149aaa7d3"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/01-Contrato/SOW-FIX-8743.pdf",
+    "size": 51246,
+    "sha256": "2a7c0578c4341e547241d6b71bc4257be1f157621f24d1148b485784ece3edb5"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/02-Cotizaciones/COT-2026-8743.pdf",
+    "size": 48023,
+    "sha256": "83b330acc2574dbbc6acae8b47d51dc7782b7e43e18cbbbcd4f9aaeff1628fc1"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/03-Expediente-General/PROP-2026-8743.pdf",
+    "size": 47673,
+    "sha256": "19cc95bc3283f8776bea9f2cc16d8d5f57f9554ee5d17214e7fb131be67cff40"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/04-Ordenes-de-Trabajo/OT-2026-8743.pdf",
+    "size": 48917,
+    "sha256": "956ab961581cdd1dcdc492e3f69ea45e0c48b7cb58ada19fab1d6675a10ae7cb"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/05-Atenciones-Tecnicas/AT-2026-8743.pdf",
+    "size": 48171,
+    "sha256": "8cdd5fcd81474cf71f80c30d618306621294ee0c65355c2458382737a2a8c886"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/05-Atenciones-Tecnicas/SRV-2026-8743.pdf",
+    "size": 49984,
+    "sha256": "f1b39ce3fcd871e147aa72ccc44615521bbfe628a94ebb40a90ce14766560bbf"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/06-Recepciones-Conformes/RC-2026-8743-FIRMADO.pdf",
+    "size": 34,
+    "sha256": "66c7a935d19b5828bb563c709e457e2d032113486787b65dabf5acdc6b4c314c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000004/06-Recepciones-Conformes/RC-2026-8743.pdf",
+    "size": 51114,
+    "sha256": "06e70d09bbec17ebc334bd15c8fa662f8e53e5ce6050464a34ada10a8c1e5c31"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/01-Contrato/SOW-2026-000007.pdf",
+    "size": 129956,
+    "sha256": "666abe03bdd2b1d0f1fa9d8cfbf74521c4855ecd38560ab4c6ed2b54e5975f32"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/01-Contrato/SOW-BANK-9708.pdf",
+    "size": 70339,
+    "sha256": "941127e12b0ed3ac78688103998ec4db5c61bc5c2b8ec11026ea926bba626fc3"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/01-Contrato/SOW-ENT-9708.pdf",
+    "size": 75560,
+    "sha256": "444d39931765d6583e3f4e2365fa8947fc6ba2d7ae4867b4d432b3d5b0ea3081"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/01-Contrato/SOW-FIX-9708.pdf",
+    "size": 70511,
+    "sha256": "33c7d8b3900a1de3c2aa54757970a95bf08264d70e0f887e68824fa29054e207"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/02-Cotizaciones/COT-2026-9708.pdf",
+    "size": 81348,
+    "sha256": "a8a9caad2c6829aa497de8c8fc85b2c383ff4e0669c9d037bfa58f8b765f0db5"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/03-Expediente-General/PROP-2026-9708.pdf",
+    "size": 68498,
+    "sha256": "223d586f5e24f801d2faa06d286b33c53b46c6c5c5f2a14e3fb214033e596fae"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/04-Ordenes-de-Trabajo/OT-2026-9708.pdf",
+    "size": 69318,
+    "sha256": "1d3642c863f356c07dc9eadbf81a8a677911176c7213e24233ae997600510a59"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/05-Atenciones-Tecnicas/AT-2026-9708.pdf",
+    "size": 70739,
+    "sha256": "cfa0d0b64ad14a69d8800e1492b824318da3ab11157fbdfa1b078a2a5c517294"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/05-Atenciones-Tecnicas/SRV-2026-9708.pdf",
+    "size": 70907,
+    "sha256": "69f1d31d75d57cfbf62e46cad281f32ec37200d7df686e9b760ed807be152463"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/06-Recepciones-Conformes/RC-2026-9708-FIRMADO.pdf",
+    "size": 34,
+    "sha256": "66c7a935d19b5828bb563c709e457e2d032113486787b65dabf5acdc6b4c314c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000005/06-Recepciones-Conformes/RC-2026-9708.pdf",
+    "size": 71493,
+    "sha256": "2ceaf33519dcb9422d39cb9c164ab306df45e28ec07b82122b56e9129b7d3727"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/01-Contrato/SOW-2026-000008.pdf",
+    "size": 130449,
+    "sha256": "c33d45e307d6abb46daa8e42e5cf557c5db8b2881c384c95bdd857705a6f233e"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/01-Contrato/SOW-BANK-5278.pdf",
+    "size": 70339,
+    "sha256": "aa9c6c311c70d37157732d55622b941eb0d82c2aa9bc04641ca08bb8516ad885"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/01-Contrato/SOW-ENT-5278.pdf",
+    "size": 75560,
+    "sha256": "3e212a5349bc817f7d36e6e578e466ca6be4e5b5d50512c1b7cfb1f20f029240"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/01-Contrato/SOW-FIX-5278.pdf",
+    "size": 70511,
+    "sha256": "41289d10636e95436d211da80f4ce7723c01865e64fda57a82d0beb5ed74990c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/02-Cotizaciones/COT-2026-5278.pdf",
+    "size": 81348,
+    "sha256": "901f7c159e47659002c14ea52ad570dc8cd323db375e0d960cab7e19f776e135"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/03-Expediente-General/PROP-2026-5278.pdf",
+    "size": 68498,
+    "sha256": "2931e09cb27ea22364efadcd594d1d7ae367eb76b120b60163e51e4115973900"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/04-Ordenes-de-Trabajo/OT-2026-5278.pdf",
+    "size": 69318,
+    "sha256": "4d663a62638d039adef6fe7e10a9be84880ad654dec7bfceabfae3386fba1f8c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/05-Atenciones-Tecnicas/AT-2026-5278.pdf",
+    "size": 70739,
+    "sha256": "7cf2c035946ee9cbd037020e962b60d206fd28ba89faf48ada93a7f6f31cbddf"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/05-Atenciones-Tecnicas/SRV-2026-5278.pdf",
+    "size": 70907,
+    "sha256": "7d45588ed4470c533f135d35a6c08cdad679b201dce4e24390534f28e12e799a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/06-Recepciones-Conformes/RC-2026-5278-FIRMADO.pdf",
+    "size": 34,
+    "sha256": "66c7a935d19b5828bb563c709e457e2d032113486787b65dabf5acdc6b4c314c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000006/06-Recepciones-Conformes/RC-2026-5278.pdf",
+    "size": 71493,
+    "sha256": "aa82e106c9774a56bd13a2cd4e611ad0d072a64034adca339f2f3c512059c8ad"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/01-Contrato/SOW-2026-000010.pdf",
+    "size": 127564,
+    "sha256": "af3844ff8207133a8696db7bbf7b7820a0e232668729508c77a57d7fc6ebc1c0"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/01-Contrato/SOW-BANK-8019.pdf",
+    "size": 70418,
+    "sha256": "332279a6e16f1feb2cb65fcfe09a80840b95e80f8bfffcc30615c1d0aeb2f931"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/01-Contrato/SOW-ENT-8019.pdf",
+    "size": 76055,
+    "sha256": "cf4ed1b5236341957d43da54e3c7537da2594189f6b250cb3f5e9c1b45df8096"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/01-Contrato/SOW-FIX-8019.pdf",
+    "size": 61503,
+    "sha256": "22ec24d0f89d9985c912ec352584f6d4cc952a02e47d7a538e0bafd220cc6327"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/02-Cotizaciones/COT-2026-8019.pdf",
+    "size": 74920,
+    "sha256": "2eea27c64516c270cb0c4b0aa3ee3a66518f45cc5ffaec1730f0a037dfead9e8"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/03-Expediente-General/PROP-2026-8019.pdf",
+    "size": 69251,
+    "sha256": "2a6d58f59f5d9b75fc33da0d4ba50a9d2b6df4c7f032f7156fc22ea834844009"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/04-Ordenes-de-Trabajo/OT-2026-8019.pdf",
+    "size": 65897,
+    "sha256": "8e30384ceac5d88e84e6d12592af086918065f026c8d6af84a931549d9a889f9"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/05-Atenciones-Tecnicas/AT-2026-8019.pdf",
+    "size": 67672,
+    "sha256": "eb11eced05ee5f33ef4ac7d87a8628637f50db9adf10f010baf4a88850c638b8"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/05-Atenciones-Tecnicas/SRV-2026-8019.pdf",
+    "size": 71207,
+    "sha256": "93f4848f3782411cb63e6ff74a31a78aa039574b5e453d2b1a22b2c2d4bfaf4b"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/06-Recepciones-Conformes/RC-2026-8019-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000009/06-Recepciones-Conformes/RC-2026-8019.pdf",
+    "size": 72086,
+    "sha256": "234432c371cfcb38722a8335bebb78282415b05b03a4fb4419c02b4910e43a7c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/01-Contrato/SOW-2026-000011.pdf",
+    "size": 127573,
+    "sha256": "b0260946fe3491f646267c7128347df776b361e12827547e4146caaea15a5fdb"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/01-Contrato/SOW-BANK-1066.pdf",
+    "size": 70418,
+    "sha256": "c34931a0432b934130c0c934ae2101921067ddcb9569b13f07fa754fd5437adc"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/01-Contrato/SOW-ENT-1066.pdf",
+    "size": 76055,
+    "sha256": "86413d66708522a1589f05eadb0f26230135c8b63b99903157ec54d1a4f34b35"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/01-Contrato/SOW-FIX-1066.pdf",
+    "size": 61503,
+    "sha256": "2ed9c8d29e75ddb1bab4c3acbe7c86ac8ae9b02f576f5522e29dad95ea5dd2b8"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/02-Cotizaciones/COT-2026-1066.pdf",
+    "size": 74920,
+    "sha256": "c207e1339df6ea4eec565396a92d2d37dabc00aa6981c621a75044cb69380bbb"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/03-Expediente-General/PROP-2026-1066.pdf",
+    "size": 69251,
+    "sha256": "0217a6286a770b101b59324984a0d0b75bb77615604a301e166f5284d13384d5"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/04-Ordenes-de-Trabajo/OT-2026-1066.pdf",
+    "size": 65897,
+    "sha256": "b0bfe3b181d6485009a54f18cb223189718f10762fbd5523b096155ad6fd58da"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/05-Atenciones-Tecnicas/AT-2026-1066.pdf",
+    "size": 67672,
+    "sha256": "effc7c84e9d20a1631c412acfe51f5eb80e2bab6340ca36487aeb93622707464"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/05-Atenciones-Tecnicas/SRV-2026-1066.pdf",
+    "size": 71207,
+    "sha256": "028a3e39aee3ac9ee6bcc56429ff302232fbb635c256a3679b130126ceb78745"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/06-Recepciones-Conformes/RC-2026-1066-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000010/06-Recepciones-Conformes/RC-2026-1066.pdf",
+    "size": 72086,
+    "sha256": "1df4c74bac8799d592cb66807c9467216b86aed9ae71ae3a8a4d9720b5452bb4"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/01-Contrato/SOW-2026-000012.pdf",
+    "size": 127564,
+    "sha256": "ac4c47f1c370050cc22f4f93c019f4c3ab4418a77ab72297ac8c173dc94e7b92"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/01-Contrato/SOW-BANK-6680.pdf",
+    "size": 70418,
+    "sha256": "d319ad26cabf49709a50b1c8d1cb4799fdc11ff5ad7bdeda6d0c1dc3d3cbd96a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/01-Contrato/SOW-ENT-6680.pdf",
+    "size": 76055,
+    "sha256": "ccd2075724f5fb3e5f1f0fff8e82f9ca72af8efa7cf2604fd49795159eb6de63"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/01-Contrato/SOW-FIX-6680.pdf",
+    "size": 61503,
+    "sha256": "eb437c2f46c5307ab57bfa032559df03e8e34862864a12e9ae977e1ac60d8595"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/02-Cotizaciones/COT-2026-6680.pdf",
+    "size": 74920,
+    "sha256": "5801ef05e6274cb2aa285644cda43c4ff06b37c2f9fc84c5254932400d5b8340"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/03-Expediente-General/PROP-2026-6680.pdf",
+    "size": 69251,
+    "sha256": "ae2df83e492a574edb58ac20810edc15934c49da1fe995a4ec21bff624dfc29d"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/04-Ordenes-de-Trabajo/OT-2026-6680.pdf",
+    "size": 65897,
+    "sha256": "96edfb8ebb94f9c9702bb6008b5bb05f649ec340ad4b33fe1f94741a9bdf1b5a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/05-Atenciones-Tecnicas/AT-2026-6680.pdf",
+    "size": 67672,
+    "sha256": "b897846dbab847f839a514efc9f4fbf51f12c0380a5e33a9b7e1e9098b0f8e2c"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/05-Atenciones-Tecnicas/SRV-2026-6680.pdf",
+    "size": 71207,
+    "sha256": "43a3bd8cf37cdc90f790fa227af9e1999a6a2a6e27009ee5804439524fe9cd14"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/06-Recepciones-Conformes/RC-2026-6680-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000011/06-Recepciones-Conformes/RC-2026-6680.pdf",
+    "size": 72086,
+    "sha256": "7960bb0d560d36b823f0143410ba937dd8b509bf952b4ca766675d8a299faba9"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/01-Contrato/SOW-2026-000013.pdf",
+    "size": 127566,
+    "sha256": "82669419b028147fbdca1e9ccc5d2572f03be62740335fa8e91a8f5707d67c01"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/01-Contrato/SOW-BANK-8813.pdf",
+    "size": 70418,
+    "sha256": "2d107b84a6167c7a95d790c5fd566d4d7f91d8e486884f41d84d44b02658d99a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/01-Contrato/SOW-ENT-8813.pdf",
+    "size": 76055,
+    "sha256": "7819d81c39535e705650e5e3d57124d40d80dcbf2c4a2a6d250664ea5050bacc"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/01-Contrato/SOW-FIX-8813.pdf",
+    "size": 61503,
+    "sha256": "e6ac401748773a363dbad3f6933aae79c91197236d4474994a57b1d15acb3bdd"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/02-Cotizaciones/COT-2026-8813.pdf",
+    "size": 74920,
+    "sha256": "be9c598bfc2335eef27e7db6dcc11689a9c1d71e284a577f44b92ed47746cc29"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/03-Expediente-General/PROP-2026-8813.pdf",
+    "size": 69251,
+    "sha256": "89fe0e1cdc6695068a95d1e6eaed569aadaf32d41d82fbfc7dfbe42bb9cdd27a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/04-Ordenes-de-Trabajo/OT-2026-8813.pdf",
+    "size": 65897,
+    "sha256": "d36c7029b24e9467068c6abbb9e2b7f6a54473cd5775a0364c7380d2495ae57d"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/05-Atenciones-Tecnicas/AT-2026-8813.pdf",
+    "size": 67672,
+    "sha256": "e80178197c3bd5368813c900901bc363704cf1c93b131e5fbac30c9ae996d6a0"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/05-Atenciones-Tecnicas/SRV-2026-8813.pdf",
+    "size": 71207,
+    "sha256": "a9f9b296efb337f051749b4ca39a8493004236c6f9fe17a2b70e597c475bfb5a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/06-Recepciones-Conformes/RC-2026-8813-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000012/06-Recepciones-Conformes/RC-2026-8813.pdf",
+    "size": 72086,
+    "sha256": "2f0fa7705731e7a5c724dda19f36b637adad1ed5dacf4e4655d85bb7c13ef872"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/01-Contrato/SOW-2026-000014.pdf",
+    "size": 127564,
+    "sha256": "43687786e7a030fa1aadeeebdfe7f0f0eec914cf994ffaeb81471813d26d5d6b"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/01-Contrato/SOW-BANK-8835.pdf",
+    "size": 70418,
+    "sha256": "c640b8e6c1d7c64e7aa5503abc16c5347c49b57684aa00b69f6c9fce49d72c7a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/01-Contrato/SOW-ENT-8835.pdf",
+    "size": 76055,
+    "sha256": "ebb6099f5db182253a2db3c689b8a93354601c149ffb9acc43f395ec85352027"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/01-Contrato/SOW-FIX-8835.pdf",
+    "size": 61503,
+    "sha256": "d5753010c275792afe26ac795ddf7c4fcd246ce0f235779bbfc69c33d723bdc5"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/02-Cotizaciones/COT-2026-8835.pdf",
+    "size": 74920,
+    "sha256": "20b0a7f26ebc31defe763661ea88b0010314aa4e0bd611b1204cc2648a6d7a88"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/03-Expediente-General/PROP-2026-8835.pdf",
+    "size": 69251,
+    "sha256": "16784510c0285cbe4f8bca49f67c0a0438910bb23d89f3cef0e26a6fc5618223"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/04-Ordenes-de-Trabajo/OT-2026-8835.pdf",
+    "size": 65897,
+    "sha256": "283bdb58d7fd0c33e03715be3b51e142ab2c2b57439b17d9ef1df1dba5f7f791"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/05-Atenciones-Tecnicas/AT-2026-8835.pdf",
+    "size": 67672,
+    "sha256": "f716a880140a1af0a772e4677c5b19b898511f597ad0a817830748092a3a467a"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/05-Atenciones-Tecnicas/SRV-2026-8835.pdf",
+    "size": 71207,
+    "sha256": "ef36cf61e58c3bb3cbe7d8432d61166d2f5ce1d10099ffde3b762bb4af18bfd4"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/06-Recepciones-Conformes/RC-2026-8835-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000013/06-Recepciones-Conformes/RC-2026-8835.pdf",
+    "size": 72086,
+    "sha256": "ce1af690f2609df361719345d7832f11eed523eb439704874305a9452ea963cd"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/01-Contrato/SOW-2026-000015.pdf",
+    "size": 127565,
+    "sha256": "b50d5dfb8495819bd2e6c537f919763f164a3b39a9b048509538854558d4ead5"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/01-Contrato/SOW-BANK-7411.pdf",
+    "size": 70418,
+    "sha256": "94411e535e2d1aa724d76f2a1648cfe9c55ace2172477b21a14764bdc6b025ea"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/01-Contrato/SOW-ENT-7411.pdf",
+    "size": 76055,
+    "sha256": "d43f363b2316bf99e52bdb1a7c0c1505bb0f163f7a33d34373eacd6d7b163fd0"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/01-Contrato/SOW-FIX-7411.pdf",
+    "size": 61503,
+    "sha256": "4938e191d4eba6e0dae5f8b788b02d51bab696f060f196df7a367879b1d69632"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/02-Cotizaciones/COT-2026-7411.pdf",
+    "size": 74920,
+    "sha256": "543909235740a8ef67f6a1cbfdc916f6fb6602cb234aab4539edcde96f83d0f4"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/03-Expediente-General/PROP-2026-7411.pdf",
+    "size": 69251,
+    "sha256": "38eb67a6c950b30570532496f53cde0119ce43d3f79377b21b6627283b49d904"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/04-Ordenes-de-Trabajo/OT-2026-7411.pdf",
+    "size": 65897,
+    "sha256": "bc542b664b12542b9ed82cb92687d699af2acd554f9c6571a50b9543c62bd9ba"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/05-Atenciones-Tecnicas/AT-2026-7411.pdf",
+    "size": 67672,
+    "sha256": "57017ecd7de714876a5cbf10afb594ca7ea75d2d7cfe5ee9a553d77f1c2a22d6"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/05-Atenciones-Tecnicas/SRV-2026-7411.pdf",
+    "size": 71207,
+    "sha256": "44b242e39fbf0cfd50481691206ec8c9ea6546c2c455bdb52f175f7b4fef70cb"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/06-Recepciones-Conformes/RC-2026-7411-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000014/06-Recepciones-Conformes/RC-2026-7411.pdf",
+    "size": 72086,
+    "sha256": "961616b54ec1cec6bffc1df23c8e8a37d19dd1fa32e8272171cee4972652daa7"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/01-Contrato/SOW-2026-000016.pdf",
+    "size": 127564,
+    "sha256": "fcfcca82a161a346f44e7934dc88d5ef5016d859651388aad08649889ff51dc7"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/01-Contrato/SOW-BANK-3457.pdf",
+    "size": 70418,
+    "sha256": "45658aff55a2304ee2217574931540c94c3d1ef02b46b931b1c82c072c9c6964"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/01-Contrato/SOW-ENT-3457.pdf",
+    "size": 76055,
+    "sha256": "97bb369b62deb7b371d0c6485c8aaf4c71ee15d5bf7b4ecc409255d4730ebcd9"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/01-Contrato/SOW-FIX-3457.pdf",
+    "size": 61503,
+    "sha256": "fdbd936370aaaa2fea2c341a72e48009a2d9f73718a246c676fef6f4be2774ef"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/02-Cotizaciones/COT-2026-3457.pdf",
+    "size": 74920,
+    "sha256": "045aef3c27a4c08b1d3d4a1a9731e3d6a45b6babbc607e15c9dfe4e2d5233a7f"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/03-Expediente-General/PROP-2026-3457.pdf",
+    "size": 69251,
+    "sha256": "ce5776e6c4cbf0024beac684e9f343165d7c55d8963f74c62d123dc646ed5210"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/04-Ordenes-de-Trabajo/OT-2026-3457.pdf",
+    "size": 65897,
+    "sha256": "3464eb3540c128de7ddf9c7583bfb000426a628488d662990b3cd3b6e96f25cf"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/05-Atenciones-Tecnicas/AT-2026-3457.pdf",
+    "size": 67672,
+    "sha256": "7129f213533102241bfbb33c85697ef85c16eddfed0cda7c61fd08bdac8c804e"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/05-Atenciones-Tecnicas/SRV-2026-3457.pdf",
+    "size": 71207,
+    "sha256": "1ca8e0bcf7907ed3367e7e66e6e3d56c931f59ae31a770792cb4cc2066395bdb"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/06-Recepciones-Conformes/RC-2026-3457-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000015/06-Recepciones-Conformes/RC-2026-3457.pdf",
+    "size": 72086,
+    "sha256": "4ee114bc1e2ee19011f897d7aa9befe9a98b70ab8eab4926e92c0e3c9a06e5ee"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/01-Contrato/SOW-2026-000017.pdf",
+    "size": 127564,
+    "sha256": "0525ae6cef5148e4d2068635a47a0e4241b1b647e2765ab9fb3a2dcae655a2a4"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/01-Contrato/SOW-BANK-4259.pdf",
+    "size": 70418,
+    "sha256": "c13388c8b10b25737603994bc3cd6c4888268006f4fb784ff3f92e8750083f9e"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/01-Contrato/SOW-ENT-4259.pdf",
+    "size": 76055,
+    "sha256": "4f2758a737135939e47f225375884f5d50e17cd1075429161a992899f8f7e3d7"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/01-Contrato/SOW-FIX-4259.pdf",
+    "size": 61503,
+    "sha256": "04c326115bbc3001a19316004eb45a26185c1e0d07fe9cc44f0daa0d122df080"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/02-Cotizaciones/COT-2026-4259.pdf",
+    "size": 74920,
+    "sha256": "9234e1df058a45f82659bbe82910c4df3c0422e4c0aa1cf806642c897e18c6dc"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/03-Expediente-General/PROP-2026-4259.pdf",
+    "size": 69251,
+    "sha256": "f77ae987cbc495630cbb5b1ff4db304da981467828ae6977d530faa1af05d210"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/04-Ordenes-de-Trabajo/OT-2026-4259.pdf",
+    "size": 65897,
+    "sha256": "467f1335477ede3a5c396bd08ce8a003309179cb72ce1cf48c268775ab8e28fc"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/05-Atenciones-Tecnicas/AT-2026-4259.pdf",
+    "size": 67672,
+    "sha256": "c6bb13a471174dca58c85fd2e13593a19e1fe43c82db8159577d87fa754748f1"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/05-Atenciones-Tecnicas/SRV-2026-4259.pdf",
+    "size": 71207,
+    "sha256": "60190949828a952a8fb0b16795e633edb48616d45f991336bddeb15393b98344"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/06-Recepciones-Conformes/RC-2026-4259-FIRMADO.pdf",
+    "size": 30,
+    "sha256": "2a0e8d641c697125771ba580cd22863d1f59da9b17589ba426fb3b1414a355ac"
+  },
+  {
+    "relativePath": "2026/EXP-2026-000016/06-Recepciones-Conformes/RC-2026-4259.pdf",
+    "size": 72086,
+    "sha256": "82fd0bdfc1ff9c8f2cbf22ac560401e3bb9f2f2ffe8381f89b28155a40f97cc0"
+  },
+  {
+    "relativePath": "2026/GENERAL/contract/SOW-2026-000005.pdf",
+    "size": 143513,
+    "sha256": "24aed500f337a41c561766223641c080bdae5ac7579cd362d20d29f31555dd65"
+  },
+  {
+    "relativePath": "EXP-2026-000004-BUNDLE.zip",
+    "size": 527396,
+    "sha256": "72820be032817bdbbe62c6ba1597551e78b0b5791c347885725d8774d5323850"
+  },
+  {
+    "relativePath": "EXP-2026-000005-BUNDLE.zip",
+    "size": 722219,
+    "sha256": "1837f5d9335f009b8b36fb70644799ad548e1f7c564c962262e99eee854bdf02"
+  },
+  {
+    "relativePath": "EXP-2026-000006-BUNDLE.zip",
+    "size": 722788,
+    "sha256": "939492ffbd6c28c54d98a97e2a49173826b259f24415e639d0aea4caaf485d48"
+  }
+]
