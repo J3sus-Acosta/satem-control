@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Base de datos MySQL 8.0
+  satem-control-db:
+    image: mysql:8.0
+    container_name: satem-control-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-satem_root_password_2026}
+      MYSQL_DATABASE: ${DB_NAME:-satem_control_db}
+      MYSQL_USER: ${DB_USER:-satem_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-satem_pass_2026}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API REST Backend Node.js / Fastify / Prisma
+  satem-control-api:
+    build:
+      context: ./satem-control-api
+      dockerfile: Dockerfile
+    container_name: satem-control-api
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: mysql://${DB_USER:-satem_user}:${DB_PASSWORD:-satem_pass_2026}@satem-control-db:3306/${DB_NAME:-satem_control_db}
+      JWT_SECRET: ${JWT_SECRET:-satem_jwt_prod_secret_2026}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-satem_jwt_refresh_prod_secret_2026}
+      COOKIE_SECRET: ${COOKIE_SECRET:-satem_cookie_prod_secret_2026}
+      STORAGE_PATH: /app/storage
+      FRONTEND_URL: ${FRONTEND_URL:-https://satem-control.yourdomain.com}
+    volumes:
+      - storage_data:/app/storage
+    ports:
+      - "3000:3000"
+    depends_on:
+      satem-control-db:
+        condition: service_healthy
+
+  # Frontend Web React / Vite / Nginx
+  satem-control-web:
+    build:
+      context: ./satem-control-web
+      dockerfile: Dockerfile
+    container_name: satem-control-web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - satem-control-api
+
+volumes:
+  mysql_data:
+  storage_data:

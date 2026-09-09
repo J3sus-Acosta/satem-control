@@ -1,0 +1,1030 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  OPERATIONS
+  ACCOUNTING
+  TECHNICIAN
+  VIEWER
+}
+
+enum ContactType {
+  TECHNICAL
+  ADMINISTRATIVE
+  FINANCIAL
+  MANAGER
+  OTHER
+}
+
+enum ContractType {
+  HOURLY
+  PER_ATTENTION
+  ATTENTION_PACKAGE
+  FIXED_PERIOD
+  RETAINER
+  OTHER
+}
+
+enum ContractModality {
+  ONE_TIME
+  RECURRING
+  OPEN_ENDED
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  EXHAUSTED
+  SUSPENDED
+  CANCELLED
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ExpedientStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+  CLOSED_WITH_EXCEPTION
+  CANCELLED
+}
+
+enum ExpedientOrigin {
+  QUOTE
+  CONTRACT
+  DIRECT_REQUEST
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  AUTHORIZED
+  ASSIGNED
+  IN_PROGRESS
+  EXECUTED
+  PENDING_CONFORMITY
+  CONFORMED
+  CLOSED
+  CANCELLED
+}
+
+enum AttentionStatus {
+  REGISTERED
+  IN_PROGRESS
+  COMPLETED
+  REVIEWED
+  CANCELLED
+}
+
+enum TaxTreatment {
+  EXPORT_SERVICE
+  VAT_APPLIED
+  VAT_EXEMPT
+  NON_TAXABLE
+  NO_INVOICE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+  VOIDED
+}
+
+enum PaymentRequestStatus {
+  PENDING
+  LINK_GENERATED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  REGISTERED
+  CONFIRMED
+  ALLOCATED
+  PARTIALLY_ALLOCATED
+  CANCELLED
+}
+
+enum ReconciliationStatus {
+  UNRECONCILED
+  PARTIALLY_RECONCILED
+  RECONCILED
+  DISCREPANCY
+}
+
+enum ExceptionSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum ExceptionStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum IntegrityStatus {
+  COMPLETED
+  PENDING
+  UNFULFILLED
+  NOT_APPLICABLE
+}
+
+enum DocumentCategory {
+  CONTRACT
+  SOW
+  QUOTATION
+  WORK_ORDER
+  ATTENTION
+  RECEPTION
+  INVOICE
+  SUMUP_PROOF
+  PAYMENT_PROOF
+  BANK_RECEIPT
+  EVIDENCE
+  REPORT
+  OTHER
+}
+
+enum TemplateCategory {
+  CONTRACT
+  QUOTATION
+  WORK_ORDER
+  ATTENTION_REPORT
+  RECEPTION_CONFORMITY
+  SERVICE_REPORT
+  COMMERCIAL_PROPOSAL
+}
+
+enum DocumentInstanceStatus {
+  DRAFT
+  GENERATED
+  SENT
+  PENDING_SIGNATURE
+  SIGNED
+  RECEIVED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  CANCELLED
+}
+
+// ----------------------------------------------------
+// IDENTIDAD CORPORATIVA SATEM SPA
+// ----------------------------------------------------
+
+model CompanyConfig {
+  id                       String   @id @default("DEFAULT")
+  legalName                String   @default("SATEM Soluciones Inteligentes SpA")
+  taxId                    String   @default("77.654.321-K")
+  address                  String   @default("Av. Providencia 1234, Of. 601, Santiago")
+  city                     String   @default("Santiago")
+  country                  String   @default("Chile")
+  email                    String   @default("contacto@satem.cl")
+  phone                    String   @default("+56 2 2999 8888")
+  website                  String   @default("https://www.satem.cl")
+  logoFullUrl              String?  @db.LongText
+  logoShortUrl             String?  @db.LongText
+  signatureUrl             String?  @db.LongText
+  legalRepresentative      String   @default("Representante Legal SATEM")
+  legalRepresentativeTitle String   @default("Gerente General")
+  updatedAt                DateTime @updatedAt
+
+  @@map("company_config")
+}
+
+// ----------------------------------------------------
+// MOTOR DE PLANTILLAS DOCUMENTALES
+// ----------------------------------------------------
+
+model DocumentTemplate {
+  id             String           @id @default(uuid())
+  code           String           @unique @db.VarChar(50)
+  name           String
+  description    String?          @db.Text
+  category       TemplateCategory
+  language       String           @default("ES/EN") @db.VarChar(10)
+  isActive       Boolean          @default(true)
+  currentVersion Int              @default(1)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  versions  DocumentTemplateVersion[]
+  instances DocumentInstance[]
+
+  @@map("document_templates")
+}
+
+model DocumentTemplateVersion {
+  id              String   @id @default(uuid())
+  templateId      String
+  versionNumber   Int
+  title           String
+  htmlTemplate    String   @db.LongText
+  cssStyles       String?  @db.LongText
+  fieldsSchema    Json?
+  variablesSchema Json?
+  headerHtml      String?  @db.Text
+  footerHtml      String?  @db.Text
+  changeReason    String   @db.Text
+  isPublished     Boolean  @default(false)
+  publishedAt     DateTime?
+  publishedById   String?
+  createdAt       DateTime @default(now())
+
+  template  DocumentTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  instances DocumentInstance[]
+
+  @@unique([templateId, versionNumber])
+  @@map("document_template_versions")
+}
+
+// ----------------------------------------------------
+// INSTANCIAS DOCUMENTALES E INMUTABILIDAD
+// ----------------------------------------------------
+
+model DocumentInstance {
+  id                   String                 @id @default(uuid())
+  documentNumber       String                 @unique @db.VarChar(60)
+  category             TemplateCategory
+  templateId           String
+  templateVersionId    String
+  customerId           String?
+  contractId           String?
+  quotationId          String?
+  expedientId          String?
+  workOrderId          String?
+  attentionId          String?
+  receptionConformityId String?
+  status               DocumentInstanceStatus @default(GENERATED)
+
+  dataSnapshot         Json
+  generatedHtml        String                 @db.LongText
+  generatedPdfPath     String                 @db.VarChar(500)
+  generatedPdfHash     String                 @db.VarChar(64)
+
+  signedPdfPath        String?                @db.VarChar(500)
+  signedPdfHash        String?                @db.VarChar(64)
+  signedAt             DateTime?
+  signedUploadedById   String?
+
+  generatedById        String
+  generatedAt          DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  template        DocumentTemplate        @relation(fields: [templateId], references: [id])
+  templateVersion DocumentTemplateVersion @relation(fields: [templateVersionId], references: [id])
+  customer        Customer?               @relation(fields: [customerId], references: [id])
+  contract        Contract?               @relation(fields: [contractId], references: [id])
+  quotation       Quotation?              @relation(fields: [quotationId], references: [id])
+  expedient       Expedient?              @relation(fields: [expedientId], references: [id])
+
+  @@map("document_instances")
+}
+
+// ----------------------------------------------------
+// USUARIOS, ROLES Y AUDITORÍA
+// ----------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         UserRole  @default(OPERATIONS)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  sessions           UserSession[]
+  auditLogs          AuditLog[]
+  attentions         AttentionTechnician[]
+  resolvedExceptions SystemException[]     @relation("ExceptionResolver")
+  closedExpedients   Expedient[]           @relation("ExpedientCloser")
+  documentsUploaded  Document[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id           String    @id @default(uuid())
+  userId       String
+  refreshToken String    @unique @db.VarChar(500)
+  ipAddress    String?
+  userAgent    String?   @db.Text
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String   @db.VarChar(100)
+  entity     String   @db.VarChar(100)
+  entityId   String   @db.VarChar(100)
+  beforeData Json?
+  afterData  Json?
+  ipAddress  String?
+  userAgent  String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ----------------------------------------------------
+// CLIENTES Y PAÍSES
+// ----------------------------------------------------
+
+model Country {
+  code      String     @id @db.VarChar(3)
+  name      String
+  customers Customer[]
+
+  @@map("countries")
+}
+
+model Customer {
+  id              String    @id @default(uuid())
+  code            String    @unique @db.VarChar(20)
+  legalName       String
+  tradeName       String?
+  taxId           String
+  countryCode     String    @db.VarChar(3)
+  address         String?   @db.Text
+  city            String?
+  postalCode      String?
+  phone           String?
+  email           String?
+  defaultCurrency String    @default("USD") @db.VarChar(3)
+  isActive        Boolean   @default(true)
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  country           Country            @relation(fields: [countryCode], references: [code])
+  entities          CustomerEntity[]
+  contacts          CustomerContact[]
+  contracts         Contract[]
+  quotations        Quotation[]
+  expedients        Expedient[]
+  documentInstances DocumentInstance[]
+
+  @@map("customers")
+}
+
+model CustomerEntity {
+  id         String   @id @default(uuid())
+  customerId String
+  name       String
+  taxId      String?
+  address    String?  @db.Text
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  contracts  Contract[]
+  expedients Expedient[]
+
+  @@map("customer_entities")
+}
+
+model CustomerContact {
+  id          String      @id @default(uuid())
+  customerId  String
+  name        String
+  title       String?
+  email       String
+  phone       String?
+  contactType ContactType @default(TECHNICAL)
+  isPrimary   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_contacts")
+}
+
+// ----------------------------------------------------
+// CONTRATOS Y VERSIONADO
+// ----------------------------------------------------
+
+model Contract {
+  id                   String           @id @default(uuid())
+  code                 String           @unique @db.VarChar(50)
+  customerId           String
+  customerEntityId     String?
+  type                 ContractType
+  modality             ContractModality
+  title                String
+  description          String?          @db.Text
+  startDate            DateTime
+  endDate              DateTime?
+  currency             String           @db.VarChar(3)
+  totalAmount          Decimal?         @db.Decimal(14, 2)
+  rate                 Decimal?         @db.Decimal(12, 2)
+  contractedHours      Decimal?         @db.Decimal(10, 2)
+  consumedHours        Decimal          @default(0.00) @db.Decimal(10, 2)
+  contractedAttentions Int?
+  consumedAttentions   Int              @default(0)
+  paymentTerms         String?          @db.Text
+  status               ContractStatus   @default(DRAFT)
+  currentVersion       Int              @default(1)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  deletedAt            DateTime?
+
+  customer          Customer           @relation(fields: [customerId], references: [id])
+  customerEntity    CustomerEntity?    @relation(fields: [customerEntityId], references: [id])
+  versions          ContractVersion[]
+  quotations        Quotation[]
+  expedients        Expedient[]
+  attentions        Attention[]
+  documentInstances DocumentInstance[]
+
+  @@map("contracts")
+}
+
+model ContractVersion {
+  id                   String   @id @default(uuid())
+  contractId           String
+  versionNumber        Int
+  title                String
+  description          String?  @db.Text
+  startDate            DateTime
+  endDate              DateTime?
+  totalAmount          Decimal? @db.Decimal(14, 2)
+  rate                 Decimal? @db.Decimal(12, 2)
+  contractedHours      Decimal? @db.Decimal(10, 2)
+  contractedAttentions Int?
+  changeReason         String   @db.Text
+  createdById          String
+  createdAt            DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, versionNumber])
+  @@map("contract_versions")
+}
+
+// ----------------------------------------------------
+// COTIZACIONES Y VERSIONADO
+// ----------------------------------------------------
+
+model Quotation {
+  id             String          @id @default(uuid())
+  code           String          @unique @db.VarChar(50)
+  contractId     String?
+  customerId     String
+  currentVersion Int             @default(1)
+  status         QuotationStatus @default(DRAFT)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+
+  contract          Contract?          @relation(fields: [contractId], references: [id])
+  customer          Customer           @relation(fields: [customerId], references: [id])
+  versions          QuotationVersion[]
+  expedients        Expedient[]
+  documentInstances DocumentInstance[]
+
+  @@map("quotations")
+}
+
+model QuotationVersion {
+  id                 String   @id @default(uuid())
+  quotationId        String
+  versionNumber      Int
+  versionCode        String   @db.VarChar(60)
+  currency           String   @db.VarChar(3)
+  subtotalCalculated Decimal  @db.Decimal(14, 2)
+  vatCalculated      Decimal  @db.Decimal(14, 2)
+  totalCalculated    Decimal  @db.Decimal(14, 2)
+  subtotalFinal      Decimal  @db.Decimal(14, 2)
+  vatFinal           Decimal  @db.Decimal(14, 2)
+  totalFinal         Decimal  @db.Decimal(14, 2)
+  isManualOverride   Boolean  @default(false)
+  overrideReason     String?  @db.Text
+  validUntil         DateTime
+  commercialTerms    String?  @db.Text
+  notes              String?  @db.Text
+  createdById        String
+  createdAt          DateTime @default(now())
+
+  quotation Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  items     QuotationItem[]
+
+  @@unique([quotationId, versionNumber])
+  @@map("quotation_versions")
+}
+
+model QuotationItem {
+  id                 String  @id @default(uuid())
+  quotationVersionId String
+  itemOrder          Int
+  description        String  @db.Text
+  quantity           Decimal @db.Decimal(10, 2)
+  unitPrice          Decimal @db.Decimal(14, 2)
+  discount           Decimal @default(0.00) @db.Decimal(14, 2)
+  subtotal           Decimal @db.Decimal(14, 2)
+
+  version QuotationVersion @relation(fields: [quotationVersionId], references: [id], onDelete: Cascade)
+
+  @@map("quotation_items")
+}
+
+// ----------------------------------------------------
+// EXPEDIENTE Y OPERACIONES
+// ----------------------------------------------------
+
+model Expedient {
+  id               String          @id @default(uuid())
+  code             String          @unique @db.VarChar(50)
+  customerId       String
+  customerEntityId String?
+  contractId       String?
+  quotationId      String?
+  origin           ExpedientOrigin @default(DIRECT_REQUEST)
+  title            String
+  description      String?         @db.Text
+  taxTreatment     TaxTreatment    @default(EXPORT_SERVICE)
+  vatRate          Decimal         @default(0.00) @db.Decimal(5, 2)
+  taxJustification String?         @db.Text
+  status           ExpedientStatus @default(DRAFT)
+
+  closedAt          DateTime?
+  closedById        String?
+  closeReason       String?   @db.Text
+  closeHasException Boolean   @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  customer       Customer        @relation(fields: [customerId], references: [id])
+  customerEntity CustomerEntity? @relation(fields: [customerEntityId], references: [id])
+  contract       Contract?       @relation(fields: [contractId], references: [id])
+  quotation      Quotation?      @relation(fields: [quotationId], references: [id])
+  closedBy       User?           @relation("ExpedientCloser", fields: [closedById], references: [id])
+
+  workOrders        WorkOrder[]
+  attentions        Attention[]
+  invoices          Invoice[]
+  integrityItems    ExpedientIntegrityItem[]
+  exceptions        SystemException[]
+  snapshots         ExpedientSnapshot[]
+  documentLinks     DocumentLink[]
+  documentInstances DocumentInstance[]
+
+  @@map("expedients")
+}
+
+// ----------------------------------------------------
+// ORDENES DE TRABAJO, ATENCIONES Y RECEPCIÓN CONFORME
+// ----------------------------------------------------
+
+model ServiceType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String   @unique @db.VarChar(20)
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  attentions Attention[]
+
+  @@map("service_types")
+}
+
+model WorkOrder {
+  id          String          @id @default(uuid())
+  code        String          @unique @db.VarChar(50)
+  expedientId String
+  title       String
+  description String?         @db.Text
+  status      WorkOrderStatus @default(DRAFT)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
+  expedient           Expedient            @relation(fields: [expedientId], references: [id])
+  attentions          Attention[]
+  receptionConformity ReceptionConformity?
+
+  @@map("work_orders")
+}
+
+model Attention {
+  id            String          @id @default(uuid())
+  code          String          @unique @db.VarChar(50)
+  expedientId   String
+  workOrderId   String
+  contractId    String?
+  serviceTypeId String
+  invoiceId     String?
+  attentionDate DateTime
+  startTime     DateTime
+  endTime       DateTime
+  hoursWorked   Decimal         @db.Decimal(6, 2)
+  problem       String          @db.Text
+  workDone      String          @db.Text
+  result        String          @db.Text
+  status        AttentionStatus @default(COMPLETED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  deletedAt     DateTime?
+
+  expedient   Expedient             @relation(fields: [expedientId], references: [id])
+  workOrder   WorkOrder             @relation(fields: [workOrderId], references: [id])
+  contract    Contract?             @relation(fields: [contractId], references: [id])
+  serviceType ServiceType           @relation(fields: [serviceTypeId], references: [id])
+  invoice     Invoice?              @relation(fields: [invoiceId], references: [id])
+  technicians AttentionTechnician[]
+
+  @@map("attentions")
+}
+
+model AttentionTechnician {
+  attentionId String
+  userId      String
+
+  attention Attention @relation(fields: [attentionId], references: [id], onDelete: Cascade)
+  technician User      @relation(fields: [userId], references: [id])
+
+  @@id([attentionId, userId])
+  @@map("attention_technicians")
+}
+
+model ReceptionConformity {
+  id             String   @id @default(uuid())
+  code           String   @unique @db.VarChar(50)
+  workOrderId    String   @unique
+  receptionDate  DateTime
+  acceptedByName String
+  acceptedByRole String?
+  acceptedByEmail String?
+  comments       String?  @db.Text
+  documentId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  document  Document? @relation(fields: [documentId], references: [id])
+
+  @@map("reception_conformities")
+}
+
+// ----------------------------------------------------
+// FACTURAS (EXTERNAS SII) Y TRIBUTACIÓN
+// ----------------------------------------------------
+
+model Invoice {
+  id            String        @id @default(uuid())
+  code          String        @unique @db.VarChar(50)
+  siiFolio      Int
+  siiDocType    Int           @default(110)
+  expedientId   String
+  issueDate     DateTime
+  currency      String        @db.VarChar(3)
+  netAmount     Decimal       @db.Decimal(14, 2)
+  vatAmount     Decimal       @default(0.00) @db.Decimal(14, 2)
+  totalAmount   Decimal       @db.Decimal(14, 2)
+  taxTreatment  TaxTreatment
+  status        InvoiceStatus @default(ISSUED)
+  pdfDocumentId String?
+  xmlDocumentId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  expedient       Expedient        @relation(fields: [expedientId], references: [id])
+  pdfDocument     Document?        @relation("InvoicePdf", fields: [pdfDocumentId], references: [id])
+  xmlDocument     Document?        @relation("InvoiceXml", fields: [xmlDocumentId], references: [id])
+  attentions      Attention[]
+  paymentRequests PaymentRequest[]
+
+  @@map("invoices")
+}
+
+// ----------------------------------------------------
+// SUMUP, CALCULADORA Y SOLICITUD DE PAGO
+// ----------------------------------------------------
+
+model PaymentRequest {
+  id                   String               @id @default(uuid())
+  code                 String               @unique @db.VarChar(50)
+  invoiceId            String
+  requestedAmount      Decimal              @db.Decimal(14, 2)
+  currency             String               @db.VarChar(3)
+  exchangeRate         Decimal              @db.Decimal(12, 4)
+  exchangeRateSource   String               @db.VarChar(100)
+  exchangeRateDate     DateTime
+  targetClpEquivalent  Decimal              @db.Decimal(14, 2)
+  estimatedFeePercent  Decimal              @db.Decimal(5, 2)
+  suggestedClpToCharge Decimal              @db.Decimal(14, 2)
+  finalClpToCharge     Decimal              @db.Decimal(14, 2)
+  isManualOverride     Boolean              @default(false)
+  overrideReason       String?              @db.Text
+  sumupLink            String?              @db.VarChar(500)
+  sumupTransactionId   String?              @db.VarChar(100)
+  feeAmountClp         Decimal?             @db.Decimal(14, 2)
+  netAmountClp         Decimal?             @db.Decimal(14, 2)
+  paymentDate          DateTime?
+  status               PaymentRequestStatus @default(PENDING)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  invoice  Invoice   @relation(fields: [invoiceId], references: [id])
+  payments Payment[]
+
+  @@map("payment_requests")
+}
+
+// ----------------------------------------------------
+// PAGOS Y ASIGNACIONES
+// ----------------------------------------------------
+
+model Payment {
+  id               String        @id @default(uuid())
+  code             String        @unique @db.VarChar(50)
+  paymentRequestId String?
+  paymentDate      DateTime
+  amount           Decimal       @db.Decimal(14, 2)
+  currency         String        @db.VarChar(3)
+  paymentMethod    String        @db.VarChar(50)
+  transactionRef   String?       @db.VarChar(100)
+  proofDocumentId  String?
+  status           PaymentStatus @default(REGISTERED)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+
+  paymentRequest PaymentRequest?     @relation(fields: [paymentRequestId], references: [id])
+  proofDocument  Document?           @relation(fields: [proofDocumentId], references: [id])
+  allocations    PaymentAllocation[]
+
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id              String   @id @default(uuid())
+  paymentId       String
+  allocatedAmount Decimal  @db.Decimal(14, 2)
+  createdAt       DateTime @default(now())
+
+  payment         Payment              @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  reconciliations BankReconciliation[]
+
+  @@map("payment_allocations")
+}
+
+// ----------------------------------------------------
+// CARTOLA SANTANDER Y CONCILIACIÓN BANCARIA
+// ----------------------------------------------------
+
+model BankReceipt {
+  id              String               @id @default(uuid())
+  code            String               @unique @db.VarChar(50)
+  bankName        String               @default("Banco Santander Chile")
+  accountNumber   String               @db.VarChar(50)
+  transactionDate DateTime
+  description     String               @db.Text
+  amountClp       Decimal              @db.Decimal(14, 2)
+  referenceNumber String?              @db.VarChar(100)
+  rawSourceFileId String?
+  status          ReconciliationStatus @default(UNRECONCILED)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  rawSourceFile   Document?            @relation(fields: [rawSourceFileId], references: [id])
+  reconciliations BankReconciliation[]
+
+  @@index([transactionDate, amountClp, referenceNumber])
+  @@map("bank_receipts")
+}
+
+model BankReconciliation {
+  id                   String   @id @default(uuid())
+  bankReceiptId        String
+  paymentAllocationId  String
+  reconciliationDate   DateTime @default(now())
+  expectedAmountClp    Decimal  @db.Decimal(14, 2)
+  receivedAmountClp    Decimal  @db.Decimal(14, 2)
+  discrepancyAmountClp Decimal  @default(0.00) @db.Decimal(14, 2)
+  notes                String?  @db.Text
+  reconciledById       String
+  createdAt            DateTime @default(now())
+
+  bankReceipt       BankReceipt       @relation(fields: [bankReceiptId], references: [id])
+  paymentAllocation PaymentAllocation @relation(fields: [paymentAllocationId], references: [id])
+
+  @@map("bank_reconciliations")
+}
+
+// ----------------------------------------------------
+// INTEGRIDAD Y CHECKLIST
+// ----------------------------------------------------
+
+model ExpedientIntegrityItem {
+  id            String          @id @default(uuid())
+  expedientId   String
+  code          String          @db.VarChar(50)
+  name          String
+  category      String          @db.VarChar(50)
+  isRequired    Boolean         @default(true)
+  status        IntegrityStatus @default(PENDING)
+  entityType    String?         @db.VarChar(50)
+  entityId      String?         @db.VarChar(100)
+  documentId    String?
+  observation   String?         @db.Text
+  completedAt   DateTime?
+  completedById String?
+
+  expedient Expedient @relation(fields: [expedientId], references: [id], onDelete: Cascade)
+  document  Document?  @relation(fields: [documentId], references: [id])
+
+  @@unique([expedientId, code])
+  @@map("expedient_integrity_items")
+}
+
+// ----------------------------------------------------
+// EXCEPCIONES Y CENTRO DE CONTROL
+// ----------------------------------------------------
+
+model SystemException {
+  id             String            @id @default(uuid())
+  expedientId    String?
+  exceptionType  String            @db.VarChar(50)
+  severity       ExceptionSeverity @default(WARNING)
+  title          String
+  description    String            @db.Text
+  entityType     String?           @db.VarChar(50)
+  entityId       String?           @db.VarChar(100)
+  status         ExceptionStatus   @default(OPEN)
+  resolvedAt     DateTime?
+  resolvedById   String?
+  resolutionNote String?           @db.Text
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  expedient  Expedient? @relation(fields: [expedientId], references: [id], onDelete: SetNull)
+  resolvedBy User?      @relation("ExceptionResolver", fields: [resolvedById], references: [id])
+
+  @@index([status, severity])
+  @@map("system_exceptions")
+}
+
+// ----------------------------------------------------
+// ALERTAS Y REGLAS DE ALERTA
+// ----------------------------------------------------
+
+model AlertRule {
+  id               String        @id @default(uuid())
+  code             String        @unique @db.VarChar(50)
+  name             String
+  targetEntity     String        @db.VarChar(50)
+  triggerCondition String        @db.VarChar(100)
+  daysThreshold    Int?
+  percentThreshold Decimal?      @db.Decimal(5, 2)
+  severity         AlertSeverity @default(WARNING)
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@map("alert_rules")
+}
+
+// ----------------------------------------------------
+// SNAPSHOT DE CIERRE DE EXPEDIENTE
+// ----------------------------------------------------
+
+model ExpedientSnapshot {
+  id             String   @id @default(uuid())
+  expedientId    String
+  snapshotData   Json
+  checksumSha256 String   @db.VarChar(64)
+  closedAt       DateTime @default(now())
+  closedById     String
+
+  expedient Expedient @relation(fields: [expedientId], references: [id], onDelete: Cascade)
+
+  @@map("expedient_snapshots")
+}
+
+// ----------------------------------------------------
+// ALMACENAMIENTO DOCUMENTAL DE SEGUNDO NIVEL
+// ----------------------------------------------------
+
+model Document {
+  id           String           @id @default(uuid())
+  originalName String
+  internalName String           @unique
+  mimeType     String           @db.VarChar(100)
+  fileSize     BigInt
+  sha256       String           @db.VarChar(64)
+  storagePath  String           @db.VarChar(500)
+  category     DocumentCategory @default(EVIDENCE)
+  uploadedById String
+  createdAt    DateTime         @default(now())
+
+  uploadedBy User           @relation(fields: [uploadedById], references: [id])
+  links      DocumentLink[]
+
+  receptionConformity ReceptionConformity[]
+  invoicePdf          Invoice[]             @relation("InvoicePdf")
+  invoiceXml          Invoice[]             @relation("InvoiceXml")
+  paymentProof        Payment[]
+  bankReceiptFile     BankReceipt[]
+  integrityItems      ExpedientIntegrityItem[]
+
+  @@map("documents")
+}
+
+model DocumentLink {
+  id          String   @id @default(uuid())
+  documentId  String
+  entityType  String   @db.VarChar(50)
+  entityId    String   @db.VarChar(100)
+  expedientId String?
+  createdAt   DateTime @default(now())
+
+  document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  expedient Expedient? @relation(fields: [expedientId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@map("document_links")
+}
+
+// ----------------------------------------------------
+// CORRELATIVOS Y SECUENCIAS CON LOCKING
+// ----------------------------------------------------
+
+model Sequence {
+  prefix       String @db.VarChar(10)
+  year         Int
+  currentValue Int    @default(0)
+
+  @@id([prefix, year])
+  @@map("sequences")
+}
+
+// ----------------------------------------------------
+// HISTORIAL DE TIPOS DE CAMBIO
+// ----------------------------------------------------
+
+model ExchangeRate {
+  id           String   @id @default(uuid())
+  currencyFrom String   @db.VarChar(3)
+  currencyTo   String   @db.VarChar(3)
+  rate         Decimal  @db.Decimal(12, 4)
+  rateDate     DateTime
+  source       String   @db.VarChar(100)
+  createdAt    DateTime @default(now())
+
+  @@unique([currencyFrom, currencyTo, rateDate, source])
+  @@map("exchange_rates")
+}

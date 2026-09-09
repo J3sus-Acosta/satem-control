@@ -1,0 +1,51 @@
+{
+  "name": "satem-control-api",
+  "version": "1.0.0",
+  "description": "Backend API REST para SATEM Control - Sistema de Control y Trazabilidad Operativa",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc && npx prisma generate",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "keywords": [
+    "satem",
+    "fastify",
+    "prisma",
+    "typescript",
+    "control-operativo"
+  ],
+  "author": "SATEM Soluciones Inteligentes SpA",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cookie": "^9.4.0",
+    "@fastify/cors": "^9.0.1",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/jwt": "^8.0.1",
+    "@fastify/multipart": "^8.3.0",
+    "@prisma/client": "^5.20.0",
+    "archiver": "^7.0.1",
+    "bcryptjs": "^2.4.3",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
+    "puppeteer": "^23.4.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.16.5",
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
