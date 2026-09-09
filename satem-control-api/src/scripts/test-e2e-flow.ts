@@ -71,7 +71,7 @@ async function runE2ETest() {
         code,
         customerId: customer.id,
         contractId: contract.id,
-        origin: ExpedientOrigin.DIRECT,
+        origin: ExpedientOrigin.DIRECT_REQUEST,
         title: 'Implementación y Desarrollo Plataforma SATEM Control',
         taxTreatment: TaxTreatment.EXPORT_SERVICE,
         vatRate: 0.00,
@@ -406,7 +406,7 @@ async function runE2ETest() {
   }
 
   await archive.finalize();
-  await new Promise((resolve) => output.on('close', resolve));
+  await new Promise((resolve) => output.on('close', () => resolve(true)));
 
   console.log(`   ✓ Archivo ZIP Creado: ${zipPath} (${fs.statSync(zipPath).size} bytes)\n`);
 
