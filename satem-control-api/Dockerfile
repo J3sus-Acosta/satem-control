@@ -1,5 +1,6 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache openssl
 COPY package*.json ./
 COPY prisma ./prisma/
 RUN npm ci
@@ -11,8 +12,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Chromium / Puppeteer dependencies for PDF export
-RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+# OpenSSL / Chromium / Puppeteer dependencies for PDF export
+RUN apk add --no-cache openssl chromium nss freetype harfbuzz ca-certificates ttf-freefont
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 COPY package*.json ./
