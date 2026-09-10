@@ -10,8 +10,10 @@ export function getAccessToken() {
   return accessToken;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.satemsoluciones.com';
+
 export const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_URL}/api/v1`,
   withCredentials: true,
 });
 
@@ -35,7 +37,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       try {
-        const res = await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true });
+        const res = await axios.post(`${API_URL}/api/v1/auth/refresh`, {}, { withCredentials: true });
         const newToken = res.data.data.accessToken;
         setAccessToken(newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
