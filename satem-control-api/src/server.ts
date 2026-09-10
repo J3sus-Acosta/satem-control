@@ -63,6 +63,19 @@ export async function buildServer() {
     }
   });
 
+  fastify.get('/api/v1/health', async () => {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  });
+
+  fastify.get('/api/v1/health/ready', async (request, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { status: 'ready', database: 'connected' };
+    } catch (err) {
+      return reply.status(503).send({ status: 'not_ready', database: 'disconnected' });
+    }
+  });
+
   await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
   await fastify.register(usersRoutes, { prefix: '/api/v1/users' });
   await fastify.register(customersRoutes, { prefix: '/api/v1/customers' });
