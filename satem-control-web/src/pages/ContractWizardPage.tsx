@@ -1,13 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { FileSignature, ArrowRight, ArrowLeft, CheckCircle2, Building, DollarSign, Lock } from 'lucide-react';
+import {
+  FileSignature, ArrowRight, ArrowLeft, CheckCircle2,
+  Building, DollarSign, Lock, FolderKanban, Download,
+  Upload, FileText, Eye, Sparkles, Briefcase, Plus,
+} from 'lucide-react';
 
 export const ContractWizardPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [customers, setCustomers] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Estado del resultado exitoso
+  const [generatedResult, setGeneratedResult] = useState<{
+    contract: any;
+    documentInstance: any;
+    expedient: any;
+  } | null>(null);
+
+  // Estado para subida de firmado rápido
+  const [signedFile, setSignedFile] = useState<File | null>(null);
+  const [uploadingSigned, setUploadingSigned] = useState(false);
+  const [signedUploadedSuccess, setSignedUploadedSuccess] = useState(false);
 
   // Form Wizard State
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -19,7 +36,7 @@ export const ContractWizardPage: React.FC = () => {
   const [totalAmount, setTotalAmount] = useState('7500');
   const [currency, setCurrency] = useState('USD');
   const [paymentTerms, setPaymentTerms] = useState('Zelle / SumUp / Wire Transfer en USD');
-  const [exportClause, setExportClause] = useState('Servicio prestado desde Chile y utilizado exclusivamente en el extranjero exento de IVA');
+  const [exportClause] = useState('Servicio prestado desde Chile y utilizado exclusivamente en el extranjero exento de IVA (Art. 12 letra E Nº 7 D.L. 825)');
 
   const navigate = useNavigate();
 
@@ -35,9 +52,13 @@ export const ContractWizardPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+
   const handleGenerateContract = async () => {
+    setSubmitting(true);
     try {
-      // 1. Crear el Contrato en DB
+      // 1. Crear el Contrato en DB (el backend auto-crea el Expediente en la misma transacción)
       const contractRes = await api.post('/contracts', {
         customerId: selectedCustomerId,
         type: contractType,
@@ -46,19 +67,21 @@ export const ContractWizardPage: React.FC = () => {
         description,
         startDate: new Date().toISOString(),
         currency,
-        totalAmount: parseFloat(totalAmount),
-        contractedHours: parseFloat(contractedHours),
+        totalAmount: parseFloat(totalAmount) || 0,
+        contractedHours: parseFloat(contractedHours) || 0,
         paymentTerms,
       });
 
       const createdContract = contractRes.data.data;
+      const createdExpedient = createdContract.expedient;
 
-      // 2. Generar Instancia Documental en PDF / HTML congelado
-      await api.post('/document-instances/generate', {
+      // 2. Generar Instancia Documental en PDF / HTML vinculada al contrato y al expediente
+      const docRes = await api.post('/document-instances/generate', {
         templateId: selectedTemplateId,
         documentNumber: createdContract.code,
         customerId: selectedCustomerId,
         contractId: createdContract.id,
+        expedientId: createdExpedient?.id,
         customVariables: {
           contrato: {
             codigo: createdContract.code,
@@ -73,38 +96,99 @@ export const ContractWizardPage: React.FC = () => {
         },
       });
 
-      alert(`¡Contrato ${createdContract.code} e Instancia Documental PDF generados exitosamente!`);
-      navigate('/customers');
+      const createdDoc = docRes.data.data;
+
+      // 3. Establecer resultado para mostrar la pantalla de éxito con descarga y acciones
+      setGeneratedResult({
+        contract: createdContract,
+        documentInstance: createdDoc,
+        expedient: createdExpedient,
+      });
+      setStep(4);
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Error al generar contrato SOW');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (loading) return <div style={{ color: 'var(--text-secondary)' }}>Cargando wizard de contratos...</div>;
+  const handleDownloadPdf = async (docId?: string) => {
+    const id = docId || generatedResult?.documentInstance?.id;
+    if (!id) return;
+    try {
+      const res = await api.get(`/document-instances/${id}/pdf`, { responseType: 'blob' });
+      const fileBlob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(fileBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${generatedResult?.contract?.code || 'CONTRATO-SOW'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      alert('Error al descargar el PDF');
+    }
+  };
+
+  const handleUploadSigned = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signedFile || !generatedResult?.documentInstance?.id) return;
+    setUploadingSigned(true);
+    const formData = new FormData();
+    formData.append('signedPdf', signedFile);
+    try {
+      await api.post(`/document-instances/${generatedResult.documentInstance.id}/upload-signed`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setSignedUploadedSuccess(true);
+      alert('¡Documento firmado subido y verificado exitosamente!');
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al subir documento firmado');
+    } finally {
+      setUploadingSigned(false);
+    }
+  };
+
+  if (loading) return <div style={{ color: 'var(--text-secondary)', padding: '20px' }}>Cargando wizard de contratos...</div>;
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '850px', margin: '0 auto' }}>
       <div style={{ marginBottom: '24px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '24px', marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
           <FileSignature size={28} color="var(--accent-primary)" /> Wizard de Contrato SOW Bilingüe (ES/EN)
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-          Generador asistido de Declaración de Trabajo (SOW) y Contratos de Exportación de Servicios SATEM.
+          Generador asistido de Declaración de Trabajo (SOW), carga en plantilla oficial y creación automática de expediente.
         </p>
       </div>
 
       {/* Indicador de Pasos */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
-        <div style={{ color: step === 1 ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 'bold' }}>1. Cliente & Plantilla</div>
-        <div style={{ color: step === 2 ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 'bold' }}>2. Alcance & Servicios</div>
-        <div style={{ color: step === 3 ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: 'bold' }}>3. Honorarios & Exportación</div>
+        {[
+          { n: 1, label: '1. Cliente & Plantilla' },
+          { n: 2, label: '2. Alcance & Servicios' },
+          { n: 3, label: '3. Honorarios & Previa' },
+          { n: 4, label: '4. Descarga & Expediente' },
+        ].map(({ n, label }) => (
+          <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: step === n ? 'var(--accent-primary)' : step > n ? 'var(--success)' : 'var(--text-muted)', fontWeight: 'bold', fontSize: '13px' }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '50%',
+              backgroundColor: step === n ? 'var(--accent-primary)' : step > n ? 'var(--success)' : 'var(--border-color)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '13px', fontWeight: 800, color: '#fff',
+            }}>
+              {step > n ? '✓' : n}
+            </div>
+            {label}
+          </div>
+        ))}
       </div>
 
       {/* Paso 1: Cliente & Plantilla */}
       {step === 1 && (
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '28px' }}>
           <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 1: Selección de Cliente Contratante</h3>
-          
+
           <div className="form-group">
             <label className="form-label">Cliente Extranjero</label>
             <select className="form-select" value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} required>
@@ -115,17 +199,42 @@ export const ContractWizardPage: React.FC = () => {
                 </option>
               ))}
             </select>
+            {customers.length === 0 && (
+              <div style={{ fontSize: '12px', color: 'var(--warning)', marginTop: '6px' }}>
+                ⚠ No hay clientes registrados. Ve a{' '}
+                <span
+                  style={{ color: 'var(--accent-primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => navigate('/customers')}
+                >
+                  Clientes & Contratos
+                </span>{' '}
+                para crear uno primero.
+              </div>
+            )}
           </div>
 
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label className="form-label">Plantilla Contractual Oficial</label>
-            <select className="form-select" value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)}>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} (v{t.currentVersion}.0 - {t.language})
-                </option>
-              ))}
-            </select>
+            {templates.length > 0 ? (
+              <select className="form-select" value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)}>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} (v{t.currentVersion}.0 - {t.language})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--warning)' }}>
+                ⚠ Sin plantillas de tipo CONTRACT activas. Ve a{' '}
+                <span
+                  style={{ color: 'var(--accent-primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => navigate('/admin/templates')}
+                >
+                  Plantillas Admin
+                </span>{' '}
+                para configurar una.
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -147,6 +256,15 @@ export const ContractWizardPage: React.FC = () => {
           </div>
 
           <div className="form-group">
+            <label className="form-label">Tipo de Contrato</label>
+            <select className="form-select" value={contractType} onChange={(e) => setContractType(e.target.value)}>
+              <option value="HOURLY">Bolsa de Horas (Hourly)</option>
+              <option value="PER_ATTENTION">Por Atención / Incidencia</option>
+              <option value="FIXED_PERIOD">Período Fijo / Retainer</option>
+            </select>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Descripción Detallada del Alcance</label>
             <textarea className="form-textarea" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} required />
           </div>
@@ -162,14 +280,14 @@ export const ContractWizardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Paso 3: Honorarios & Confirmación */}
+      {/* Paso 3: Honorarios, Resumen & Generación */}
       {step === 3 && (
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '28px' }}>
-          <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 3: Honorarios, Cláusula de Exportación & Firma</h3>
+          <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 3: Honorarios, Condiciones & Confirmación</h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">Horas Contratadas</label>
+              <label className="form-label">Horas / Unidades Contratadas</label>
               <input type="number" className="form-input" value={contractedHours} onChange={(e) => setContractedHours(e.target.value)} required />
             </div>
 
@@ -184,17 +302,122 @@ export const ContractWizardPage: React.FC = () => {
             <input type="text" className="form-input" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} required />
           </div>
 
-          <div style={{ padding: '12px 16px', backgroundColor: '#0f172a', borderLeft: '4px solid var(--accent-primary)', borderRadius: 'var(--radius-sm)', marginBottom: '24px', fontSize: '12px' }}>
-            <strong>🔒 Cláusula de Exención Tributaria Registrada:</strong><br />
-            {exportClause}
+          {/* Resumen previo de datos cargados */}
+          <div style={{ padding: '16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Eye size={16} /> Resumen de Carga en Plantilla SOW:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+              <div><strong>Cliente:</strong> {selectedCustomer?.legalName} ({selectedCustomer?.taxId})</div>
+              <div><strong>País:</strong> {selectedCustomer?.countryCode}</div>
+              <div><strong>Plantilla:</strong> {selectedTemplate?.name || 'SOW Oficial'}</div>
+              <div><strong>Monto:</strong> ${totalAmount} {currency} ({contractedHours} hrs)</div>
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+              🔒 <strong>Cláusula de Exención:</strong> {exportClause}
+            </div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <button onClick={() => setStep(2)} className="btn btn-secondary">
+            <button onClick={() => setStep(2)} className="btn btn-secondary" disabled={submitting}>
               <ArrowLeft size={18} /> Anterior
             </button>
-            <button onClick={handleGenerateContract} className="btn btn-primary">
-              <CheckCircle2 size={18} /> Generar Contrato SOW & PDF
+            <button onClick={handleGenerateContract} className="btn btn-primary" disabled={submitting}>
+              <CheckCircle2 size={18} /> {submitting ? 'Generando SOW y Expediente...' : 'Generar Contrato SOW & Crear Expediente'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Paso 4: Descarga, Expediente y Subida de Firmado */}
+      {step === 4 && generatedResult && (
+        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--success)', borderRadius: 'var(--radius-lg)', padding: '32px', boxShadow: '0 0 40px rgba(16,185,129,0.15)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <CheckCircle2 size={56} color="var(--success)" style={{ margin: '0 auto 12px' }} />
+            <h2 style={{ fontSize: '22px', color: 'var(--success)', marginBottom: '6px' }}>
+              ¡Contrato SOW & Expediente Creados con Éxito!
+            </h2>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', alignItems: 'center' }}>
+              <span className="badge badge-info" style={{ fontSize: '13px' }}>Contrato: {generatedResult.contract.code}</span>
+              <span className="badge badge-success" style={{ fontSize: '13px' }}>Expediente: {generatedResult.expedient?.code || 'EXP-AUTO'}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+            {/* Tarjeta de Descarga y Envío */}
+            <div style={{ backgroundColor: '#0f172a', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+              <h4 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', marginBottom: '10px' }}>
+                <Download size={18} /> 1. Descargar Documento
+              </h4>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                Descarga el SOW generado en PDF con el formato oficial SATEM para revisarlo, firmarlo o enviarlo al cliente.
+              </p>
+              <button
+                onClick={() => handleDownloadPdf()}
+                className="btn btn-primary"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <Download size={18} /> Descargar SOW (PDF)
+              </button>
+            </div>
+
+            {/* Tarjeta de Subida de Firmado (Opcional) */}
+            <div style={{ backgroundColor: '#0f172a', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+              <h4 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--warning)', marginBottom: '10px' }}>
+                <Upload size={18} /> 2. Cargar PDF Firmado (Opcional)
+              </h4>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Si el cliente ya firmó el contrato, sube el PDF firmado. También puedes hacerlo más tarde desde el expediente sin bloquear tus operaciones.
+              </p>
+              {signedUploadedSuccess ? (
+                <div style={{ padding: '10px', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', color: 'var(--success)', fontSize: '12px', textAlign: 'center' }}>
+                  ✓ Documento firmado cargado exitosamente.
+                </div>
+              ) : (
+                <form onSubmit={handleUploadSigned} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setSignedFile(e.target.files?.[0] || null)}
+                    style={{ fontSize: '12px', color: 'var(--text-secondary)' }}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-secondary"
+                    disabled={!signedFile || uploadingSigned}
+                    style={{ fontSize: '12px', justifyContent: 'center' }}
+                  >
+                    <Upload size={14} /> {uploadingSigned ? 'Subiendo...' : 'Subir Firmado'}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+
+          {/* Acciones para continuar el flujo */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={() => navigate('/expedients')}
+              className="btn btn-primary"
+              style={{ padding: '10px 20px', fontSize: '14px' }}
+            >
+              <FolderKanban size={18} /> Ir al Expediente ({generatedResult.expedient?.code})
+            </button>
+
+            <button
+              onClick={() => navigate('/documents/generator')}
+              className="btn btn-secondary"
+              style={{ padding: '10px 20px', fontSize: '14px' }}
+            >
+              <Plus size={18} /> Generar Otro Documento / Propuesta
+            </button>
+
+            <button
+              onClick={() => navigate('/customers')}
+              className="btn btn-secondary"
+              style={{ padding: '10px 20px', fontSize: '14px' }}
+            >
+              <Building size={18} /> Ver Clientes & Contratos
             </button>
           </div>
         </div>
@@ -202,3 +425,4 @@ export const ContractWizardPage: React.FC = () => {
     </div>
   );
 };
+

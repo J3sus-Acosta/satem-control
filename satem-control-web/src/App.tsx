@@ -13,6 +13,7 @@ import { BankPage } from './pages/BankPage';
 import { TemplatesPage } from './pages/admin/TemplatesPage';
 import { TemplateEditorPage } from './pages/admin/TemplateEditorPage';
 import { ContractWizardPage } from './pages/ContractWizardPage';
+import { DocumentGeneratorPage } from './pages/DocumentGeneratorPage';
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ export const App: React.FC = () => {
               <Route path="control-center" element={<ControlCenterPage />} />
               <Route path="expedients" element={<ExpedientsPage />} />
               <Route path="customers" element={<CustomersPage />} />
+              <Route path="documents/generator" element={<DocumentGeneratorPage />} />
               <Route path="billing" element={<BillingPage />} />
               <Route path="bank" element={<BankPage />} />
               <Route path="admin/templates" element={<TemplatesPage />} />

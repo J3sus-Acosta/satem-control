@@ -21,6 +21,7 @@ const generateDocumentSchema = z.object({
   expedientId: z.string().uuid().optional(),
   workOrderId: z.string().uuid().optional(),
   customVariables: z.record(z.any()).optional(),
+  customHtml: z.string().optional(),
 });
 
 export async function listDocumentInstancesHandler(request: FastifyRequest, reply: FastifyReply) {
@@ -71,6 +72,14 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
   }
   if (body.expedientId) {
     expedient = (await prisma.expedient.findUnique({ where: { id: body.expedientId } })) || {};
+  } else if (body.contractId) {
+    const expFound = await prisma.expedient.findFirst({
+      where: { contractId: body.contractId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (expFound) {
+      expedient = expFound;
+    }
   }
 
   const sanitizeCustomVars = { ...(body.customVariables || {}) };
@@ -122,7 +131,9 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
     },
   };
 
-  const compiledHtml = compileTemplate(targetVersion.htmlTemplate, variables);
+  const compiledHtml = body.customHtml && body.customHtml.trim().length > 0
+    ? body.customHtml
+    : compileTemplate(targetVersion.htmlTemplate, variables);
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -165,7 +176,7 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
         customerId: body.customerId || null,
         contractId: body.contractId || null,
         quotationId: body.quotationId || null,
-        expedientId: body.expedientId || null,
+        expedientId: expedient.id || body.expedientId || null,
         workOrderId: body.workOrderId || null,
         status: DocumentInstanceStatus.GENERATED,
         dataSnapshot: JSON.parse(JSON.stringify(variables)),
@@ -175,6 +186,16 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
         generatedById: userId,
       },
     });
+
+    if (expedient.id && template.category === TemplateCategory.CONTRACT) {
+      await tx.expedientIntegrityItem.updateMany({
+        where: {
+          expedientId: expedient.id,
+          code: 'CONTRACT_PRESENT',
+        },
+        data: { status: 'COMPLETED' },
+      });
+    }
 
     await createAuditLog(tx, {
       userId,

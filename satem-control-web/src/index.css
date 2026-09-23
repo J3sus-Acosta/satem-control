@@ -274,3 +274,55 @@ a:hover {
   border-bottom-color: var(--accent-primary);
   color: var(--accent-primary);
 }
+
+/* ——————————————————————————————————
+   Estilos del Flujo Ideal (adiciones)
+   —————————————————————————————————— */
+
+/* Badge neutro para estados DISMISSED, SUPERSEDED, etc. */
+.badge-secondary {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+  border: 1px solid #475569;
+}
+
+/* KPI card clickeable — cursor + feedback hover activo */
+.kpi-card-link {
+  cursor: pointer;
+}
+.kpi-card-link:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+/* Botón deshabilitado */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Form textarea (faltaba) */
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: var(--font-sans);
+}
+
+/* Tabla — última fila sin borde inferior */
+.custom-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Animación fade-in para modales */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Efecto de entrada para el modal de éxito del wizard */
+[style*="position: fixed"] > div {
+  animation: fadeInScale 0.2s ease;
+}
+

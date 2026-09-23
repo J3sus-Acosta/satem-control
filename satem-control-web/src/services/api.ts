@@ -10,7 +10,9 @@ export function getAccessToken() {
   return accessToken;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.satemsoluciones.com';
+const API_URL = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
+  ? import.meta.env.VITE_API_URL
+  : (import.meta.env.DEV ? '' : 'https://api.satemsoluciones.com');
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,

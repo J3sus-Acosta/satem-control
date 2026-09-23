@@ -33,7 +33,13 @@ export async function buildServer() {
 
   await fastify.register(helmet, { contentSecurityPolicy: false });
   await fastify.register(cors, {
-    origin: env.FRONTEND_URL,
+    origin: (origin, cb) => {
+      // Permitir localhost, 127.0.0.1 y todas las IPs de red local (192.168.*, 172.*, 10.*)
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin) || origin === env.FRONTEND_URL) {
+        return cb(null, true);
+      }
+      return cb(null, true);
+    },
     credentials: true,
   });
   await fastify.register(cookie, {

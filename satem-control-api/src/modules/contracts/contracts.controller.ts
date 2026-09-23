@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { Prisma, ContractType, ContractModality, ContractStatus } from '@prisma/client';
+import { Prisma, ContractType, ContractModality, ContractStatus, ExpedientOrigin, ExpedientStatus, TaxTreatment } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { NotFoundError } from '../../common/errors/app-error.js';
 import { generateSequence } from '../../common/utils/sequence.js';
@@ -42,6 +42,7 @@ export async function listContractsHandler(request: FastifyRequest, reply: Fasti
       customer: true,
       customerEntity: true,
       versions: { orderBy: { versionNumber: 'desc' } },
+      expedients: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -95,7 +96,7 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
   const body = createContractSchema.parse(request.body);
   const userId = (request.user as any)?.userId;
 
-  const contract = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const code = await generateSequence(tx, 'SOW');
 
     const created = await tx.contract.create({
@@ -137,6 +138,47 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
       },
     });
 
+    // Auto-crear el Expediente para este Contrato
+    const expCode = await generateSequence(tx, 'EXP');
+    const createdExpedient = await tx.expedient.create({
+      data: {
+        code: expCode,
+        customerId: body.customerId,
+        customerEntityId: body.customerEntityId || null,
+        contractId: created.id,
+        origin: ExpedientOrigin.CONTRACT,
+        title: `Expediente SOW — ${body.title}`,
+        description: body.description || `Expediente generado automáticamente para el contrato ${code}`,
+        taxTreatment: TaxTreatment.EXPORT_SERVICE,
+        vatRate: new Prisma.Decimal(0),
+        status: ExpedientStatus.OPEN,
+      },
+    });
+
+    const baseItems = [
+      { code: 'CUSTOMER_DATA_COMPLETE', name: 'Datos del Cliente completos', category: 'DOCUMENTAL', isRequired: true },
+      { code: 'CONTRACT_PRESENT', name: 'Contrato SOW emitido / cargado', category: 'DOCUMENTAL', isRequired: true },
+      { code: 'WORK_ORDER_PRESENT', name: 'Orden de Trabajo autorizada', category: 'OPERATIONAL', isRequired: true },
+      { code: 'ATTENTION_REGISTERED', name: 'Atención(es) técnica(s) ejecutadas', category: 'OPERATIONAL', isRequired: true },
+      { code: 'RECEPTION_SIGNED', name: 'Recepción Conforme firmada por cliente', category: 'OPERATIONAL', isRequired: true },
+      { code: 'INVOICE_REGISTERED', name: 'Factura SII registrada', category: 'TAX', isRequired: true },
+      { code: 'PAYMENT_PROOF_PRESENT', name: 'Comprobante de pago registrado', category: 'FINANCIAL', isRequired: true },
+      { code: 'RECONCILIATION_COMPLETED', name: 'Conciliación bancaria Santander', category: 'FINANCIAL', isRequired: true },
+    ];
+
+    for (const item of baseItems) {
+      await tx.expedientIntegrityItem.create({
+        data: {
+          expedientId: createdExpedient.id,
+          code: item.code,
+          name: item.name,
+          category: item.category,
+          isRequired: item.isRequired,
+          status: item.code === 'CUSTOMER_DATA_COMPLETE' ? 'COMPLETED' : 'PENDING',
+        },
+      });
+    }
+
     await createAuditLog(tx, {
       userId,
       action: 'CREATE_CONTRACT',
@@ -147,10 +189,20 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
       userAgent: request.headers['user-agent'],
     });
 
-    return created;
+    await createAuditLog(tx, {
+      userId,
+      action: 'CREATE_EXPEDIENT_AUTO',
+      entity: 'Expedient',
+      entityId: createdExpedient.id,
+      afterData: createdExpedient,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    return { ...created, expedient: createdExpedient, expedientId: createdExpedient.id };
   });
 
-  return reply.status(201).send({ success: true, data: contract });
+  return reply.status(201).send({ success: true, data: result });
 }
 
 export async function addContractVersionHandler(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {

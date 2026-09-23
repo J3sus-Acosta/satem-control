@@ -1,20 +1,51 @@
 import React from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Building2,
-  FileSignature,
   FolderKanban,
   FileSpreadsheet,
   Landmark,
   ShieldAlert,
   LogOut,
   User,
-  Calculator,
   FileCode,
-  FileText,
+  ChevronRight,
+  FilePlus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/':                   'Dashboard',
+  '/control-center':    'Centro de Control',
+  '/expedients':        'Expedientes',
+  '/customers':         'Clientes & Contratos',
+  '/contracts/wizard':  'Wizard SOW',
+  '/documents/generator':'Generador de Documentos',
+  '/billing':           'Facturación & SumUp',
+  '/bank':              'Conciliación Bancaria',
+  '/admin/templates':   'Plantillas Documentales',
+};
+
+const BreadcrumbHeader: React.FC = () => {
+  const location = useLocation();
+  const { user } = useAuth();
+  const currentLabel = ROUTE_LABELS[location.pathname] || location.pathname;
+
+  return (
+    <header className="header">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
+        <span style={{ color: 'var(--text-muted)' }}>SATEM Control</span>
+        <ChevronRight size={14} color="var(--text-muted)" />
+        <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{currentLabel}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user?.email}</span>
+        <span className="badge badge-info">{user?.role}</span>
+      </div>
+    </header>
+  );
+};
 
 export const AppLayout: React.FC = () => {
   const { user, logout } = useAuth();
@@ -64,19 +95,19 @@ export const AppLayout: React.FC = () => {
           </NavLink>
 
           <NavLink
-            to="/contracts/wizard"
-            className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ justifyContent: 'flex-start' }}
-          >
-            <FileSignature size={18} /> Generar Contrato SOW
-          </NavLink>
-
-          <NavLink
             to="/customers"
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
             <Building2 size={18} /> Clientes & Contratos
+          </NavLink>
+
+          <NavLink
+            to="/documents/generator"
+            className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ justifyContent: 'flex-start' }}
+          >
+            <FilePlus size={18} /> Generar Documento / Propuesta
           </NavLink>
 
           <NavLink
@@ -124,14 +155,8 @@ export const AppLayout: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <header className="header">
-          <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            SATEM Soluciones Inteligentes SpA — Trazabilidad & Auditoría
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="badge badge-info">{user?.role}</span>
-          </div>
-        </header>
+        <BreadcrumbHeader />
+
 
         <div className="content-body">
           <Outlet />
