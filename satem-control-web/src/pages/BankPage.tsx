@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import {
   Landmark, Upload, CheckCircle2, AlertTriangle,
-  FileCheck, Zap, RefreshCw, Info,
+  FileCheck, Zap, RefreshCw, Info, FileSpreadsheet,
 } from 'lucide-react';
 
 export const BankPage: React.FC = () => {
@@ -47,7 +47,7 @@ export const BankPage: React.FC = () => {
       });
       setPreviewData(res.data.data);
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Error al procesar archivo CSV');
+      alert(err.response?.data?.error?.message || err.response?.data?.message || 'Error al procesar archivo de cartola');
     } finally {
       setImporting(false);
     }
@@ -57,7 +57,7 @@ export const BankPage: React.FC = () => {
     if (!previewData) return;
     try {
       await api.post('/bank/import-confirm', {
-        accountNumber: 'Santander CLP 123456789',
+        accountNumber: previewData.accountNumber || 'Santander CLP 123456789',
         rows: previewData.rows,
       });
       alert('Importación de abonos Santander confirmada exitosamente');
@@ -69,7 +69,7 @@ export const BankPage: React.FC = () => {
     }
   };
 
-  /** MEJ-01: Auto-Match abono ↔ factura SII */
+  /** Auto-Match abono ↔ pago / factura */
   const handleAutoMatch = async () => {
     setMatching(true);
     setMatchResult(null);
@@ -78,13 +78,8 @@ export const BankPage: React.FC = () => {
       setMatchResult(res.data.data);
       fetchReceipts();
     } catch (err: any) {
-      // Si el endpoint aún no existe mostramos mensaje informativo
-      const msg = err.response?.data?.error?.message;
-      if (err.response?.status === 404) {
-        setMatchResult({ notImplemented: true });
-      } else {
-        alert(msg || 'Error al ejecutar auto-match');
-      }
+      const msg = err.response?.data?.error?.message || err.response?.data?.message;
+      alert(msg || 'Error al ejecutar auto-match');
     } finally {
       setMatching(false);
     }
@@ -104,65 +99,68 @@ export const BankPage: React.FC = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Conciliación Bancaria Santander</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-          Importación de cartola bancaria, detección de duplicados y conciliación automática con facturas SII.
-        </p>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid-4" style={{ marginBottom: '24px' }}>
-        <div className="kpi-card">
-          <div className="kpi-title">Total Abonos</div>
-          <div className="kpi-value" style={{ color: 'var(--accent-primary)' }}>{receipts.length}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Registros importados</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-title">Conciliados</div>
-          <div className="kpi-value" style={{ color: 'var(--success)' }}>{reconciledCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Match factura ↔ abono</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-title">Sin Conciliar</div>
-          <div className="kpi-value" style={{ color: 'var(--warning)' }}>{unreconciledCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Pendientes de match</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-title">Descalces</div>
-          <div className="kpi-value" style={{ color: 'var(--danger)' }}>{discrepancyCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Monto no coincide</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-        {/* Subida CSV */}
-        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
-          <h3 style={{ fontSize: '17px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
-            <Upload size={20} /> Importar Cartola Santander (CSV)
-          </h3>
-          <form onSubmit={handlePreviewUpload}>
-            <div className="form-group">
-              <label className="form-label">Seleccionar Archivo CSV de Cartola</label>
-              <input
-                type="file" accept=".csv,.xlsx" className="form-input"
-                onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-                required
-              />
-            </div>
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }} disabled={importing}>
-              {importing ? 'Procesando y validando...' : 'Previsualizar Cartola'}
-            </button>
-          </form>
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Conciliación Bancaria Santander</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+            Importación oficial de cartola bancaria Santander (.pdf, .xlsx, .xls, .csv), detección anti-duplicados y conciliación automática con informes de depósitos SumUp y expedientes.
+          </p>
         </div>
 
-        {/* Auto-Match MEJ-01 */}
+        {/* KPIs */}
+        <div className="grid-4" style={{ marginBottom: '24px' }}>
+          <div className="kpi-card">
+            <div className="kpi-title">Total Abonos</div>
+            <div className="kpi-value" style={{ color: 'var(--accent-primary)' }}>{receipts.length}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Registros importados</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title">Conciliados</div>
+            <div className="kpi-value" style={{ color: 'var(--success)' }}>{reconciledCount}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Match pago ↔ abono</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title">Sin Conciliar</div>
+            <div className="kpi-value" style={{ color: 'var(--warning)' }}>{unreconciledCount}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Pendientes de match</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title">Descalces</div>
+            <div className="kpi-value" style={{ color: 'var(--danger)' }}>{discrepancyCount}</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Monto no coincide</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+          {/* Subida PDF / Excel / CSV */}
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
+            <h3 style={{ fontSize: '17px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
+              <FileSpreadsheet size={20} /> Importar Cartola Santander (PDF / Excel / CSV)
+            </h3>
+            <form onSubmit={handlePreviewUpload}>
+              <div className="form-group">
+                <label className="form-label">Seleccionar Archivo de Cartola Santander (.pdf, .xlsx, .xls o .csv)</label>
+                <input
+                  type="file" accept=".pdf,.xlsx,.xls,.csv" className="form-input"
+                  onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                  required
+                />
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Compatible directamente con el PDF estándar de <strong>Cartolas históricas de Cta.Cte y Líneas de Crédito</strong> de Office Banking Santander y archivos Excel/CSV.
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }} disabled={importing}>
+                {importing ? 'Procesando y validando cartola...' : 'Previsualizar Cartola'}
+              </button>
+            </form>
+          </div>
+
+        {/* Auto-Match */}
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
           <h3 style={{ fontSize: '17px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)' }}>
-            <Zap size={20} /> Auto-Match Abono ↔ Factura SII
+            <Zap size={20} /> Auto-Match Abono Santander ↔ Pagos
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.6 }}>
-            Ejecuta el algoritmo de conciliación automática: compara montos y rangos de fecha (±3 días) entre abonos importados y facturas SII emitidas. Marca como <strong>RECONCILED</strong> los que coinciden exactamente.
+            Ejecuta el algoritmo de conciliación automática: compara referencias bancarias y montos en CLP entre los abonos de la cartola y los comprobantes de pago registrados.
           </p>
 
           <button
@@ -178,20 +176,12 @@ export const BankPage: React.FC = () => {
             )}
           </button>
 
-          {matchResult && !matchResult.notImplemented && (
+          {matchResult && (
             <div style={{ padding: '14px', backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', fontSize: '13px' }}>
-              <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '6px' }}>✓ Auto-Match Completado</div>
+              <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '4px' }}>✓ Proceso de Conciliación Finalizado</div>
               <div style={{ color: 'var(--text-secondary)' }}>
-                Conciliados: <strong style={{ color: 'var(--success)' }}>{matchResult.matched ?? 0}</strong> |
-                Sin match: <strong style={{ color: 'var(--warning)' }}> {matchResult.unmatched ?? 0}</strong> |
-                Descalces: <strong style={{ color: 'var(--danger)' }}> {matchResult.discrepancies ?? 0}</strong>
+                {matchResult.message || `Movimientos conciliados: ${matchResult.reconciledCount}`}
               </div>
-            </div>
-          )}
-          {matchResult?.notImplemented && (
-            <div style={{ padding: '14px', backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid var(--info)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--info)' }}>
-              <Info size={13} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-              Endpoint <code>/bank/auto-match</code> pendiente de implementar en la API. Cuando esté disponible, este botón ejecutará la conciliación automáticamente.
             </div>
           )}
         </div>
@@ -200,19 +190,56 @@ export const BankPage: React.FC = () => {
       {/* Preview anti-duplicados */}
       {previewData && (
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-md)', padding: '24px', marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '17px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)' }}>
-            <FileCheck size={20} /> Previsualización ({previewData.totalRows} filas)
-          </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-            Duplicados detectados: <strong style={{ color: 'var(--warning)' }}>{previewData.duplicateRowsCount}</strong>
-          </p>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button onClick={handleConfirmImport} className="btn btn-primary">
-              Confirmar e Insertar Abonos
-            </button>
-            <button onClick={() => { setPreviewData(null); setFile(null); }} className="btn btn-secondary">
-              Cancelar
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)' }}>
+                <FileCheck size={20} /> Previsualización de Cartola ({previewData.totalRows} movimientos válidos)
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Cuenta detectada: <strong>{previewData.accountNumber}</strong> | Duplicados existentes: <strong style={{ color: previewData.duplicateRowsCount > 0 ? 'var(--warning)' : 'var(--success)' }}>{previewData.duplicateRowsCount}</strong>
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => { setPreviewData(null); setFile(null); }} className="btn btn-secondary">
+                Cancelar
+              </button>
+              <button onClick={handleConfirmImport} className="btn btn-primary">
+                Confirmar e Importar {previewData.totalRows} Abonos
+              </button>
+            </div>
+          </div>
+
+          <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+            <table className="custom-table" style={{ margin: 0 }}>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción / Concepto</th>
+                  <th>N° Documento / Ref</th>
+                  <th>Monto (CLP)</th>
+                  <th>Estado Preview</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewData.rows.map((row: any, idx: number) => (
+                  <tr key={idx} style={{ backgroundColor: row.isPossibleDuplicate ? 'rgba(234,179,8,0.05)' : 'transparent' }}>
+                    <td style={{ fontSize: '13px' }}>{new Date(row.transactionDate).toLocaleDateString('es-CL')}</td>
+                    <td style={{ fontSize: '13px' }}>{row.description}</td>
+                    <td style={{ fontSize: '13px', fontFamily: 'monospace' }}>{row.referenceNumber || '—'}</td>
+                    <td style={{ fontWeight: 'bold', color: row.amountClp >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      ${Math.abs(row.amountClp).toLocaleString('es-CL')} CLP
+                    </td>
+                    <td>
+                      {row.isPossibleDuplicate ? (
+                        <span className="badge badge-warning">Posible Duplicado</span>
+                      ) : (
+                        <span className="badge badge-success">Nuevo</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -221,47 +248,51 @@ export const BankPage: React.FC = () => {
       <div className="table-container">
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Landmark size={18} color="var(--accent-primary)" /> Abonos Santander Registrados
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
-              ({receipts.length} total)
-            </span>
+            <Landmark size={18} color="var(--accent-primary)" /> Registro de Abonos Banco Santander Chile
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({receipts.length} registros)</span>
           </h3>
-          <button onClick={fetchReceipts} className="btn btn-secondary" style={{ padding: '5px 10px', fontSize: '12px', gap: '4px' }}>
-            <RefreshCw size={13} /> Actualizar
+          <button onClick={fetchReceipts} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+            <RefreshCw size={13} style={{ marginRight: '4px' }} /> Actualizar
           </button>
         </div>
 
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando abonos...</div>
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando registros bancarios...</div>
         ) : (
           <>
             <table className="custom-table">
               <thead>
                 <tr>
                   <th>Código</th>
-                  <th>Fecha</th>
-                  <th>Descripción</th>
+                  <th>Fecha Movimiento</th>
+                  <th>Descripción / Concepto</th>
+                  <th>N° Documento / Ref</th>
                   <th>Monto (CLP)</th>
-                  <th>Estado Conciliación</th>
+                  <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedReceipts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
-                      No se han importado abonos bancarios aún.
+                    <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                      <Landmark size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+                      No hay abonos bancarios registrados.
+                      <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                        Usa el formulario superior para importar tu cartola de Banco Santander en Excel (.xlsx) o CSV.
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  pagedReceipts.map((br) => (
-                    <tr key={br.id}>
-                      <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{br.code}</td>
-                      <td>{new Date(br.transactionDate).toLocaleDateString('es-CL')}</td>
-                      <td style={{ fontSize: '13px', maxWidth: '240px' }}>{br.description}</td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>
-                        ${Number(br.amountClp).toLocaleString('es-CL')} CLP
+                  pagedReceipts.map((r) => (
+                    <tr key={r.id}>
+                      <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{r.code}</td>
+                      <td style={{ fontSize: '13px' }}>{new Date(r.transactionDate).toLocaleDateString('es-CL')}</td>
+                      <td style={{ fontSize: '13px' }}>{r.description}</td>
+                      <td style={{ fontSize: '13px', fontFamily: 'monospace' }}>{r.referenceNumber || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                      <td style={{ fontWeight: 'bold', color: Number(r.amountClp) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        ${Math.abs(Number(r.amountClp)).toLocaleString('es-CL')} CLP
                       </td>
-                      <td>{statusBadge(br.status)}</td>
+                      <td>{statusBadge(r.status)}</td>
                     </tr>
                   ))
                 )}

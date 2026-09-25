@@ -10,6 +10,50 @@ const resolveExceptionSchema = z.object({
   resolutionNote: z.string().min(3, 'Nota de resolución requerida'),
 });
 
+const createExceptionSchema = z.object({
+  expedientId: z.string().uuid().optional().nullable(),
+  exceptionType: z.string().default('MANUAL_AUDIT_EXCEPTION'),
+  severity: z.nativeEnum(ExceptionSeverity).default(ExceptionSeverity.WARNING),
+  title: z.string().min(3, 'Título requerido'),
+  description: z.string().min(3, 'Descripción requerida'),
+  entityType: z.string().optional().nullable(),
+  entityId: z.string().optional().nullable(),
+});
+
+export async function createExceptionHandler(request: FastifyRequest, reply: FastifyReply) {
+  const body = createExceptionSchema.parse(request.body);
+  const userId = (request.user as any)?.userId;
+
+  const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const item = await tx.systemException.create({
+      data: {
+        expedientId: body.expedientId || null,
+        exceptionType: body.exceptionType,
+        severity: body.severity,
+        title: body.title,
+        description: body.description,
+        entityType: body.entityType || (body.expedientId ? 'Expedient' : null),
+        entityId: body.entityId || body.expedientId || null,
+        status: ExceptionStatus.OPEN,
+      },
+    });
+
+    await createAuditLog(tx, {
+      userId,
+      action: 'CREATE_EXCEPTION',
+      entity: 'SystemException',
+      entityId: item.id,
+      afterData: item,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    return item;
+  });
+
+  return reply.status(201).send({ success: true, data: created });
+}
+
 export async function listExceptionsHandler(request: FastifyRequest, reply: FastifyReply) {
   const exceptions = await prisma.systemException.findMany({
     include: {

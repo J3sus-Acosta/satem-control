@@ -252,7 +252,17 @@ export async function generateQuotationPdfHandler(
   });
   const page = await browser.newPage();
   await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-  const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+  const pdfBuffer = await page.pdf({
+    format: 'A4',
+    printBackground: true,
+    margin: {
+      top: '18mm',
+      bottom: '18mm',
+      left: '16mm',
+      right: '16mm',
+    },
+    preferCSSPageSize: true,
+  });
   await browser.close();
 
   reply.header('Content-Type', 'application/pdf');

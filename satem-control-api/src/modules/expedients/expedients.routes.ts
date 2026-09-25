@@ -4,6 +4,7 @@ import {
   getExpedientHandler,
   createExpedientHandler,
   closeExpedientHandler,
+  reopenExpedientHandler,
   downloadExpedientBundleHandler,
 } from './expedients.controller.js';
 import { authenticateGuard } from '../../common/middleware/auth-guard.js';
@@ -15,5 +16,6 @@ export async function expedientsRoutes(fastify: FastifyInstance) {
   fastify.get('/:id', getExpedientHandler);
   fastify.post('/', createExpedientHandler);
   fastify.post('/:id/close', closeExpedientHandler);
+  fastify.post('/:id/reopen', reopenExpedientHandler);
   fastify.get('/:id/bundle', downloadExpedientBundleHandler);
 }

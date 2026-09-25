@@ -4,6 +4,12 @@ import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+
+// Soporte global de serialización para BigInt en JSON (ej. Document.fileSize)
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
 import { errorHandler } from './common/middleware/error-handler.js';
@@ -25,6 +31,7 @@ import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { companyRoutes } from './modules/company/company.routes.js';
 import { templatesRoutes } from './modules/templates/templates.routes.js';
 import { documentInstancesRoutes } from './modules/document-instances/document-instances.routes.js';
+import { auditLogsRoutes } from './modules/audit-logs/audit-logs.routes.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -99,6 +106,7 @@ export async function buildServer() {
   await fastify.register(companyRoutes, { prefix: '/api/v1/company' });
   await fastify.register(templatesRoutes, { prefix: '/api/v1/document-templates' });
   await fastify.register(documentInstancesRoutes, { prefix: '/api/v1/document-instances' });
+  await fastify.register(auditLogsRoutes, { prefix: '/api/v1/audit-logs' });
 
   return fastify;
 }

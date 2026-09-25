@@ -33,6 +33,7 @@
     "csv-parse": "^5.5.6",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
+    "pdf-parse": "^2.4.5",
     "puppeteer": "^23.4.0",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
@@ -41,6 +42,7 @@
     "@types/archiver": "^6.0.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.5",
+    "@types/pdf-parse": "^1.1.5",
     "prisma": "^5.20.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"

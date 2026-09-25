@@ -159,7 +159,6 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
       { code: 'CUSTOMER_DATA_COMPLETE', name: 'Datos del Cliente completos', category: 'DOCUMENTAL', isRequired: true },
       { code: 'CONTRACT_PRESENT', name: 'Contrato SOW emitido / cargado', category: 'DOCUMENTAL', isRequired: true },
       { code: 'WORK_ORDER_PRESENT', name: 'Orden de Trabajo autorizada', category: 'OPERATIONAL', isRequired: true },
-      { code: 'ATTENTION_REGISTERED', name: 'Atención(es) técnica(s) ejecutadas', category: 'OPERATIONAL', isRequired: true },
       { code: 'RECEPTION_SIGNED', name: 'Recepción Conforme firmada por cliente', category: 'OPERATIONAL', isRequired: true },
       { code: 'INVOICE_REGISTERED', name: 'Factura SII registrada', category: 'TAX', isRequired: true },
       { code: 'PAYMENT_PROOF_PRESENT', name: 'Comprobante de pago registrado', category: 'FINANCIAL', isRequired: true },

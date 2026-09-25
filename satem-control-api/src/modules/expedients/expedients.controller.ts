@@ -51,8 +51,8 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     include: {
       customer: { include: { country: true } },
       customerEntity: true,
-      contract: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
-      quotation: { include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } },
+      contract: true,
+      quotation: true,
       workOrders: {
         include: {
           attentions: { include: { technicians: { include: { technician: true } }, serviceType: true } },
@@ -68,9 +68,8 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
       },
       integrityItems: { include: { document: true } },
       exceptions: true,
-      snapshots: { orderBy: { closedAt: 'desc' }, take: 1 },
+      snapshots: { select: { id: true, checksumSha256: true, closedAt: true, closedById: true } },
       documentLinks: { include: { document: true } },
-      documentInstances: true,
     },
   });
 
@@ -78,7 +77,104 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     throw new NotFoundError('Expediente no encontrado');
   }
 
-  return reply.send({ success: true, data: expedient });
+  // Buscar todas las instancias vinculadas por expedientId o por contractId/quotationId
+  const orConditions: any[] = [{ expedientId: expedient.id }];
+  if (expedient.contractId) orConditions.push({ contractId: expedient.contractId });
+  if (expedient.quotationId) orConditions.push({ quotationId: expedient.quotationId });
+
+  const docInstances = await prisma.documentInstance.findMany({
+    where: { OR: orConditions },
+    include: { template: true },
+    orderBy: { generatedAt: 'desc' },
+  });
+
+  // Eliminar ítems obsoletos de ATTENTION_REGISTERED si existieran previamente en la base de datos
+  const deletedOld = await prisma.expedientIntegrityItem.deleteMany({
+    where: { expedientId: expedient.id, code: 'ATTENTION_REGISTERED' },
+  });
+
+  // Auto-sincronización de integridad con instancias documentales generadas/firmadas
+  let needsIntegrityReload = deletedOld.count > 0;
+  for (const item of expedient.integrityItems) {
+    if (item.code === 'ATTENTION_REGISTERED') continue;
+    if (item.status === 'PENDING') {
+      if (item.code === 'WORK_ORDER_PRESENT') {
+        const wo = docInstances.find((d) => d.category === 'WORK_ORDER');
+        if (wo || (expedient.workOrders && expedient.workOrders.length > 0)) {
+          const isSigned = wo?.status === 'SIGNED';
+          const docNum = wo?.documentNumber || (expedient.workOrders[0] && expedient.workOrders[0].code) || 'OT';
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'COMPLETED',
+              observation: `Orden de Trabajo autorizada ${isSigned ? 'y firmada por cliente' : 'emitida'} (${docNum})`,
+              completedAt: new Date(),
+            },
+          });
+          needsIntegrityReload = true;
+        }
+      } else if (item.code === 'CONTRACT_PRESENT') {
+        const sow = docInstances.find((d) => d.category === 'CONTRACT');
+        if (sow || expedient.contractId) {
+          const isSigned = sow?.status === 'SIGNED';
+          const docNum = sow?.documentNumber || expedient.contract?.code || 'SOW';
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'COMPLETED',
+              observation: `Contrato SOW ${isSigned ? 'firmado por cliente cargado y verificado' : 'emitido'} (${docNum})`,
+              completedAt: new Date(),
+            },
+          });
+          needsIntegrityReload = true;
+        }
+      } else if (item.code === 'RECEPTION_SIGNED') {
+        const rc = docInstances.find((d) => d.category === 'RECEPTION_CONFORMITY' && d.status === 'SIGNED');
+        if (rc) {
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'COMPLETED',
+              observation: `Recepción Conforme firmada por cliente cargada (${rc.documentNumber})`,
+              completedAt: new Date(),
+            },
+          });
+          needsIntegrityReload = true;
+        }
+      } else if (item.code === 'INVOICE_REGISTERED') {
+        if (expedient.invoices && expedient.invoices.length > 0) {
+          const inv = expedient.invoices[0];
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'COMPLETED',
+              documentId: inv.pdfDocumentId || undefined,
+              observation: `Factura SII N° ${inv.siiFolio} registrada y verificada`,
+              completedAt: new Date(),
+            },
+          });
+          needsIntegrityReload = true;
+        }
+      }
+    }
+  }
+
+  let finalIntegrityItems = expedient.integrityItems.filter((i) => i.code !== 'ATTENTION_REGISTERED');
+  if (needsIntegrityReload) {
+    finalIntegrityItems = await prisma.expedientIntegrityItem.findMany({
+      where: { expedientId: expedient.id },
+      include: { document: true },
+    });
+  }
+
+  return reply.send({
+    success: true,
+    data: {
+      ...expedient,
+      integrityItems: finalIntegrityItems,
+      documentInstances: docInstances,
+    },
+  });
 }
 
 export async function createExpedientHandler(request: FastifyRequest, reply: FastifyReply) {
@@ -108,7 +204,6 @@ export async function createExpedientHandler(request: FastifyRequest, reply: Fas
     const baseItems = [
       { code: 'CUSTOMER_DATA_COMPLETE', name: 'Datos del Cliente completos', category: 'DOCUMENTAL', isRequired: true },
       { code: 'WORK_ORDER_PRESENT', name: 'Orden de Trabajo autorizada', category: 'OPERATIONAL', isRequired: true },
-      { code: 'ATTENTION_REGISTERED', name: 'Atención(es) técnica(s) ejecutadas', category: 'OPERATIONAL', isRequired: true },
       { code: 'RECEPTION_SIGNED', name: 'Recepción Conforme firmada por cliente', category: 'OPERATIONAL', isRequired: true },
     ];
 
@@ -237,10 +332,56 @@ export async function closeExpedientHandler(
       userAgent: request.headers['user-agent'],
     });
 
-    return closed;
+      return closed;
+    });
+
+    return reply.send({ success: true, data: updatedExpedient });
+  }
+
+const reopenExpedientSchema = z.object({
+  reason: z.string().min(3, 'Debe especificar el motivo de reapertura'),
+});
+
+export async function reopenExpedientHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  const { id } = request.params;
+  const body = reopenExpedientSchema.parse(request.body || {});
+  const userId = (request.user as any)?.userId;
+
+  const expedient = await prisma.expedient.findUnique({ where: { id } });
+  if (!expedient || expedient.deletedAt) {
+    throw new NotFoundError('Expediente no encontrado');
+  }
+
+  const updatedExpedient = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const reopened = await tx.expedient.update({
+      where: { id },
+      data: {
+        status: ExpedientStatus.OPEN,
+        closedAt: null,
+        closedById: null,
+        closeReason: null,
+        closeHasException: false,
+      },
+    });
+
+    await createAuditLog(tx, {
+      userId,
+      action: 'REOPEN_EXPEDIENT',
+      entity: 'Expedient',
+      entityId: id,
+      beforeData: { status: expedient.status, closedAt: expedient.closedAt, closeReason: expedient.closeReason },
+      afterData: { status: ExpedientStatus.OPEN, reopenReason: body.reason },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    return reopened;
   });
 
-  return reply.send({ success: true, data: updatedExpedient });
+  return reply.send({ success: true, data: updatedExpedient, message: 'Expediente reabierto exitosamente' });
 }
 
 export async function downloadExpedientBundleHandler(
@@ -250,14 +391,27 @@ export async function downloadExpedientBundleHandler(
   const expedient = await prisma.expedient.findUnique({
     where: { id: request.params.id },
     include: {
+      customer: true,
+      contract: true,
+      integrityItems: true,
       documentLinks: { include: { document: true } },
-      documentInstances: true,
     },
   });
 
   if (!expedient) {
     throw new NotFoundError('Expediente no encontrado');
   }
+
+  // Buscar todas las instancias vinculadas por expedientId o contractId/quotationId
+  const orConditions: any[] = [{ expedientId: expedient.id }];
+  if (expedient.contractId) orConditions.push({ contractId: expedient.contractId });
+  if (expedient.quotationId) orConditions.push({ quotationId: expedient.quotationId });
+
+  const docInstances = await prisma.documentInstance.findMany({
+    where: { OR: orConditions },
+    include: { template: true },
+    orderBy: { generatedAt: 'asc' },
+  });
 
   reply.header('Content-Type', 'application/zip');
   reply.header('Content-Disposition', `attachment; filename="${expedient.code}.zip"`);
@@ -286,8 +440,23 @@ export async function downloadExpedientBundleHandler(
     archive.append('', { name: `${expedient.code}/${folder}/.keep` });
   }
 
+  const manifestLines: string[] = [
+    '================================================================================',
+    `SATEM CONTROL — MANIFIESTO OFICIAL DE AUDITORÍA Y TRAZABILIDAD DOCUMENTAL`,
+    '================================================================================',
+    `Folio Expediente : ${expedient.code}`,
+    `Título Operación : ${expedient.title}`,
+    `Cliente          : ${expedient.customer?.legalName || 'N/A'} (Tax ID: ${expedient.customer?.taxId || 'N/A'})`,
+    `Tratamiento Trib : ${expedient.taxTreatment} (IVA: ${expedient.vatRate}%)`,
+    `Estado Operación : ${expedient.status}`,
+    `Fecha Emisión    : ${new Date().toISOString()}`,
+    '================================================================================',
+    'DOCUMENTOS OFICIALES, INSTANCIAS Y FIRMAS REGISTRADAS:',
+    '--------------------------------------------------------------------------------',
+  ];
+
   // 1. Agregar Instancias Documentales Generadas y Firmadas
-  for (const inst of expedient.documentInstances) {
+  for (const inst of docInstances) {
     let targetFolder = '12-Otros';
     if (inst.category === 'CONTRACT') targetFolder = '01-Contrato';
     else if (inst.category === 'QUOTATION') targetFolder = '02-Cotizacion';
@@ -295,12 +464,26 @@ export async function downloadExpedientBundleHandler(
     else if (inst.category === 'ATTENTION_REPORT' || inst.category === 'SERVICE_REPORT') targetFolder = '04-Atenciones';
     else if (inst.category === 'RECEPTION_CONFORMITY') targetFolder = '05-Recepcion-Conforme';
 
+    manifestLines.push(`• [${inst.category}] ${inst.documentNumber}`);
+    manifestLines.push(`  - Estado: ${inst.status}`);
+    manifestLines.push(`  - Plantilla: ${inst.template?.name || 'Documento Oficial'}`);
+    manifestLines.push(`  - Generado: ${inst.generatedAt.toISOString()} | SHA-256: ${inst.generatedPdfHash}`);
+
     if (fs.existsSync(inst.generatedPdfPath)) {
       archive.file(inst.generatedPdfPath, { name: `${expedient.code}/${targetFolder}/${inst.documentNumber}.pdf` });
     }
+
     if (inst.signedPdfPath && fs.existsSync(inst.signedPdfPath)) {
+      manifestLines.push(`  - FIRMA CLIENTE REGISTRADA:`);
+      manifestLines.push(`    * Archivo: ${inst.documentNumber}-FIRMADO.pdf`);
+      manifestLines.push(`    * Fecha Firma: ${inst.signedAt ? inst.signedAt.toISOString() : 'N/A'}`);
+      manifestLines.push(`    * SHA-256 Firma: ${inst.signedPdfHash || 'N/A'}`);
+
       archive.file(inst.signedPdfPath, { name: `${expedient.code}/${targetFolder}/${inst.documentNumber}-FIRMADO.pdf` });
+    } else {
+      manifestLines.push(`  - Firma Cliente: PENDIENTE DE CARGA`);
     }
+    manifestLines.push('--------------------------------------------------------------------------------');
   }
 
   // 2. Agregar Documentos adjuntos tradicionales (Facturas, Evidencias, Bancos)
@@ -314,9 +497,16 @@ export async function downloadExpedientBundleHandler(
       else if (cat === 'BANK_RECEIPT') targetFolder = '09-Banco';
       else if (cat === 'REPORT') targetFolder = '11-Reportes';
 
+      manifestLines.push(`• [ADJUNTO ${cat}] ${link.document.originalName} (${link.document.sha256})`);
       archive.file(link.document.storagePath, { name: `${expedient.code}/${targetFolder}/${link.document.originalName}` });
     }
   }
+
+  manifestLines.push('================================================================================');
+  manifestLines.push('FIN DEL MANIFIESTO DE AUDITORÍA SATEM CONTROL');
+  manifestLines.push('================================================================================');
+
+  archive.append(manifestLines.join('\r\n'), { name: `${expedient.code}/00-MANIFIESTO-AUDITORIA.txt` });
 
   await archive.finalize();
 }

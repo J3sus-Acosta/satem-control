@@ -32,11 +32,14 @@ export const ContractWizardPage: React.FC = () => {
   const [contractTitle, setContractTitle] = useState('Statement of Work - Servicios Internacionales 2026');
   const [description, setDescription] = useState('Desarrollo de Software, Consultoría Técnica y Soporte Infraestructura Cloud');
   const [contractType, setContractType] = useState('HOURLY');
+  const [modality, setModality] = useState('RECURRING');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState('');
   const [contractedHours, setContractedHours] = useState('100');
   const [totalAmount, setTotalAmount] = useState('7500');
   const [currency, setCurrency] = useState('USD');
   const [paymentTerms, setPaymentTerms] = useState('Zelle / SumUp / Wire Transfer en USD');
-  const [exportClause] = useState('Servicio prestado desde Chile y utilizado exclusivamente en el extranjero exento de IVA (Art. 12 letra E Nº 7 D.L. 825)');
+  const [exportClause, setExportClause] = useState('Servicio prestado desde Chile y utilizado exclusivamente en el extranjero por el Cliente, exento de IVA conforme al Art. 12 letra E Nº 7 del D.L. 825 de la Ley sobre Impuesto a las Ventas y Servicios.');
 
   const navigate = useNavigate();
 
@@ -62,10 +65,11 @@ export const ContractWizardPage: React.FC = () => {
       const contractRes = await api.post('/contracts', {
         customerId: selectedCustomerId,
         type: contractType,
-        modality: 'RECURRING',
+        modality,
         title: contractTitle,
         description,
-        startDate: new Date().toISOString(),
+        startDate: startDate ? new Date(startDate).toISOString() : new Date().toISOString(),
+        endDate: endDate ? new Date(endDate).toISOString() : undefined,
         currency,
         totalAmount: parseFloat(totalAmount) || 0,
         contractedHours: parseFloat(contractedHours) || 0,
@@ -75,7 +79,7 @@ export const ContractWizardPage: React.FC = () => {
       const createdContract = contractRes.data.data;
       const createdExpedient = createdContract.expedient;
 
-      // 2. Generar Instancia Documental en PDF / HTML vinculada al contrato y al expediente
+      // 2. Generar Instancia Documental en PDF / HTML vinculada al contrato y al expediente con TODOS los datos
       const docRes = await api.post('/document-instances/generate', {
         templateId: selectedTemplateId,
         documentNumber: createdContract.code,
@@ -88,10 +92,14 @@ export const ContractWizardPage: React.FC = () => {
             titulo: contractTitle,
             descripcion: description,
             tipo: contractType,
+            modalidad: modality,
             horas: contractedHours,
             valor: totalAmount,
             moneda: currency,
             metodoPago: paymentTerms,
+            fechaInicio: startDate,
+            fechaTermino: endDate || 'Indefinida / Según horas consumidas',
+            clausulaExportacion: exportClause,
           },
         },
       });
@@ -248,24 +256,50 @@ export const ContractWizardPage: React.FC = () => {
       {/* Paso 2: Alcance & Servicios */}
       {step === 2 && (
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '28px' }}>
-          <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 2: Título y Alcance del Servicio</h3>
+          <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 2: Título, Fechas y Alcance del Servicio</h3>
 
           <div className="form-group">
             <label className="form-label">Título de la Declaración de Trabajo (SOW)</label>
             <input type="text" className="form-input" value={contractTitle} onChange={(e) => setContractTitle(e.target.value)} required />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Tipo de Contrato</label>
-            <select className="form-select" value={contractType} onChange={(e) => setContractType(e.target.value)}>
-              <option value="HOURLY">Bolsa de Horas (Hourly)</option>
-              <option value="PER_ATTENTION">Por Atención / Incidencia</option>
-              <option value="FIXED_PERIOD">Período Fijo / Retainer</option>
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Tipo de Contrato</label>
+              <select className="form-select" value={contractType} onChange={(e) => setContractType(e.target.value)}>
+                <option value="HOURLY">Bolsa de Horas (Hourly)</option>
+                <option value="PER_ATTENTION">Por Atención / Incidencia</option>
+                <option value="ATTENTION_PACKAGE">Paquete de Atenciones</option>
+                <option value="FIXED_PERIOD">Período Fijo / Retainer</option>
+                <option value="RETAINER">Retainer Mensual</option>
+                <option value="OTHER">Servicios Profesionales TI</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Modalidad de Ejecución</label>
+              <select className="form-select" value={modality} onChange={(e) => setModality(e.target.value)}>
+                <option value="RECURRING">Recurrente / Periódico</option>
+                <option value="ONE_TIME">Servicio Único / Proyecto Cerrado</option>
+                <option value="OPEN_ENDED">Plazo Indefinido / Según Consumo</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Fecha de Inicio</label>
+              <input type="date" className="form-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Fecha de Término / Vigencia <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span></label>
+              <input type="date" className="form-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} placeholder="Dejar vacío si es indefinido" />
+            </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Descripción Detallada del Alcance</label>
+            <label className="form-label">Descripción Detallada del Alcance (Scope of Work)</label>
             <textarea className="form-textarea" rows={4} value={description} onChange={(e) => setDescription(e.target.value)} required />
           </div>
 
@@ -285,10 +319,20 @@ export const ContractWizardPage: React.FC = () => {
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '28px' }}>
           <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 3: Honorarios, Condiciones & Confirmación</h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">Horas / Unidades Contratadas</label>
+              <label className="form-label">Horas / Unidades</label>
               <input type="number" className="form-input" value={contractedHours} onChange={(e) => setContractedHours(e.target.value)} required />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Moneda</label>
+              <select className="form-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <option value="USD">USD - Dólar Estadounidense</option>
+                <option value="EUR">EUR - Euro</option>
+                <option value="CLP">CLP - Peso Chileno</option>
+                <option value="UF">UF - Unidad de Fomento</option>
+              </select>
             </div>
 
             <div className="form-group">
@@ -297,24 +341,34 @@ export const ContractWizardPage: React.FC = () => {
             </div>
           </div>
 
+          {parseFloat(contractedHours) > 0 && parseFloat(totalAmount) > 0 && (
+            <div style={{ fontSize: '12px', color: 'var(--accent-primary)', marginBottom: '14px', fontWeight: 600 }}>
+              💡 Tarifa calculada: ${(parseFloat(totalAmount) / parseFloat(contractedHours)).toFixed(2)} {currency}/hora
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Forma y Condiciones de Pago</label>
             <input type="text" className="form-input" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} required />
           </div>
 
+          <div className="form-group">
+            <label className="form-label">Cláusula de Exención de IVA (Exportación de Servicios)</label>
+            <textarea className="form-textarea" rows={2} value={exportClause} onChange={(e) => setExportClause(e.target.value)} required />
+          </div>
+
           {/* Resumen previo de datos cargados */}
           <div style={{ padding: '16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Eye size={16} /> Resumen de Carga en Plantilla SOW:
+              <Eye size={16} /> Resumen de Datos que se Plasmarán en el SOW:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
               <div><strong>Cliente:</strong> {selectedCustomer?.legalName} ({selectedCustomer?.taxId})</div>
               <div><strong>País:</strong> {selectedCustomer?.countryCode}</div>
               <div><strong>Plantilla:</strong> {selectedTemplate?.name || 'SOW Oficial'}</div>
               <div><strong>Monto:</strong> ${totalAmount} {currency} ({contractedHours} hrs)</div>
-            </div>
-            <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-              🔒 <strong>Cláusula de Exención:</strong> {exportClause}
+              <div><strong>Vigencia:</strong> {startDate} {endDate ? `al ${endDate}` : '(Indefinida)'}</div>
+              <div><strong>Modalidad:</strong> {modality}</div>
             </div>
           </div>
 

@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Calculator, FileSpreadsheet, RefreshCw,
-  FileText, ChevronDown, ChevronUp, Plus, Download,
+  FileText, ChevronDown, ChevronUp, Plus, Download, Upload
 } from 'lucide-react';
 
 export const BillingPage: React.FC = () => {
@@ -27,12 +27,14 @@ export const BillingPage: React.FC = () => {
   const [feePercent, setFeePercent] = useState('3.5');
   const [calcResult, setCalcResult] = useState<any>(null);
 
-  // MEJ-03: Modal Registrar Folio SII
+  // Modal Registrar Folio SII
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invFolio, setInvFolio] = useState('');
   const [invExpedientId, setInvExpedientId] = useState('');
   const [invAmountUsd, setInvAmountUsd] = useState('');
   const [invIssuedAt, setInvIssuedAt] = useState(new Date().toISOString().split('T')[0]);
+  const [invFile, setInvFile] = useState<File | null>(null);
+  const [submittingInvoice, setSubmittingInvoice] = useState(false);
 
   const fetchInvoices = () => {
     setLoadingInvoices(true);
@@ -59,40 +61,82 @@ export const BillingPage: React.FC = () => {
     } catch { alert('Error al calcular valor SumUp'); }
   };
 
-  // MEJ-03: Registrar Folio SII
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!invExpedientId) {
+      alert('Por favor selecciona un expediente.');
+      return;
+    }
+
+    setSubmittingInvoice(true);
     try {
-      await api.post('/invoices', {
-        folio: invFolio,
-        expedientId: invExpedientId || undefined,
-        netAmountUsd: parseFloat(invAmountUsd),
-        issuedAt: new Date(invIssuedAt).toISOString(),
-        taxTreatment: 'EXPORT_SERVICE',
-      });
+      if (invFile) {
+        const formData = new FormData();
+        formData.append('expedientId', invExpedientId);
+        formData.append('siiFolio', invFolio);
+        formData.append('issueDate', invIssuedAt);
+        formData.append('currency', 'USD');
+        formData.append('netAmount', invAmountUsd);
+        formData.append('totalAmount', invAmountUsd);
+        formData.append('taxTreatment', 'EXPORT_SERVICE');
+        formData.append('invoiceFile', invFile);
+
+        await api.post('/invoices/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        await api.post('/invoices', {
+          siiFolio: parseInt(invFolio, 10),
+          expedientId: invExpedientId,
+          netAmount: parseFloat(invAmountUsd),
+          totalAmount: parseFloat(invAmountUsd),
+          issueDate: new Date(invIssuedAt).toISOString(),
+          taxTreatment: 'EXPORT_SERVICE',
+          currency: 'USD',
+        });
+      }
+
+      alert('Factura SII registrada e integrada exitosamente.');
       setShowInvoiceModal(false);
-      setInvFolio(''); setInvExpedientId(''); setInvAmountUsd('');
+      setInvFolio(''); setInvExpedientId(''); setInvAmountUsd(''); setInvFile(null);
       fetchInvoices();
     } catch (err: any) {
-      const msg = err.response?.data?.error?.message;
-      if (err.response?.status === 404) {
-        alert('El endpoint POST /invoices aún no está disponible en la API. Implementar en el backend.');
-      } else {
-        alert(msg || 'Error al registrar folio SII');
-      }
+      const msg = err.response?.data?.error?.message || err.response?.data?.message;
+      alert(msg || 'Error al registrar folio SII');
+    } finally {
+      setSubmittingInvoice(false);
     }
   };
 
-  // MEJ-11: Exportar a CSV
+  const handleViewInvoiceDoc = async (docId: string, filename?: string) => {
+    try {
+      const response = await api.get(`/documents/${docId}/download`, { responseType: 'blob' });
+      const file = new Blob([response.data], { type: 'application/pdf' });
+      const fileUrl = window.URL.createObjectURL(file);
+      const w = window.open(fileUrl, '_blank');
+      if (!w) {
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = filename || 'factura_sii.pdf';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+    } catch (err: any) {
+      alert('Error al visualizar o descargar el PDF de la factura');
+    }
+  };
+
+  // Exportar a CSV
   const handleExportCsv = () => {
     if (invoices.length === 0) { alert('No hay facturas para exportar.'); return; }
     const headers = ['Folio/Código', 'Expediente', 'Cliente', 'Monto Neto USD', 'Fecha Emisión', 'Estado'];
     const rows = invoices.map(inv => [
       inv.code || inv.folio || inv.id?.slice(0, 8),
       inv.expedient?.code || inv.expedientCode || '',
-      inv.customer?.legalName || inv.customerName || '',
-      inv.totalAmountUsd || inv.netAmountUsd || 0,
-      inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString('es-CL') : '',
+      inv.expedient?.customer?.legalName || inv.customer?.legalName || inv.customerName || '',
+      inv.totalAmount || inv.netAmount || inv.totalAmountUsd || inv.netAmountUsd || 0,
+      inv.issueDate || inv.issuedAt || inv.createdAt ? new Date(inv.issueDate || inv.issuedAt || inv.createdAt).toLocaleDateString('es-CL') : '',
       inv.status,
     ]);
     const csvContent = [headers, ...rows].map(r => r.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -117,7 +161,7 @@ export const BillingPage: React.FC = () => {
 
   const totalNetUSD = invoices
     .filter(inv => inv.status === 'ISSUED')
-    .reduce((sum, inv) => sum + (parseFloat(inv.totalAmountUsd || inv.netAmountUsd) || 0), 0);
+    .reduce((sum, inv) => sum + (parseFloat(inv.totalAmount || inv.netAmount || inv.totalAmountUsd || inv.netAmountUsd) || 0), 0);
 
   return (
     <div>
@@ -125,7 +169,7 @@ export const BillingPage: React.FC = () => {
         <div>
           <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Facturación SII & Cobros SumUp</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Registro de folios SII Tipo 110 (exportación sin IVA) y simulación de cobro SumUp.
+            Registro de folios SII Tipo 110 (exportación sin IVA), carga de documentos PDF oficiales y simulación de cobro SumUp.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -181,7 +225,7 @@ export const BillingPage: React.FC = () => {
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({invoices.length} total)</span>
           </h3>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            Las facturas se emiten en el portal SII. Aquí se registra el folio para trazabilidad.
+            Las facturas se emiten en el portal SII y se incorporan al expediente como soporte de auditoría.
           </div>
         </div>
 
@@ -192,18 +236,19 @@ export const BillingPage: React.FC = () => {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Folio / Código</th>
+                  <th>Folio SII / Código</th>
                   <th>Expediente</th>
                   <th>Cliente</th>
                   <th>Monto Neto (USD)</th>
                   <th>Fecha Emisión</th>
                   <th>Estado</th>
+                  <th>Documento PDF</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
                       <FileText size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
                       No hay facturas registradas.
                       {!isViewer && (
@@ -214,22 +259,43 @@ export const BillingPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  pagedInvoices.map((inv) => (
-                    <tr key={inv.id}>
-                      <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>
-                        {inv.code || inv.folio || inv.id?.slice(0, 8)}
-                      </td>
-                      <td style={{ fontSize: '13px' }}>{inv.expedient?.code || inv.expedientCode || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                      <td>{inv.customer?.legalName || inv.customerName || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>
-                        ${parseFloat(inv.totalAmountUsd || inv.netAmountUsd || 0).toLocaleString()} USD
-                      </td>
-                      <td style={{ fontSize: '13px' }}>
-                        {inv.issuedAt || inv.createdAt ? new Date(inv.issuedAt || inv.createdAt).toLocaleDateString('es-CL') : '—'}
-                      </td>
-                      <td>{statusBadge(inv.status)}</td>
-                    </tr>
-                  ))
+                  pagedInvoices.map((inv) => {
+                    const docId = inv.pdfDocumentId || inv.pdfDocument?.id;
+                    const folioDisplay = inv.siiFolio ? `Folio ${inv.siiFolio}` : (inv.code || inv.folio || inv.id?.slice(0, 8));
+
+                    return (
+                      <tr key={inv.id}>
+                        <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>
+                          <div>{folioDisplay}</div>
+                          {inv.code && inv.siiFolio && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>{inv.code}</div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '13px' }}>{inv.expedient?.code || inv.expedientCode || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                        <td>{inv.expedient?.customer?.legalName || inv.customer?.legalName || inv.customerName || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                        <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>
+                          ${parseFloat(inv.totalAmount || inv.netAmount || inv.totalAmountUsd || inv.netAmountUsd || 0).toLocaleString()} USD
+                        </td>
+                        <td style={{ fontSize: '13px' }}>
+                          {inv.issueDate || inv.issuedAt || inv.createdAt ? new Date(inv.issueDate || inv.issuedAt || inv.createdAt).toLocaleDateString('es-CL') : '—'}
+                        </td>
+                        <td>{statusBadge(inv.status)}</td>
+                        <td>
+                          {docId ? (
+                            <button
+                              onClick={() => handleViewInvoiceDoc(docId, `FACTURA_SII_${inv.siiFolio || inv.code}.pdf`)}
+                              className="btn btn-secondary"
+                              style={{ fontSize: '11px', padding: '4px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <FileText size={13} /> Ver PDF
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sin PDF</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -316,23 +382,23 @@ export const BillingPage: React.FC = () => {
         )}
       </div>
 
-      {/* Modal Registrar Folio SII — MEJ-03 */}
+      {/* Modal Registrar Folio SII */}
       {showInvoiceModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '480px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '4px' }}>Registrar Folio SII</h3>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              La factura se emite externamente en el portal SII (Tipo 110). Aquí se registra el folio para trazabilidad interna.
+              La factura se emite externamente en el portal SII (Tipo 110). Aquí se registra el folio y se adjunta el PDF para trazabilidad y auditoría.
             </p>
             <form onSubmit={handleCreateInvoice}>
               <div className="form-group">
                 <label className="form-label">Número de Folio SII *</label>
-                <input type="text" className="form-input" placeholder="Ej: 110-000123" value={invFolio} onChange={(e) => setInvFolio(e.target.value)} required />
+                <input type="number" className="form-input" placeholder="Ej: 12345" value={invFolio} onChange={(e) => setInvFolio(e.target.value)} required />
               </div>
               <div className="form-group">
-                <label className="form-label">Expediente Asociado <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span></label>
-                <select className="form-select" value={invExpedientId} onChange={(e) => setInvExpedientId(e.target.value)}>
-                  <option value="">Sin expediente específico</option>
+                <label className="form-label">Expediente Asociado *</label>
+                <select className="form-select" value={invExpedientId} onChange={(e) => setInvExpedientId(e.target.value)} required>
+                  <option value="">Seleccione un expediente...</option>
                   {expedients.map((exp) => (
                     <option key={exp.id} value={exp.id}>{exp.code} — {exp.title}</option>
                   ))}
@@ -346,12 +412,18 @@ export const BillingPage: React.FC = () => {
                 <label className="form-label">Fecha de Emisión *</label>
                 <input type="date" className="form-input" value={invIssuedAt} onChange={(e) => setInvIssuedAt(e.target.value)} required />
               </div>
+              <div className="form-group">
+                <label className="form-label">Archivo PDF Oficial Factura SII <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(recomendado)</span></label>
+                <input type="file" accept="application/pdf" className="form-input" onChange={(e) => setInvFile(e.target.files?.[0] || null)} />
+              </div>
               <div style={{ padding: '10px 14px', backgroundColor: 'rgba(0,168,150,0.08)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-sm)', fontSize: '12px', marginBottom: '20px', color: 'var(--accent-primary)' }}>
                 🔒 Tratamiento tributario: <strong>EXPORT_SERVICE (Sin IVA)</strong> — normativa de exportación de servicios.
               </div>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                 <button type="button" onClick={() => setShowInvoiceModal(false)} className="btn btn-secondary">Cancelar</button>
-                <button type="submit" className="btn btn-primary">Registrar Folio</button>
+                <button type="submit" className="btn btn-primary" disabled={submittingInvoice}>
+                  {submittingInvoice ? 'Guardando...' : 'Registrar Folio'}
+                </button>
               </div>
             </form>
           </div>

@@ -242,7 +242,10 @@ export const TemplateEditorPage: React.FC = () => {
             <div>
               <strong style={{ color: 'var(--success)', fontSize: '11px', textTransform: 'uppercase' }}>CLIENTE</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                {['cliente.nombreLegal', 'cliente.taxId', 'cliente.pais', 'cliente.direccion', 'cliente.email'].map((v) => (
+                {[
+                  'cliente.nombreLegal', 'cliente.taxId', 'cliente.pais', 'cliente.ciudad',
+                  'cliente.direccion', 'cliente.email', 'cliente.contacto'
+                ].map((v) => (
                   <div
                     key={v}
                     onClick={() => insertVariable(v)}
@@ -257,7 +260,12 @@ export const TemplateEditorPage: React.FC = () => {
             <div>
               <strong style={{ color: 'var(--warning)', fontSize: '11px', textTransform: 'uppercase' }}>CONTRATO / SOW</strong>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                {['contrato.codigo', 'contrato.titulo', 'contrato.descripcion', 'contrato.valor', 'contrato.moneda', 'contrato.horas', 'contrato.metodoPago'].map((v) => (
+                {[
+                  'contrato.codigo', 'contrato.titulo', 'contrato.tipoNombre', 'contrato.modalidadNombre',
+                  'contrato.descripcion', 'contrato.valor', 'contrato.moneda', 'contrato.horas',
+                  'contrato.tarifaHora', 'contrato.fechaEmision', 'contrato.fechaInicio', 'contrato.fechaTermino',
+                  'contrato.metodoPago', 'contrato.clausulaExportacion'
+                ].map((v) => (
                   <div
                     key={v}
                     onClick={() => insertVariable(v)}
