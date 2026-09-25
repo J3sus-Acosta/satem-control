@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   LogOut,
   User,
+  Users,
   FileCode,
   ChevronRight,
   FilePlus,
@@ -25,6 +26,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/billing':           'Facturación & SumUp',
   '/bank':              'Conciliación Bancaria',
   '/admin/templates':   'Plantillas Documentales',
+  '/admin/users':       'Gestión de Usuarios',
 };
 
 const BreadcrumbHeader: React.FC = () => {
@@ -137,6 +139,16 @@ export const AppLayout: React.FC = () => {
                 <FileCode size={18} /> Plantillas Documentales
               </NavLink>
             </>
+          )}
+
+          {user?.role === 'ADMIN' && (
+            <NavLink
+              to="/admin/users"
+              className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ justifyContent: 'flex-start' }}
+            >
+              <Users size={18} /> Gestión de Usuarios
+            </NavLink>
           )}
         </nav>
 

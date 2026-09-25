@@ -12,6 +12,7 @@ import { BillingPage } from './pages/BillingPage';
 import { BankPage } from './pages/BankPage';
 import { TemplatesPage } from './pages/admin/TemplatesPage';
 import { TemplateEditorPage } from './pages/admin/TemplateEditorPage';
+import { UsersPage } from './pages/admin/UsersPage';
 import { ContractWizardPage } from './pages/ContractWizardPage';
 import { DocumentGeneratorPage } from './pages/DocumentGeneratorPage';
 
@@ -63,6 +64,14 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS']}>
                     <TemplateEditorPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/users"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <UsersPage />
                   </ProtectedRoute>
                 }
               />
