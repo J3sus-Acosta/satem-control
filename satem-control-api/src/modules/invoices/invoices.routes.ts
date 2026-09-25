@@ -1,11 +1,12 @@
 import { FastifyInstance } from 'fastify';
+import { UserRole } from '@prisma/client';
 import { listInvoicesHandler, createInvoiceHandler, uploadInvoiceHandler } from './invoices.controller.js';
-import { authenticateGuard } from '../../common/middleware/auth-guard.js';
+import { authenticateGuard, roleGuard } from '../../common/middleware/auth-guard.js';
 
 export async function invoicesRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', authenticateGuard);
 
   fastify.get('/', listInvoicesHandler);
-  fastify.post('/', createInvoiceHandler);
-  fastify.post('/upload', uploadInvoiceHandler);
+  fastify.post('/', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING, UserRole.OPERATIONS])] }, createInvoiceHandler);
+  fastify.post('/upload', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING, UserRole.OPERATIONS])] }, uploadInvoiceHandler);
 }

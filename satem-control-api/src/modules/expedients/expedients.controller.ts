@@ -63,13 +63,31 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
         include: {
           pdfDocument: true,
           xmlDocument: true,
-          paymentRequests: { include: { payments: { include: { allocations: { include: { reconciliations: true } } } } } },
+          paymentRequests: { include: { payments: { include: { allocations: { include: { reconciliations: { include: { bankReceipt: true } } } } } } } },
         },
       },
       integrityItems: { include: { document: true } },
       exceptions: true,
       snapshots: { select: { id: true, checksumSha256: true, closedAt: true, closedById: true } },
-      documentLinks: { include: { document: true } },
+      documentLinks: {
+        include: {
+          document: {
+            include: {
+              paymentProof: {
+                include: {
+                  allocations: {
+                    include: {
+                      reconciliations: {
+                        include: { bankReceipt: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -150,6 +168,82 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
               status: 'COMPLETED',
               documentId: inv.pdfDocumentId || undefined,
               observation: `Factura SII N° ${inv.siiFolio} registrada y verificada`,
+              completedAt: new Date(),
+            },
+          });
+          needsIntegrityReload = true;
+        }
+      } else if (item.code === 'RECONCILIATION_COMPLETED') {
+        let totalReconciledClp = 0;
+        let totalReconciledUsd = 0;
+        const receiptCodes: string[] = [];
+        const seenRecs = new Set<string>();
+
+        for (const inv of expedient.invoices) {
+          for (const pr of inv.paymentRequests) {
+            for (const p of pr.payments) {
+              for (const alloc of p.allocations) {
+                for (const rec of alloc.reconciliations) {
+                  if (!seenRecs.has(rec.id)) {
+                    seenRecs.add(rec.id);
+                    totalReconciledClp += Number(rec.receivedAmountClp || 0);
+                    const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
+                    totalReconciledUsd += pUsd;
+                    if (rec.bankReceipt?.code && !receiptCodes.includes(rec.bankReceipt.code)) {
+                      receiptCodes.push(rec.bankReceipt.code);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        for (const link of (expedient.documentLinks || [])) {
+          if (link.document?.paymentProof) {
+            for (const p of link.document.paymentProof) {
+              for (const alloc of p.allocations) {
+                for (const rec of alloc.reconciliations) {
+                  if (!seenRecs.has(rec.id)) {
+                    seenRecs.add(rec.id);
+                    totalReconciledClp += Number(rec.receivedAmountClp || 0);
+                    const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
+                    totalReconciledUsd += pUsd;
+                    if (rec.bankReceipt?.code && !receiptCodes.includes(rec.bankReceipt.code)) {
+                      receiptCodes.push(rec.bankReceipt.code);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (totalReconciledClp > 0) {
+          const contractAmount = Number(expedient.contract?.totalAmount || 0);
+          const totalInvoiceAmount = expedient.invoices.reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+          const currency = expedient.contract?.currency || expedient.invoices[0]?.currency || 'USD';
+          const codesStr = receiptCodes.length > 0 ? receiptCodes.join(', ') : 'Santander';
+
+          let progressText = '';
+          if (currency === 'USD' && (contractAmount > 0 || totalInvoiceAmount > 0)) {
+            const targetUsd = contractAmount > 0 ? contractAmount : totalInvoiceAmount;
+            let pct = Math.min(100, Math.round((totalReconciledUsd / targetUsd) * 100));
+            if (pct >= 99) pct = 100;
+            progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Progreso: ${pct}% ($${totalReconciledUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / $${targetUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD) • Total Líquido Santander: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
+          } else if (currency === 'CLP' && contractAmount > 0) {
+            let pct = Math.min(100, Math.round((totalReconciledClp / contractAmount) * 100));
+            if (pct >= 99) pct = 100;
+            progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Pagado y Conciliado: ${pct}% ($${totalReconciledClp.toLocaleString('es-CL')} / $${contractAmount.toLocaleString('es-CL')} CLP)`;
+          } else {
+            progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Total Conciliado en Banco: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
+          }
+
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'COMPLETED',
+              observation: progressText,
               completedAt: new Date(),
             },
           });
@@ -497,8 +591,9 @@ export async function downloadExpedientBundleHandler(
       else if (cat === 'BANK_RECEIPT') targetFolder = '09-Banco';
       else if (cat === 'REPORT') targetFolder = '11-Reportes';
 
-      manifestLines.push(`• [ADJUNTO ${cat}] ${link.document.originalName} (${link.document.sha256})`);
-      archive.file(link.document.storagePath, { name: `${expedient.code}/${targetFolder}/${link.document.originalName}` });
+      const safeFileName = path.basename(link.document.originalName).replace(/[^a-zA-Z0-9._\-\s]/g, '_') || 'adjunto.pdf';
+      manifestLines.push(`• [ADJUNTO ${cat}] ${safeFileName} (${link.document.sha256})`);
+      archive.file(link.document.storagePath, { name: `${expedient.code}/${targetFolder}/${safeFileName}` });
     }
   }
 

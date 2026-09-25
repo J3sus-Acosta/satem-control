@@ -218,16 +218,23 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
     },
   };
 
-  const compiledHtml = body.customHtml && body.customHtml.trim().length > 0
+  // Sanitizar HTML para prevenir inyección de scripts maliciosos y referencias a esquemas locales
+  let rawCompiledHtml = body.customHtml && body.customHtml.trim().length > 0
     ? body.customHtml
     : compileTemplate(targetVersion.htmlTemplate, variables);
 
+  const sanitizedHtml = rawCompiledHtml
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/src=["']?(file|ftp|gopher):/gi, 'src="about:blank"')
+    .replace(/href=["']?(file|ftp|gopher):/gi, 'href="#"');
+
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
   });
   const page = await browser.newPage();
-  await page.setContent(compiledHtml, { waitUntil: 'networkidle0' });
+  await page.setContent(sanitizedHtml, { waitUntil: 'networkidle0' });
   const pdfBuffer = await page.pdf({
     format: 'A4',
     printBackground: true,
@@ -276,7 +283,7 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
         workOrderId: body.workOrderId || null,
         status: DocumentInstanceStatus.GENERATED,
         dataSnapshot: JSON.parse(JSON.stringify(variables)),
-        generatedHtml: compiledHtml,
+        generatedHtml: sanitizedHtml,
         generatedPdfPath,
         generatedPdfHash,
         generatedById: userId,

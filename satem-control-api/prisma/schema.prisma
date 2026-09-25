@@ -798,6 +798,8 @@ model Payment {
   paymentMethod    String        @db.VarChar(50)
   transactionRef   String?       @db.VarChar(100)
   proofDocumentId  String?
+  usdEquivalent    Decimal?      @db.Decimal(14, 2)
+  exchangeRate     Decimal?      @db.Decimal(12, 4)
   status           PaymentStatus @default(REGISTERED)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt

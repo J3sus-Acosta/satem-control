@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 
-export type SequencePrefix = 'EXP' | 'COT' | 'OT' | 'AT' | 'SOW' | 'RC' | 'FAC' | 'PAY' | 'SUM' | 'BR';
+export type SequencePrefix = 'EXP' | 'COT' | 'OT' | 'AT' | 'SOW' | 'RC' | 'FAC' | 'PAY' | 'SUM' | 'BR' | 'SRV' | 'PROP' | 'DOC';
 
 /**
  * Genera un correlativo transaccional bloqueando pesimistamente la fila en MySQL (FOR UPDATE)

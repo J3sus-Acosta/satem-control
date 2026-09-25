@@ -126,15 +126,18 @@ export const AppLayout: React.FC = () => {
             <Landmark size={18} /> Conciliación Bancaria
           </NavLink>
 
-          <div style={{ margin: '8px 0', borderTop: '1px dashed var(--border-color)' }} />
-
-          <NavLink
-            to="/admin/templates"
-            className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ justifyContent: 'flex-start' }}
-          >
-            <FileCode size={18} /> Plantillas Documentales
-          </NavLink>
+          {(user?.role === 'ADMIN' || user?.role === 'OPERATIONS') && (
+            <>
+              <div style={{ margin: '8px 0', borderTop: '1px dashed var(--border-color)' }} />
+              <NavLink
+                to="/admin/templates"
+                className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ justifyContent: 'flex-start' }}
+              >
+                <FileCode size={18} /> Plantillas Documentales
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>

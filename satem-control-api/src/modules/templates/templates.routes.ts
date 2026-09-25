@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { UserRole } from '@prisma/client';
 import {
   listTemplatesHandler,
   getTemplateHandler,
@@ -6,16 +7,18 @@ import {
   addTemplateVersionHandler,
   publishTemplateVersionHandler,
 } from './templates.controller.js';
-import { authenticateGuard } from '../../common/middleware/auth-guard.js';
+import { authenticateGuard, roleGuard } from '../../common/middleware/auth-guard.js';
 
 export async function templatesRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', authenticateGuard);
 
   fastify.get('/', listTemplatesHandler);
-  fastify.get('/:id', getTemplateHandler);
-  fastify.post('/', createTemplateHandler);
-  fastify.post('/:id/versions', addTemplateVersionHandler);
-  fastify.post('/:id/versions/:vId/publish', (req: FastifyRequest, reply: FastifyReply) =>
-    publishTemplateVersionHandler(req as any, reply)
+  fastify.get('/:id', (req: any, reply: any) => getTemplateHandler(req, reply));
+  fastify.post('/', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS])] }, createTemplateHandler);
+  fastify.post('/:id/versions', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS])] }, (req: any, reply: any) => addTemplateVersionHandler(req, reply));
+  fastify.post(
+    '/:id/versions/:vId/publish',
+    { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS])] },
+    (req: any, reply: any) => publishTemplateVersionHandler(req, reply)
   );
 }

@@ -11,6 +11,7 @@ import { generateSequence } from '../../common/utils/sequence.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 import { convertImageToPdf } from '../../common/utils/image-to-pdf.js';
 import { parseSumupPdfReport } from '../../common/utils/pdf-statement-parser.js';
+import { getUsdToClpExchangeRate } from '../exchange-rates/exchange-rates.service.js';
 
 const createPaymentSchema = z.object({
   paymentRequestId: z.string().uuid().optional(),
@@ -21,6 +22,8 @@ const createPaymentSchema = z.object({
   transactionRef: z.string().optional(),
   proofDocumentId: z.string().uuid().optional(),
   allocatedAmount: z.coerce.number().positive().optional(),
+  usdEquivalent: z.coerce.number().positive().optional(),
+  exchangeRate: z.coerce.number().positive().optional(),
   expedientId: z.string().uuid().optional(),
 });
 
@@ -84,6 +87,18 @@ export async function createPaymentHandler(request: FastifyRequest, reply: Fasti
   const body = createPaymentSchema.parse(request.body);
   const userId = (request.user as any)?.userId;
   const allocAmount = body.allocatedAmount || body.amount;
+  let usdEquivalent = body.usdEquivalent || null;
+  let exchangeRate = body.exchangeRate || null;
+
+  if (!usdEquivalent) {
+    if (body.currency === 'USD') {
+      usdEquivalent = body.amount;
+    } else if (body.currency === 'CLP') {
+      const rateData = await getUsdToClpExchangeRate();
+      exchangeRate = exchangeRate || rateData.rate;
+      usdEquivalent = Number((body.amount / exchangeRate).toFixed(2));
+    }
+  }
 
   const payment = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const code = await generateSequence(tx, 'PAY');
@@ -98,6 +113,8 @@ export async function createPaymentHandler(request: FastifyRequest, reply: Fasti
         paymentMethod: body.paymentMethod,
         transactionRef: body.transactionRef || null,
         proofDocumentId: body.proofDocumentId || null,
+        usdEquivalent: usdEquivalent ? new Prisma.Decimal(usdEquivalent) : null,
+        exchangeRate: exchangeRate ? new Prisma.Decimal(exchangeRate) : null,
         status: PaymentStatus.CONFIRMED,
         allocations: {
           create: [
@@ -285,6 +302,19 @@ export async function uploadPaymentProofHandler(request: FastifyRequest, reply: 
       },
     });
 
+    let usdEquivalent = parseFloat(fields.usdEquivalent || '0') || null;
+    let exchangeRate = parseFloat(fields.exchangeRate || '0') || null;
+
+    if (!usdEquivalent) {
+      if (currency === 'USD') {
+        usdEquivalent = amount;
+      } else if (currency === 'CLP') {
+        const rateData = await getUsdToClpExchangeRate();
+        exchangeRate = exchangeRate || rateData.rate;
+        usdEquivalent = Number((amount / exchangeRate).toFixed(2));
+      }
+    }
+
     // 2. Generar correlativo de pago
     const code = await generateSequence(tx, 'PAY');
 
@@ -299,6 +329,8 @@ export async function uploadPaymentProofHandler(request: FastifyRequest, reply: 
         paymentMethod,
         transactionRef,
         proofDocumentId: document.id,
+        usdEquivalent: usdEquivalent ? new Prisma.Decimal(usdEquivalent) : null,
+        exchangeRate: exchangeRate ? new Prisma.Decimal(exchangeRate) : null,
         status: PaymentStatus.CONFIRMED,
         allocations: {
           create: [

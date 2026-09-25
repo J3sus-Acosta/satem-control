@@ -17,10 +17,13 @@ import { DocumentGeneratorPage } from './pages/DocumentGeneratorPage';
 
 const queryClient = new QueryClient();
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ color: '#fff', padding: '40px' }}>Cargando sesión...</div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 };
 
@@ -47,8 +50,22 @@ export const App: React.FC = () => {
               <Route path="documents/generator" element={<DocumentGeneratorPage />} />
               <Route path="billing" element={<BillingPage />} />
               <Route path="bank" element={<BankPage />} />
-              <Route path="admin/templates" element={<TemplatesPage />} />
-              <Route path="admin/templates/:id/editor" element={<TemplateEditorPage />} />
+              <Route
+                path="admin/templates"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS']}>
+                    <TemplatesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/templates/:id/editor"
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN', 'OPERATIONS']}>
+                    <TemplateEditorPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="contracts/wizard" element={<ContractWizardPage />} />
             </Route>
 

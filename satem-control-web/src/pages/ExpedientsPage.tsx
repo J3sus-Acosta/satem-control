@@ -5,8 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import {
   FolderKanban, Plus, CheckCircle, AlertTriangle, Download,
   FileText, Lock, ShieldAlert, Clock, History, FilePlus, Upload,
-  DollarSign, Receipt, CreditCard, ExternalLink, ChevronDown, ChevronUp, RotateCcw
+  DollarSign, Receipt, CreditCard, ExternalLink, ChevronDown, ChevronUp, RotateCcw,
+  Trash2, Calculator, X
 } from 'lucide-react';
+import { SumUpCalculator } from '../components/SumUpCalculator';
 
 export const ExpedientsPage: React.FC = () => {
   const { user } = useAuth();
@@ -20,6 +22,7 @@ export const ExpedientsPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSumUpModal, setShowSumUpModal] = useState(false);
   const [sidebarLimit, setSidebarLimit] = useState<number>(6);
 
   // Form Factura SII
@@ -39,6 +42,8 @@ export const ExpedientsPage: React.FC = () => {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payMethod, setPayMethod] = useState('SumUp Link');
   const [payRef, setPayRef] = useState('');
+  const [payUsdEquivalent, setPayUsdEquivalent] = useState('');
+  const [payExchangeRate, setPayExchangeRate] = useState('');
   const [payFile, setPayFile] = useState<File | null>(null);
   const [sumUpInfo, setSumUpInfo] = useState<any>(null);
   const [parsingSumUp, setParsingSumUp] = useState(false);
@@ -224,6 +229,8 @@ export const ExpedientsPage: React.FC = () => {
     formData.append('paymentDate', payDate);
     formData.append('paymentMethod', payMethod);
     if (payRef) formData.append('transactionRef', payRef);
+    if (payUsdEquivalent) formData.append('usdEquivalent', payUsdEquivalent);
+    if (payExchangeRate) formData.append('exchangeRate', payExchangeRate);
     formData.append('proofFile', payFile);
 
     try {
@@ -235,6 +242,8 @@ export const ExpedientsPage: React.FC = () => {
       setPayAmount('');
       setPayAllocatedAmount(null);
       setPayRef('');
+      setPayUsdEquivalent('');
+      setPayExchangeRate('');
       setPayFile(null);
       setSumUpInfo(null);
       fetchExpedientDetail(selectedExpedient.id);
@@ -386,9 +395,25 @@ export const ExpedientsPage: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         link.remove();
+        window.URL.revokeObjectURL(fileUrl);
       }
     } catch (err: any) {
       alert('Error al descargar o visualizar el documento adjunto');
+    }
+  };
+
+  const handleDeleteAttachedDoc = async (docId: string, filename?: string) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar el documento "${filename || 'seleccionado'}"? Esta acción lo removerá de este expediente permanentemente.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/documents/${docId}`);
+      if (selectedExpedient) {
+        await fetchExpedientDetail(selectedExpedient.id);
+        await fetchExpedients();
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al eliminar el documento adjunto');
     }
   };
 
@@ -622,6 +647,14 @@ export const ExpedientsPage: React.FC = () => {
                   {!isViewer && (
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
+                        onClick={() => setShowSumUpModal(true)}
+                        className="btn btn-secondary"
+                        style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
+                        title="Calcular cobro SumUp en CLP con Dólar Observado en vivo"
+                      >
+                        <Calculator size={14} /> Calculadora SumUp
+                      </button>
+                      <button
                         onClick={() => setShowInvoiceModal(true)}
                         className="btn btn-secondary"
                         style={{ fontSize: '12px', padding: '6px 12px' }}
@@ -664,8 +697,39 @@ export const ExpedientsPage: React.FC = () => {
                               ✓ {item.observation}
                             </div>
                           )}
+                          {item.code === 'RECONCILIATION_COMPLETED' && (
+                            <div style={{ marginTop: '10px', maxWidth: '460px' }}>
+                              {(() => {
+                                const match = item.observation?.match(/Progreso:\s*(\d+)%/) || item.observation?.match(/Pagado y Conciliado:\s*(\d+)%/);
+                                const reconPct = match ? parseInt(match[1], 10) : (isCompleted ? 100 : 0);
+                                return (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '5px' }}>
+                                      <span style={{ color: 'var(--text-secondary)' }}>Progreso de Cobro del Contrato (USD)</span>
+                                      <span style={{ fontWeight: 'bold', color: reconPct >= 100 ? 'var(--success)' : (reconPct > 0 ? 'var(--warning)' : 'var(--text-muted)') }}>
+                                        {reconPct}% {reconPct >= 100 ? '(Totalmente Pagado)' : (reconPct > 0 ? '(Abono Parcial Recibido)' : '(Pendiente de Abono)')}
+                                      </span>
+                                    </div>
+                                    <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
+                                      <div
+                                        style={{
+                                          width: `${Math.max(0, Math.min(100, reconPct))}%`,
+                                          height: '100%',
+                                          background: reconPct >= 100
+                                            ? 'linear-gradient(90deg, #10b981, #059669)'
+                                            : 'linear-gradient(90deg, #f59e0b, #d97706)',
+                                          borderRadius: '4px',
+                                          transition: 'width 0.4s ease'
+                                        }}
+                                      />
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
                           {item.completedAt && (
-                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                               Completado el: {new Date(item.completedAt).toLocaleString('es-CL')}
                             </div>
                           )}
@@ -721,11 +785,11 @@ export const ExpedientsPage: React.FC = () => {
 
                           {item.code === 'RECONCILIATION_COMPLETED' && (
                             <button
-                              onClick={() => navigate('/reconciliation')}
+                              onClick={() => navigate('/bank')}
                               className="btn btn-secondary"
                               style={{ fontSize: '11px', padding: '4px 10px' }}
                             >
-                              <ExternalLink size={13} /> Ir a Conciliación
+                              <ExternalLink size={13} /> Ir a Conciliación Bancaria
                             </button>
                           )}
 
@@ -955,7 +1019,7 @@ export const ExpedientsPage: React.FC = () => {
                               SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {new Date(doc.createdAt).toLocaleString('es-CL')}
                             </div>
                           </div>
-                          <div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <button
                               onClick={() => handleViewAttachedDoc(doc.id, doc.originalName)}
                               className="btn btn-secondary"
@@ -963,6 +1027,27 @@ export const ExpedientsPage: React.FC = () => {
                             >
                               <FileText size={14} /> Ver Documento
                             </button>
+                            {!isViewer && (
+                              <button
+                                onClick={() => handleDeleteAttachedDoc(doc.id, doc.originalName)}
+                                className="btn btn-danger"
+                                style={{
+                                  fontSize: '12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                  color: '#f87171',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  padding: '6px 12px',
+                                  borderRadius: 'var(--radius-sm)',
+                                  cursor: 'pointer'
+                                }}
+                                title="Eliminar documento adjunto del expediente"
+                              >
+                                <Trash2 size={14} /> Eliminar
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -1197,6 +1282,25 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Equivalente en USD Pactado <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span></label>
+                  <input
+                    type="number" step="0.01" className="form-input" placeholder="Ej: 50.00"
+                    value={payUsdEquivalent} onChange={(e) => setPayUsdEquivalent(e.target.value)}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Monto que amortiza este pago del contrato</div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tipo de Cambio Aplicado <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(CLP/USD)</span></label>
+                  <input
+                    type="number" step="0.01" className="form-input" placeholder="Ej: 955.00"
+                    value={payExchangeRate} onChange={(e) => setPayExchangeRate(e.target.value)}
+                  />
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Dólar fijado al momento del cobro</div>
+                </div>
+              </div>
+
               <div className="form-group" style={{ marginBottom: '20px' }}>
                 <label className="form-label">N° Transacción / Ref. Bancaria <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span></label>
                 <input
@@ -1316,6 +1420,33 @@ export const ExpedientsPage: React.FC = () => {
                 <button type="submit" className="btn btn-primary">Registrar Excepción</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Calculadora SumUp */}
+      {showSumUpModal && selectedExpedient && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '20px' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', width: '800px', maxWidth: '95vw', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calculator size={18} color="var(--accent-primary)" />
+                <h3 style={{ fontSize: '16px', margin: 0 }}>Calculadora de Cobro SumUp — {selectedExpedient.code}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSumUpModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ padding: '20px' }}>
+              <SumUpCalculator
+                initialAmountUsd={Number(selectedExpedient.contract?.totalAmount || selectedExpedient.invoices?.[0]?.totalAmount || '')}
+                expedientCode={selectedExpedient.code}
+                customerName={selectedExpedient.customer?.legalName}
+              />
+            </div>
           </div>
         </div>
       )}

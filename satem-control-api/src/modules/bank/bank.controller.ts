@@ -1,9 +1,13 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { z } from 'zod';
 import * as xlsx from 'xlsx';
 import { parse } from 'csv-parse/sync';
-import { Prisma, ReconciliationStatus } from '@prisma/client';
+import { Prisma, ReconciliationStatus, DocumentCategory } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
+import { env } from '../../config/env.js';
 import { NotFoundError, AppError } from '../../common/errors/app-error.js';
 import { generateSequence } from '../../common/utils/sequence.js';
 import { createAuditLog } from '../../common/utils/audit.js';
@@ -122,15 +126,145 @@ function parseChileanDate(val: any): Date | null {
   return null;
 }
 
+async function updateExpedientIntegrityReconciliation(
+  tx: Prisma.TransactionClient,
+  expedientId: string,
+  receiptCode: string,
+  reconciledAmountClp: number,
+  userId?: string
+) {
+  const expedient = await tx.expedient.findUnique({
+    where: { id: expedientId },
+    include: {
+      contract: true,
+      invoices: {
+        include: {
+          paymentRequests: {
+            include: {
+              payments: {
+                include: {
+                  allocations: {
+                    include: { reconciliations: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      documentLinks: {
+        include: {
+          document: {
+            include: {
+              paymentProof: {
+                include: {
+                  allocations: {
+                    include: { reconciliations: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!expedient) return;
+
+  let totalReconciledClp = 0;
+  let totalReconciledUsd = 0;
+  const seenRecIds = new Set<string>();
+
+  for (const inv of expedient.invoices) {
+    for (const pr of inv.paymentRequests) {
+      for (const p of pr.payments) {
+        for (const alloc of p.allocations) {
+          for (const rec of alloc.reconciliations) {
+            if (!seenRecIds.has(rec.id)) {
+              seenRecIds.add(rec.id);
+              totalReconciledClp += Number(rec.receivedAmountClp || 0);
+              const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
+              totalReconciledUsd += pUsd;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (const link of expedient.documentLinks) {
+    if (link.document?.paymentProof) {
+      for (const p of link.document.paymentProof) {
+        for (const alloc of p.allocations) {
+          for (const rec of alloc.reconciliations) {
+            if (!seenRecIds.has(rec.id)) {
+              seenRecIds.add(rec.id);
+              totalReconciledClp += Number(rec.receivedAmountClp || 0);
+              const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
+              totalReconciledUsd += pUsd;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const contractAmount = Number(expedient.contract?.totalAmount || 0);
+  const totalInvoiceAmount = expedient.invoices.reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+  const currency = expedient.contract?.currency || expedient.invoices[0]?.currency || 'USD';
+
+  let progressText = '';
+  let isComplete = false;
+
+  if (currency === 'USD' && (contractAmount > 0 || totalInvoiceAmount > 0)) {
+    const targetUsd = contractAmount > 0 ? contractAmount : totalInvoiceAmount;
+    let pct = Math.min(100, Math.round((totalReconciledUsd / targetUsd) * 100));
+    if (pct >= 99) pct = 100;
+    isComplete = pct >= 100 || (totalReconciledClp > 0 && targetUsd <= totalReconciledUsd);
+    progressText = ` • Progreso: ${pct}% ($${totalReconciledUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / $${targetUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD) • Total Líquido Santander: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
+  } else if (currency === 'CLP' && contractAmount > 0) {
+    let pct = Math.min(100, Math.round((totalReconciledClp / contractAmount) * 100));
+    if (pct >= 99) pct = 100;
+    isComplete = pct >= 100;
+    progressText = ` • Pagado y Conciliado: ${pct}% ($${totalReconciledClp.toLocaleString('es-CL')} / $${contractAmount.toLocaleString('es-CL')} CLP)`;
+  } else if (totalReconciledClp > 0) {
+    isComplete = true;
+    progressText = ` • Total Conciliado en Banco: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
+  }
+
+  await tx.expedientIntegrityItem.updateMany({
+    where: { expedientId, code: 'RECONCILIATION_COMPLETED' },
+    data: {
+      status: 'COMPLETED',
+      observation: `Conciliación bancaria Santander confirmada (${receiptCode})${progressText}`,
+      completedAt: new Date(),
+      completedById: userId,
+    },
+  });
+}
+
 export async function listBankReceiptsHandler(request: FastifyRequest, reply: FastifyReply) {
   const receipts = await prisma.bankReceipt.findMany({
     include: {
+      rawSourceFile: true,
       reconciliations: {
         include: {
           paymentAllocation: {
             include: {
               payment: {
                 include: {
+                  proofDocument: {
+                    include: {
+                      links: {
+                        include: {
+                          expedient: {
+                            include: { customer: true },
+                          },
+                        },
+                      },
+                    },
+                  },
                   paymentRequest: {
                     include: {
                       invoice: {
@@ -156,12 +290,15 @@ export async function listBankReceiptsHandler(request: FastifyRequest, reply: Fa
 }
 
 export async function previewBankImportHandler(request: FastifyRequest, reply: FastifyReply) {
+  const userId = (request.user as any)?.userId;
   let rawBuffer: Buffer | null = null;
   let filename = '';
+  let mimetype = '';
 
   for await (const part of request.parts()) {
     if (part.type === 'file') {
       filename = part.filename;
+      mimetype = part.mimetype;
       rawBuffer = await part.toBuffer();
     }
   }
@@ -171,6 +308,36 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
   }
 
   const isPdf = filename.toLowerCase().endsWith('.pdf') || (rawBuffer.length > 4 && rawBuffer.toString('utf8', 0, 4) === '%PDF');
+
+  // Guardar archivo físico y registrar Document para trazabilidad y visualización oficial
+  const sha256 = crypto.createHash('sha256').update(rawBuffer).digest('hex');
+  const year = new Date().getFullYear();
+  const targetDir = path.join(env.STORAGE_PATH, String(year), 'BANK_CARTOLAS');
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const ext = path.extname(filename) || (isPdf ? '.pdf' : '.csv');
+  const internalName = `${Date.now()}_${crypto.randomBytes(8).toString('hex')}${ext}`;
+  const storagePath = path.join(targetDir, internalName);
+  fs.writeFileSync(storagePath, rawBuffer);
+
+  let finalUserId = userId;
+  if (!finalUserId) {
+    const admin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    finalUserId = admin?.id || 'SYSTEM';
+  }
+
+  const doc = await prisma.document.create({
+    data: {
+      originalName: filename || `Cartola_Santander_${Date.now()}${ext}`,
+      internalName,
+      mimeType: isPdf ? 'application/pdf' : (filename.endsWith('.xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : (mimetype || 'text/csv')),
+      fileSize: BigInt(rawBuffer.length),
+      sha256,
+      storagePath,
+      category: DocumentCategory.BANK_RECEIPT,
+      uploadedById: finalUserId,
+    },
+  });
 
   // 1. Si es PDF, parsear directamente con el motor de Cartola Santander
   if (isPdf) {
@@ -207,6 +374,8 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
           totalRows: preview.length,
           duplicateRowsCount: preview.filter((p) => p.isPossibleDuplicate).length,
           rows: preview,
+          rawSourceFileId: doc.id,
+          rawSourceFileName: doc.originalName,
         },
       });
     } catch (pdfErr: any) {
@@ -243,7 +412,6 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
     throw new AppError('El archivo de cartola bancaria está vacío.', 400);
   }
 
-  // 4. Localizar fila de encabezados y mapear columnas exactas de Santander Chile
   let headerRowIndex = -1;
   let montoCol = -1;
   let descCol = -1;
@@ -252,51 +420,45 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
   let cargoAbonoCol = -1;
   let movCol = -1;
 
-  for (let i = 0; i < Math.min(rows2D.length, 30); i++) {
-    const row = rows2D[i];
+  for (let r = 0; r < Math.min(rows2D.length, 30); r++) {
+    const row = rows2D[r];
     if (!Array.isArray(row)) continue;
-
-    const rowStr = row.map((c) => String(c || '').trim()).join(' ').toLowerCase();
-
-    // Detectar cuenta corriente en metadatos iniciales
-    if (rowStr.includes('cuenta') && (rowStr.includes('corriente') || rowStr.includes('cte') || rowStr.includes('n°') || rowStr.includes('n°:'))) {
-      const ctaMatch = rowStr.match(/(?:cuenta\s*corriente\s*n[°o\.]*\s*[:#]?\s*)([0-9\-]+)/i) || rowStr.match(/([0-9\-]{5,})/);
-      if (ctaMatch && ctaMatch[1]) {
-        detectedAccount = `Santander Cta Cte ${ctaMatch[1]}`;
-      }
-    }
 
     let colMonto = -1;
     let colDesc = -1;
-    let colFecha = -1;
+    let colDate = -1;
     let colDoc = -1;
     let colCargoAbono = -1;
     let colMov = -1;
 
     for (let c = 0; c < row.length; c++) {
       const cell = String(row[c] || '').trim().toLowerCase();
-      if (!cell) continue;
 
-      if (cell === 'monto' || cell === 'importe' || cell === 'valor') {
+      if (cell.includes('cuenta') && c + 1 < row.length) {
+        const nextCell = String(row[c + 1] || '').trim();
+        if (nextCell) detectedAccount = `Santander Cta Cte ${nextCell}`;
+      }
+
+      if (cell === 'monto' || cell === 'abono' || cell === 'abonos' || cell === 'valor' || cell === 'importe') {
         colMonto = c;
-      } else if (cell.includes('descripci') || cell.includes('detalle') || cell.includes('concepto')) {
+      } else if (cell.includes('descrip') || cell.includes('concepto') || cell.includes('detalle')) {
         colDesc = c;
-      } else if (cell === 'fecha' || cell === 'fec.' || cell === 'date') {
-        colFecha = c;
-      } else if (cell.includes('cargo/abono') || cell === 'c/a' || cell === 'cargo / abono') {
-        colCargoAbono = c;
-      } else if (cell.includes('documento') || cell === 'n° documento' || cell === 'doc') {
+      } else if (cell.includes('fecha') || cell === 'fec.') {
+        colDate = c;
+      } else if (cell.includes('doc') || cell.includes('comprobante') || cell.includes('cheque/ref')) {
         colDoc = c;
-      } else if (cell.includes('movimiento') && (cell.includes('n°') || cell.includes('nro') || cell.includes('num'))) {
+      } else if (cell.includes('cargo/abono') || cell.includes('c/a') || cell.includes('tipo')) {
+        colCargoAbono = c;
+      } else if (cell.includes('movimiento') || cell.includes('n° mov') || cell.includes('nro mov') || cell.includes('correlativo')) {
         colMov = c;
       }
     }
 
-    if (colMonto !== -1 && (colDesc !== -1 || colFecha !== -1)) {
-      headerRowIndex = i;
+    if (colMonto !== -1 && (colDesc !== -1 || colDate !== -1)) {
+      headerRowIndex = r;
       montoCol = colMonto;
       descCol = colDesc;
-      dateCol = colFecha;
+      dateCol = colDate;
       cargoAbonoCol = colCargoAbono;
       docCol = colDoc;
       movCol = colMov;
@@ -304,9 +466,8 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
     }
   }
 
-  // Fallback a columnas estándar Santander (A: MONTO, B: DESCRIPCION, C: FECHA, D: SALDO, E: N° DOC, G: CARGO/ABONO, H: N° MOV)
   if (headerRowIndex === -1) {
-    headerRowIndex = 11; // Fila 12 (0-indexed 11)
+    headerRowIndex = 11;
     montoCol = 0;
     descCol = 1;
     dateCol = 2;
@@ -324,7 +485,7 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
 
     const rawDateVal = dateCol !== -1 ? row[dateCol] : null;
     const parsedDate = parseChileanDate(rawDateVal);
-    if (!parsedDate) continue; // Saltar filas que no son transacciones (totales, saldos, etc.)
+    if (!parsedDate) continue;
 
     const rawDesc = descCol !== -1 ? String(row[descCol] || '').trim() : 'Movimiento Santander';
     if (!rawDesc || /^(saldo\s*inicial|saldo\s*final|total|totales)/i.test(rawDesc)) {
@@ -369,6 +530,8 @@ export async function previewBankImportHandler(request: FastifyRequest, reply: F
       totalRows: preview.length,
       duplicateRowsCount: preview.filter((p) => p.isPossibleDuplicate).length,
       rows: preview,
+      rawSourceFileId: doc.id,
+      rawSourceFileName: doc.originalName,
     },
   });
 }
@@ -402,7 +565,7 @@ export async function confirmBankImportHandler(request: FastifyRequest, reply: F
       action: 'IMPORT_BANK_RECEIPTS',
       entity: 'BankReceipt',
       entityId: `BATCH_${createdReceipts.length}`,
-      afterData: { count: createdReceipts.length, accountNumber: body.accountNumber },
+      afterData: { count: createdReceipts.length, accountNumber: body.accountNumber, rawSourceFileId: body.rawSourceFileId },
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'],
     });
@@ -415,6 +578,47 @@ export async function confirmBankImportHandler(request: FastifyRequest, reply: F
     data: imported,
     message: `${imported.length} movimientos de cartola Santander importados exitosamente.`,
   });
+}
+
+export async function deleteBankReceiptHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  const { id } = request.params;
+  const userId = (request.user as any)?.userId;
+
+  const receipt = await prisma.bankReceipt.findUnique({
+    where: { id },
+    include: { reconciliations: true },
+  });
+
+  if (!receipt) {
+    throw new NotFoundError('Movimiento bancario no encontrado');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (receipt.reconciliations.length > 0) {
+      await tx.bankReconciliation.deleteMany({
+        where: { bankReceiptId: id },
+      });
+    }
+
+    await tx.bankReceipt.delete({
+      where: { id },
+    });
+
+    await createAuditLog(tx, {
+      userId,
+      action: 'DELETE_BANK_RECEIPT',
+      entity: 'BankReceipt',
+      entityId: id,
+      beforeData: receipt,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+  });
+
+  return reply.send({ success: true, message: 'Movimiento bancario eliminado exitosamente' });
 }
 
 export async function reconcileHandler(request: FastifyRequest, reply: FastifyReply) {
@@ -436,23 +640,35 @@ export async function reconcileHandler(request: FastifyRequest, reply: FastifyRe
       },
     });
 
-    await tx.bankReceipt.update({
+    const receipt = await tx.bankReceipt.update({
       where: { id: body.bankReceiptId },
       data: {
         status: discrepancyAmountClp > 0 ? ReconciliationStatus.DISCREPANCY : ReconciliationStatus.RECONCILED,
       },
     });
 
-    if (body.expedientId) {
-      await tx.expedientIntegrityItem.updateMany({
-        where: { expedientId: body.expedientId, code: 'RECONCILIATION_COMPLETED' },
-        data: {
-          status: 'COMPLETED',
-          observation: `Conciliación bancaria Santander efectuada exitosamente`,
-          completedAt: new Date(),
-          completedById: userId,
+    // Resolver expediente
+    let targetExpedientId = body.expedientId;
+    if (!targetExpedientId) {
+      const alloc = await tx.paymentAllocation.findUnique({
+        where: { id: body.paymentAllocationId },
+        include: {
+          payment: {
+            include: {
+              paymentRequest: { include: { invoice: true } },
+              proofDocument: { include: { links: true } },
+            },
+          },
         },
       });
+      targetExpedientId =
+        alloc?.payment?.paymentRequest?.invoice?.expedientId ||
+        alloc?.payment?.proofDocument?.links?.find((l) => l.expedientId)?.expedientId ||
+        undefined;
+    }
+
+    if (targetExpedientId) {
+      await updateExpedientIntegrityReconciliation(tx, targetExpedientId, receipt.code, body.receivedAmountClp, userId);
     }
 
     await createAuditLog(tx, {
@@ -474,18 +690,17 @@ export async function reconcileHandler(request: FastifyRequest, reply: FastifyRe
 export async function autoMatchBankHandler(request: FastifyRequest, reply: FastifyReply) {
   const userId = (request.user as any)?.userId;
 
-  // 1. Obtener recibos bancarios sin conciliar
   const unreconciledReceipts = await prisma.bankReceipt.findMany({
     where: { status: ReconciliationStatus.UNRECONCILED },
     orderBy: { transactionDate: 'asc' },
   });
 
-  // 2. Obtener pagos y asignaciones disponibles
   const paymentAllocations = await prisma.paymentAllocation.findMany({
     where: { reconciliations: { none: {} } },
     include: {
       payment: {
         include: {
+          proofDocument: { include: { links: true } },
           paymentRequest: {
             include: {
               invoice: {
@@ -498,17 +713,22 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
     },
   });
 
+  // Priorizar alocaciones que tengan expediente o documento vinculado
+  paymentAllocations.sort((a, b) => {
+    const aHasExp = (a.payment.paymentRequest?.invoice?.expedientId || a.payment.proofDocument?.links?.length) ? 1 : 0;
+    const bHasExp = (b.payment.paymentRequest?.invoice?.expedientId || b.payment.proofDocument?.links?.length) ? 1 : 0;
+    return bHasExp - aHasExp;
+  });
+
   let matchCount = 0;
 
   for (const receipt of unreconciledReceipts) {
     const receiptAmount = Number(receipt.amountClp);
     if (receiptAmount <= 0) continue;
 
-    // Buscar coincidencia por referencia exacta, por monto neto asignado o por identificación SumUp
     const match = paymentAllocations.find((alloc) => {
       const p = alloc.payment;
 
-      // 1. Coincidencia por número de referencia bancaria o SumUp PID
       if (receipt.referenceNumber && p.transactionRef) {
         const refR = receipt.referenceNumber.trim().toLowerCase();
         const refP = p.transactionRef.trim().toLowerCase();
@@ -523,12 +743,10 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
       const allocAmount = Number(alloc.allocatedAmount);
       const grossAmount = Number(p.amount);
 
-      // 2. Coincidencia exacta de monto asignado (neto en Santander)
       if (Math.abs(allocAmount - receiptAmount) < 1) {
         return true;
       }
 
-      // 3. Coincidencia de SumUp por monto bruto o neto
       if (isSumUpBank && isSumUpPayment && (Math.abs(allocAmount - receiptAmount) < 1 || Math.abs(grossAmount - receiptAmount) < 1)) {
         return true;
       }
@@ -537,7 +755,11 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
     });
 
     if (match) {
-      const expedId = match.payment.paymentRequest?.invoice?.expedientId;
+      const expedId =
+        match.payment.paymentRequest?.invoice?.expedientId ||
+        match.payment.proofDocument?.links?.find((l) => l.expedientId)?.expedientId ||
+        match.payment.proofDocument?.links?.find((l) => l.entityType === 'EXPEDIENT')?.entityId;
+
       await prisma.$transaction(async (tx) => {
         await tx.bankReconciliation.create({
           data: {
@@ -557,15 +779,7 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
         });
 
         if (expedId) {
-          await tx.expedientIntegrityItem.updateMany({
-            where: { expedientId: expedId, code: 'RECONCILIATION_COMPLETED' },
-            data: {
-              status: 'COMPLETED',
-              observation: `Conciliación bancaria Santander emparejada con abono (${receipt.code})`,
-              completedAt: new Date(),
-              completedById: userId,
-            },
-          });
+          await updateExpedientIntegrityReconciliation(tx, expedId, receipt.code, receiptAmount, userId);
         }
       });
 

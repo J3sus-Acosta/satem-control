@@ -5,10 +5,12 @@ import { prisma } from '../../config/prisma.js';
 import { generateSequence } from '../../common/utils/sequence.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 
+import { getUsdToClpExchangeRate } from '../exchange-rates/exchange-rates.service.js';
+
 const calculateSumupSchema = z.object({
   requestedAmount: z.number().positive(),
-  exchangeRate: z.number().positive(),
-  estimatedFeePercent: z.number().nonnegative().default(3.5),
+  exchangeRate: z.number().positive().optional(),
+  estimatedFeePercent: z.number().nonnegative().default(3.8085), // 3.2% + IVA (19%) = 3.8085%
 });
 
 const createPaymentRequestSchema = z.object({
@@ -16,9 +18,9 @@ const createPaymentRequestSchema = z.object({
   requestedAmount: z.number().positive(),
   currency: z.string().default('USD'),
   exchangeRate: z.number().positive(),
-  exchangeRateSource: z.string().default('Banco Central de Chile'),
+  exchangeRateSource: z.string().default('mindicador.cl (Banco Central de Chile)'),
   exchangeRateDate: z.string().transform((v) => new Date(v)),
-  estimatedFeePercent: z.number().default(3.5),
+  estimatedFeePercent: z.number().default(3.8085),
   finalClpToCharge: z.number().positive(),
   isManualOverride: z.boolean().default(false),
   overrideReason: z.string().optional(),
@@ -29,19 +31,39 @@ const createPaymentRequestSchema = z.object({
 export async function calculateSumupHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = calculateSumupSchema.parse(request.body);
 
-  const targetClpEquivalent = body.requestedAmount * body.exchangeRate;
-  const feeDecimal = body.estimatedFeePercent / 100;
-  const suggestedClpToCharge = Math.ceil(targetClpEquivalent / (1 - feeDecimal));
+  let rate = body.exchangeRate;
+  let rateSource = 'Manual';
+  let rateDate = new Date().toISOString();
+
+  if (!rate || rate <= 0) {
+    const liveRate = await getUsdToClpExchangeRate();
+    rate = liveRate.rate;
+    rateSource = liveRate.source;
+    rateDate = liveRate.rateDate;
+  }
+
+  // REGLA DE COBRO: El cliente paga exactamente el equivalente acordado en USD sin recargo artificial
+  const clpToCharge = Math.round(body.requestedAmount * rate);
+
+  // REGLA DE LIQUIDACIÓN INTERNA: Tarjetas Internacionales SumUp (3.2% + IVA = 3.8085%)
+  const feePercent = body.estimatedFeePercent ?? 3.8085;
+  const feeDecimal = feePercent / 100;
+  const feeAmountClpEstimated = Math.round(clpToCharge * feeDecimal);
+  const netLiquidityClp = clpToCharge - feeAmountClpEstimated;
 
   return reply.send({
     success: true,
     data: {
       requestedAmount: body.requestedAmount,
-      exchangeRate: body.exchangeRate,
-      targetClpEquivalent,
-      estimatedFeePercent: body.estimatedFeePercent,
-      suggestedClpToCharge,
-      feeAmountClpEstimated: Math.ceil(suggestedClpToCharge * feeDecimal),
+      exchangeRate: rate,
+      exchangeRateSource: rateSource,
+      exchangeRateDate: rateDate,
+      clpToCharge,
+      suggestedClpToCharge: clpToCharge,
+      estimatedFeePercent: feePercent,
+      feeAmountClpEstimated,
+      netLiquidityClp,
+      disclaimer: 'El cobro final en el link se procesará en CLP al tipo de cambio de hoy. Su banco internacional podría aplicar un cargo por conversión de hasta un 3% adicional de forma independiente.',
     },
   });
 }

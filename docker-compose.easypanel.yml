@@ -14,7 +14,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -37,7 +37,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-satem_jwt_refresh_prod_secret_2026}
       COOKIE_SECRET: ${COOKIE_SECRET:-satem_cookie_prod_secret_2026}
       STORAGE_PATH: /app/storage
-      FRONTEND_URL: ${FRONTEND_URL:-https://satem-control.yourdomain.com}
+      FRONTEND_URL: ${FRONTEND_URL:-https://app.satem.cl}
     volumes:
       - storage_data:/app/storage
     ports:
@@ -51,6 +51,8 @@ services:
     build:
       context: ./satem-control-web
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.satem.cl}
     container_name: satem-control-web
     restart: always
     ports:

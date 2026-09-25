@@ -157,3 +157,96 @@ export async function downloadDocumentHandler(
   const stream = fs.createReadStream(doc.storagePath);
   return reply.send(stream);
 }
+
+export async function deleteDocumentHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  const userId = (request.user as any)?.userId;
+  const { id } = request.params;
+
+  const doc = await prisma.document.findUnique({
+    where: { id },
+  });
+
+  if (!doc) {
+    throw new NotFoundError('Documento no encontrado');
+  }
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // 1. Desvincular de ExpedientIntegrityItem si estuviese referenciado
+    await tx.expedientIntegrityItem.updateMany({
+      where: { documentId: id },
+      data: { documentId: null },
+    });
+
+    // 2. Desvincular de Payment
+    await tx.payment.updateMany({
+      where: { proofDocumentId: id },
+      data: { proofDocumentId: null },
+    });
+
+    // 3. Desvincular de BankReceipt
+    await tx.bankReceipt.updateMany({
+      where: { rawSourceFileId: id },
+      data: { rawSourceFileId: null },
+    });
+
+    // 4. Desvincular de Invoice (PDF y XML)
+    await tx.invoice.updateMany({
+      where: { pdfDocumentId: id },
+      data: { pdfDocumentId: null },
+    });
+    await tx.invoice.updateMany({
+      where: { xmlDocumentId: id },
+      data: { xmlDocumentId: null },
+    });
+
+    // 5. Desvincular de ReceptionConformity
+    await tx.receptionConformity.updateMany({
+      where: { documentId: id },
+      data: { documentId: null },
+    });
+
+    // 6. Eliminar enlaces asociados en document_links
+    await tx.documentLink.deleteMany({
+      where: { documentId: id },
+    });
+
+    // 7. Eliminar registro del documento
+    await tx.document.delete({
+      where: { id },
+    });
+
+    // 8. Registrar evento en auditoría
+    await createAuditLog(tx, {
+      userId,
+      action: 'DELETE_DOCUMENT',
+      entity: 'Document',
+      entityId: id,
+      beforeData: {
+        originalName: doc.originalName,
+        category: doc.category,
+        sha256: doc.sha256,
+        storagePath: doc.storagePath,
+      },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+  });
+
+  // Eliminar archivo físico de almacenamiento de forma segura
+  try {
+    if (doc.storagePath && fs.existsSync(doc.storagePath)) {
+      fs.unlinkSync(doc.storagePath);
+    }
+  } catch (fsErr) {
+    console.error('Error al eliminar archivo físico de documento:', fsErr);
+  }
+
+  return reply.send({
+    success: true,
+    message: 'Documento eliminado exitosamente',
+  });
+}
+

@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { FolderKanban, Lock, Mail, AlertCircle } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('admin@satem.cl');
-  const [password, setPassword] = useState('Satem2026!Control');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,6 +51,7 @@ export const LoginPage: React.FC = () => {
                 type="email"
                 className="form-input"
                 style={{ paddingLeft: '40px' }}
+                placeholder="ejemplo@satemsoluciones.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -66,6 +67,7 @@ export const LoginPage: React.FC = () => {
                 type="password"
                 className="form-input"
                 style={{ paddingLeft: '40px' }}
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

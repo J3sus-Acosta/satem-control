@@ -5,6 +5,7 @@ import {
   Calculator, FileSpreadsheet, RefreshCw,
   FileText, ChevronDown, ChevronUp, Plus, Download, Upload
 } from 'lucide-react';
+import { SumUpCalculator } from '../components/SumUpCalculator';
 
 export const BillingPage: React.FC = () => {
   const { user } = useAuth();
@@ -22,10 +23,6 @@ export const BillingPage: React.FC = () => {
 
   // Calculadora SumUp
   const [showCalc, setShowCalc] = useState(false);
-  const [requestedAmount, setRequestedAmount] = useState('1000');
-  const [exchangeRate, setExchangeRate] = useState('940.50');
-  const [feePercent, setFeePercent] = useState('3.5');
-  const [calcResult, setCalcResult] = useState<any>(null);
 
   // Modal Registrar Folio SII
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -48,18 +45,6 @@ export const BillingPage: React.FC = () => {
     fetchInvoices();
     api.get('/expedients').then((res) => setExpedients(res.data.data || [])).catch(() => {});
   }, []);
-
-  const handleCalculateSumup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await api.post('/sumup/calculate', {
-        requestedAmount: parseFloat(requestedAmount),
-        exchangeRate: parseFloat(exchangeRate),
-        estimatedFeePercent: parseFloat(feePercent),
-      });
-      setCalcResult(res.data.data);
-    } catch { alert('Error al calcular valor SumUp'); }
-  };
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,7 +301,7 @@ export const BillingPage: React.FC = () => {
         )}
       </div>
 
-      {/* Calculadora SumUp colapsable */}
+      {/* Calculadora Dinámica SumUp colapsable */}
       <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
         <button
           onClick={() => setShowCalc(!showCalc)}
@@ -329,55 +314,15 @@ export const BillingPage: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Calculator size={18} color="var(--accent-primary)" />
-            <span style={{ fontWeight: 700, fontSize: '14px' }}>Calculadora de Cobro SumUp</span>
-            <span className="badge badge-info" style={{ fontSize: '11px' }}>Herramienta Auxiliar</span>
+            <span style={{ fontWeight: 700, fontSize: '14px' }}>Calculadora Dinámica de Cobros SumUp</span>
+            <span className="badge badge-success" style={{ fontSize: '11px' }}>Dólar en Tiempo Real</span>
           </div>
           {showCalc ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
         </button>
 
         {showCalc && (
-          <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-            <div>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                Calcula el monto bruto a cobrar en SumUp para que, tras descontar comisión, el neto equivalga al objetivo en USD.
-              </p>
-              <form onSubmit={handleCalculateSumup}>
-                <div className="form-group">
-                  <label className="form-label">Monto Solicitado (USD)</label>
-                  <input type="number" className="form-input" value={requestedAmount} onChange={(e) => setRequestedAmount(e.target.value)} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Tipo de Cambio (CLP/USD)</label>
-                  <input type="number" step="0.01" className="form-input" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Comisión SumUp (%)</label>
-                  <input type="number" step="0.1" className="form-input" value={feePercent} onChange={(e) => setFeePercent(e.target.value)} required />
-                </div>
-                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '8px' }}>Calcular</button>
-              </form>
-            </div>
-            <div>
-              {calcResult ? (
-                <div style={{ padding: '20px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-primary)', height: '100%' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Equivalente Objetivo Neto en CLP:</div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '16px' }}>
-                    ${calcResult.targetClpEquivalent?.toLocaleString()} CLP
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Monto Sugerido A Cobrar en SumUp:</div>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)', fontFamily: 'var(--font-heading)', marginBottom: '12px' }}>
-                    ${calcResult.suggestedClpToCharge?.toLocaleString()} CLP
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '10px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)' }}>
-                    Comisión: ${calcResult.feeAmountClpEstimated?.toLocaleString()} CLP ({calcResult.estimatedFeePercent}%)
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>
-                  <div><Calculator size={36} style={{ margin: '0 auto 12px', opacity: 0.2 }} /><br />Completa el formulario para calcular.</div>
-                </div>
-              )}
-            </div>
+          <div style={{ padding: '20px' }}>
+            <SumUpCalculator initialAmountUsd={100} />
           </div>
         )}
       </div>

@@ -5,6 +5,8 @@ import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 
+import rateLimit from '@fastify/rate-limit';
+
 // Soporte global de serialización para BigInt en JSON (ej. Document.fileSize)
 (BigInt.prototype as any).toJSON = function () {
   return Number(this);
@@ -32,6 +34,7 @@ import { companyRoutes } from './modules/company/company.routes.js';
 import { templatesRoutes } from './modules/templates/templates.routes.js';
 import { documentInstancesRoutes } from './modules/document-instances/document-instances.routes.js';
 import { auditLogsRoutes } from './modules/audit-logs/audit-logs.routes.js';
+import { exchangeRatesRoutes } from './modules/exchange-rates/exchange-rates.routes.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -39,13 +42,24 @@ export async function buildServer() {
   });
 
   await fastify.register(helmet, { contentSecurityPolicy: false });
+  await fastify.register(rateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
+  });
   await fastify.register(cors, {
     origin: (origin, cb) => {
-      // Permitir localhost, 127.0.0.1 y todas las IPs de red local (192.168.*, 172.*, 10.*)
-      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin) || origin === env.FRONTEND_URL) {
+      if (!origin) {
         return cb(null, true);
       }
-      return cb(null, true);
+      const isAllowed =
+        /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin) ||
+        origin === env.FRONTEND_URL ||
+        /^https?:\/\/(app|api|admin)\.satem\.cl(:\d+)?$/.test(origin);
+
+      if (isAllowed) {
+        return cb(null, true);
+      }
+      return cb(new Error('Acceso no permitido por política CORS'), false);
     },
     credentials: true,
   });
@@ -107,6 +121,7 @@ export async function buildServer() {
   await fastify.register(templatesRoutes, { prefix: '/api/v1/document-templates' });
   await fastify.register(documentInstancesRoutes, { prefix: '/api/v1/document-instances' });
   await fastify.register(auditLogsRoutes, { prefix: '/api/v1/audit-logs' });
+  await fastify.register(exchangeRatesRoutes, { prefix: '/api/v1/exchange-rates' });
 
   return fastify;
 }

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../services/api';
+import { api, getAccessToken } from '../services/api';
 import {
   Landmark, Upload, CheckCircle2, AlertTriangle,
   FileCheck, Zap, RefreshCw, Info, FileSpreadsheet,
+  Trash2, Eye, Download, X, FileText, Filter
 } from 'lucide-react';
 
 export const BankPage: React.FC = () => {
@@ -13,12 +14,22 @@ export const BankPage: React.FC = () => {
   const [importing, setImporting] = useState(false);
   const [matching, setMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNRECONCILED' | 'RECONCILED' | 'DISCREPANCY'>('ALL');
+
+  // Modal de visualización de documento de cartola
+  const [docModal, setDocModal] = useState<{ isOpen: boolean; docId: string; title: string } | null>(null);
 
   // Paginación client-side
   const PAGE_SIZE = 15;
   const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(receipts.length / PAGE_SIZE);
-  const pagedReceipts = receipts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const filteredReceipts = receipts.filter((r) => {
+    if (filterStatus === 'ALL') return true;
+    return r.status === filterStatus;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / PAGE_SIZE));
+  const pagedReceipts = filteredReceipts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const fetchReceipts = () => {
     setLoading(true);
@@ -59,13 +70,26 @@ export const BankPage: React.FC = () => {
       await api.post('/bank/import-confirm', {
         accountNumber: previewData.accountNumber || 'Santander CLP 123456789',
         rows: previewData.rows,
+        rawSourceFileId: previewData.rawSourceFileId,
       });
-      alert('Importación de abonos Santander confirmada exitosamente');
+      alert('Importación de abonos Santander confirmada exitosamente y respaldada en documentos');
       setPreviewData(null);
       setFile(null);
       fetchReceipts();
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Error al confirmar importación');
+    }
+  };
+
+  const handleDeleteReceipt = async (id: string, code: string) => {
+    if (!confirm(`¿Estás seguro de eliminar y descartar el abono bancario ${code}?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/bank/receipts/${id}`);
+      fetchReceipts();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al eliminar movimiento bancario');
     }
   };
 
@@ -99,60 +123,61 @@ export const BankPage: React.FC = () => {
 
   return (
     <div>
-        <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Conciliación Bancaria Santander</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Importación oficial de cartola bancaria Santander (.pdf, .xlsx, .xls, .csv), detección anti-duplicados y conciliación automática con informes de depósitos SumUp y expedientes.
-          </p>
-        </div>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Conciliación Bancaria Santander</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+          Importación oficial de cartola bancaria Santander (.pdf, .xlsx, .xls, .csv), archivo documental persistente, detección anti-duplicados y conciliación con expedientes.
+        </p>
+      </div>
 
-        {/* KPIs */}
-        <div className="grid-4" style={{ marginBottom: '24px' }}>
-          <div className="kpi-card">
-            <div className="kpi-title">Total Abonos</div>
-            <div className="kpi-value" style={{ color: 'var(--accent-primary)' }}>{receipts.length}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Registros importados</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-title">Conciliados</div>
-            <div className="kpi-value" style={{ color: 'var(--success)' }}>{reconciledCount}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Match pago ↔ abono</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-title">Sin Conciliar</div>
-            <div className="kpi-value" style={{ color: 'var(--warning)' }}>{unreconciledCount}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Pendientes de match</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-title">Descalces</div>
-            <div className="kpi-value" style={{ color: 'var(--danger)' }}>{discrepancyCount}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Monto no coincide</div>
-          </div>
+      {/* KPIs */}
+      <div className="grid-4" style={{ marginBottom: '24px' }}>
+        <div className="kpi-card">
+          <div className="kpi-title">Total Abonos</div>
+          <div className="kpi-value" style={{ color: 'var(--accent-primary)' }}>{receipts.length}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Registros importados</div>
         </div>
+        <div className="kpi-card">
+          <div className="kpi-title">Conciliados</div>
+          <div className="kpi-value" style={{ color: 'var(--success)' }}>{reconciledCount}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Match pago ↔ abono</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-title">Sin Conciliar</div>
+          <div className="kpi-value" style={{ color: 'var(--warning)' }}>{unreconciledCount}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Pendientes de match</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-title">Descalces</div>
+          <div className="kpi-value" style={{ color: 'var(--danger)' }}>{discrepancyCount}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Monto no coincide</div>
+        </div>
+      </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-          {/* Subida PDF / Excel / CSV */}
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
-            <h3 style={{ fontSize: '17px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
-              <FileSpreadsheet size={20} /> Importar Cartola Santander (PDF / Excel / CSV)
-            </h3>
-            <form onSubmit={handlePreviewUpload}>
-              <div className="form-group">
-                <label className="form-label">Seleccionar Archivo de Cartola Santander (.pdf, .xlsx, .xls o .csv)</label>
-                <input
-                  type="file" accept=".pdf,.xlsx,.xls,.csv" className="form-input"
-                  onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-                  required
-                />
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Compatible directamente con el PDF estándar de <strong>Cartolas históricas de Cta.Cte y Líneas de Crédito</strong> de Office Banking Santander y archivos Excel/CSV.
-                </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        {/* Subida PDF / Excel / CSV */}
+        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
+          <h3 style={{ fontSize: '17px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
+            <FileSpreadsheet size={20} /> Importar Cartola Santander (PDF / Excel / CSV)
+          </h3>
+          <form onSubmit={handlePreviewUpload}>
+            <div className="form-group">
+              <label className="form-label">Seleccionar Archivo de Cartola Santander (.pdf, .xlsx, .xls o .csv)</label>
+              <input
+                type="file" accept=".pdf,.xlsx,.xls,.csv" className="form-input"
+                onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                required
+              />
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Compatible con el PDF estándar de <strong>Cartola Histórica de Cta.Cte</strong> de Office Banking Santander y archivos Excel/CSV. Al importar se guardará automáticamente en el repositorio de documentos.
               </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }} disabled={importing}>
-                {importing ? 'Procesando y validando cartola...' : 'Previsualizar Cartola'}
-              </button>
-            </form>
-          </div>
+            </div>
+
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }} disabled={importing}>
+              {importing ? 'Procesando, archivando y validando cartola...' : 'Previsualizar e Importar Cartola'}
+            </button>
+          </form>
+        </div>
 
         {/* Auto-Match */}
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
@@ -199,7 +224,17 @@ export const BankPage: React.FC = () => {
                 Cuenta detectada: <strong>{previewData.accountNumber}</strong> | Duplicados existentes: <strong style={{ color: previewData.duplicateRowsCount > 0 ? 'var(--warning)' : 'var(--success)' }}>{previewData.duplicateRowsCount}</strong>
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {previewData.rawSourceFileId && (
+                <button
+                  type="button"
+                  onClick={() => setDocModal({ isOpen: true, docId: previewData.rawSourceFileId, title: previewData.rawSourceFileName || 'Cartola Santander' })}
+                  className="btn btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Eye size={15} /> Ver PDF / Archivo Original
+                </button>
+              )}
               <button onClick={() => { setPreviewData(null); setFile(null); }} className="btn btn-secondary">
                 Cancelar
               </button>
@@ -244,16 +279,89 @@ export const BankPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tabla Abonos con paginación */}
+      {/* Tabla Abonos con filtros y paginación */}
       <div className="table-container">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Landmark size={18} color="var(--accent-primary)" /> Registro de Abonos Banco Santander Chile
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({receipts.length} registros)</span>
-          </h3>
-          <button onClick={fetchReceipts} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-            <RefreshCw size={13} style={{ marginRight: '4px' }} /> Actualizar
-          </button>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Landmark size={18} color="var(--accent-primary)" /> Registro de Abonos Banco Santander Chile
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({filteredReceipts.length} de {receipts.length} registros)</span>
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* Filtros de estado */}
+            <div style={{ display: 'flex', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', padding: '2px', border: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                onClick={() => { setFilterStatus('ALL'); setPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: filterStatus === 'ALL' ? 'var(--accent-primary)' : 'transparent',
+                  color: filterStatus === 'ALL' ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Todos ({receipts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFilterStatus('UNRECONCILED'); setPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: filterStatus === 'UNRECONCILED' ? 'var(--warning)' : 'transparent',
+                  color: filterStatus === 'UNRECONCILED' ? '#000' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Sin Conciliar ({unreconciledCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFilterStatus('RECONCILED'); setPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: filterStatus === 'RECONCILED' ? 'var(--success)' : 'transparent',
+                  color: filterStatus === 'RECONCILED' ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Conciliados ({reconciledCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setFilterStatus('DISCREPANCY'); setPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: filterStatus === 'DISCREPANCY' ? 'var(--danger)' : 'transparent',
+                  color: filterStatus === 'DISCREPANCY' ? '#fff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Descalces ({discrepancyCount})
+              </button>
+            </div>
+
+            <button onClick={fetchReceipts} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+              <RefreshCw size={13} style={{ marginRight: '4px' }} /> Actualizar
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -269,32 +377,72 @@ export const BankPage: React.FC = () => {
                   <th>N° Documento / Ref</th>
                   <th>Monto (CLP)</th>
                   <th>Estado</th>
+                  <th>Documento Cartola</th>
+                  <th style={{ textAlign: 'center' }}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedReceipts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
                       <Landmark size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-                      No hay abonos bancarios registrados.
-                      <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                        Usa el formulario superior para importar tu cartola de Banco Santander en Excel (.xlsx) o CSV.
-                      </div>
+                      No hay abonos bancarios bajo el filtro seleccionado.
                     </td>
                   </tr>
                 ) : (
-                  pagedReceipts.map((r) => (
-                    <tr key={r.id}>
-                      <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{r.code}</td>
-                      <td style={{ fontSize: '13px' }}>{new Date(r.transactionDate).toLocaleDateString('es-CL')}</td>
-                      <td style={{ fontSize: '13px' }}>{r.description}</td>
-                      <td style={{ fontSize: '13px', fontFamily: 'monospace' }}>{r.referenceNumber || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                      <td style={{ fontWeight: 'bold', color: Number(r.amountClp) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        ${Math.abs(Number(r.amountClp)).toLocaleString('es-CL')} CLP
-                      </td>
-                      <td>{statusBadge(r.status)}</td>
-                    </tr>
-                  ))
+                  pagedReceipts.map((r) => {
+                    const rec = r.reconciliations?.[0];
+                    const matchedPayment = rec?.paymentAllocation?.payment;
+                    const matchedExpedient =
+                      matchedPayment?.paymentRequest?.invoice?.expedient ||
+                      matchedPayment?.proofDocument?.links?.find((l: any) => l.expedient)?.expedient;
+
+                    return (
+                      <tr key={r.id}>
+                        <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{r.code}</td>
+                        <td style={{ fontSize: '13px' }}>{new Date(r.transactionDate).toLocaleDateString('es-CL')}</td>
+                        <td style={{ fontSize: '13px' }}>
+                          <div>{r.description}</div>
+                          {matchedExpedient && (
+                            <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px', fontWeight: 600 }}>
+                              ↳ Conciliado con Expediente {matchedExpedient.code} ({matchedExpedient.customer?.legalName || 'SATEM'})
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: '13px', fontFamily: 'monospace' }}>{r.referenceNumber || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                        <td style={{ fontWeight: 'bold', color: Number(r.amountClp) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                          ${Math.abs(Number(r.amountClp)).toLocaleString('es-CL')} CLP
+                        </td>
+                        <td>{statusBadge(r.status)}</td>
+                        <td>
+                          {r.rawSourceFile ? (
+                            <button
+                              type="button"
+                              onClick={() => setDocModal({ isOpen: true, docId: r.rawSourceFile.id, title: r.rawSourceFile.originalName })}
+                              className="btn btn-secondary"
+                              style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              title="Ver Cartola Santander Original"
+                            >
+                              <FileText size={12} color="var(--accent-primary)" /> {r.rawSourceFile.originalName.length > 18 ? `${r.rawSourceFile.originalName.slice(0, 15)}...` : r.rawSourceFile.originalName}
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReceipt(r.id, r.code)}
+                            className="btn btn-secondary"
+                            style={{ padding: '5px 8px', color: 'var(--danger)', fontSize: '12px' }}
+                            title="Eliminar o descartar este movimiento del listado"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -303,7 +451,7 @@ export const BankPage: React.FC = () => {
             {totalPages > 1 && (
               <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Página {page} de {totalPages} ({receipts.length} registros)
+                  Página {page} de {totalPages} ({filteredReceipts.length} registros)
                 </span>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '13px' }} disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Anterior</button>
@@ -314,6 +462,81 @@ export const BankPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Modal Visor de Documento de Cartola Santander */}
+      {docModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.75)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderRadius: 'var(--radius-lg)',
+              width: '95%',
+              maxWidth: '900px',
+              height: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--shadow-xl)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileSpreadsheet size={20} color="var(--accent-primary)" />
+                <h3 style={{ fontSize: '16px', margin: 0 }}>{docModal.title}</h3>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <a
+                  href={`/api/v1/documents/${docModal.docId}/download?token=${getAccessToken() || ''}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '12px', padding: '6px 12px', textDecoration: 'none' }}
+                >
+                  <Download size={14} /> Descargar
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setDocModal(null)}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, backgroundColor: '#1e293b', overflow: 'hidden' }}>
+              <iframe
+                src={`/api/v1/documents/${docModal.docId}/download?token=${getAccessToken() || ''}`}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                title={docModal.title}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
