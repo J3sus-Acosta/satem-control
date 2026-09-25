@@ -2,61 +2,77 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+const TABLES_TO_PURGE = [
+  'bank_reconciliations',
+  'bank_receipts',
+  'payment_allocations',
+  'payments',
+  'payment_requests',
+  'invoices',
+  'expedient_integrity_items',
+  'system_exceptions',
+  'expedient_snapshots',
+  'reception_conformities',
+  'attention_technicians',
+  'attentions',
+  'work_orders',
+  'expedients',
+  'document_instances',
+  'document_links',
+  'documents',
+  'quotation_items',
+  'quotation_versions',
+  'quotations',
+  'contract_versions',
+  'contracts',
+  'customer_contacts',
+  'customer_entities',
+  'customers',
+  'audit_logs',
+  'user_sessions',
+  'sequences',
+];
+
 async function purgeData() {
   console.log('🧹 [SATEM Control] Iniciando purga segura de datos de prueba...');
   console.log('🔒 Conservando: Identidad Corporativa (CompanyConfig), Plantillas (DocumentTemplate), Países, Tipos de Servicio y Usuarios.');
 
   try {
-    // Desactivar temporalmente foreign keys para truncar/limpiar limpiamente en MySQL
+    // Desactivar temporalmente foreign keys
     await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
 
-    console.log('🗑️  Limpiando conciliación bancaria y pagos...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE bank_reconciliations;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE bank_receipts;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE payment_allocations;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE sumup_transactions;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE payment_requests;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE payments;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE invoices;');
+    // Obtener las tablas que existen actualmente en la base de datos
+    const dbTablesRaw: any[] = await prisma.$queryRawUnsafe('SHOW TABLES;');
+    const existingTables = new Set<string>();
 
-    console.log('🗑️  Limpiando expedientes, atenciones y órdenes de trabajo...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE expedient_integrity_items;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE system_exceptions;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE expedient_snapshots;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE reception_conformities;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE attention_technicians;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE attentions;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE work_orders;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE expedients;');
+    for (const row of dbTablesRaw) {
+      const tableName = Object.values(row)[0] as string;
+      if (tableName) {
+        existingTables.add(tableName.toLowerCase());
+      }
+    }
 
-    console.log('🗑️  Limpiando instancias de documentos y almacenamiento de archivos...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE document_instances;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE document_links;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE documents;');
+    console.log(`📊 Tablas detectadas en la base de datos: ${existingTables.size}`);
 
-    console.log('🗑️  Limpiando cotizaciones y contratos...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE quotation_items;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE quotation_versions;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE quotations;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE contract_versions;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE contracts;');
-
-    console.log('🗑️  Limpiando clientes y entidades asociadas...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE customer_contacts;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE customer_entities;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE customers;');
-
-    console.log('🗑️  Limpiando auditoría y sesiones de prueba...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE audit_logs;');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE user_sessions;');
-
-    console.log('🔄 Reiniciando todas las secuencias y folios correlativos a 0 (el próximo será 001)...');
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE sequences;');
+    for (const table of TABLES_TO_PURGE) {
+      if (existingTables.has(table.toLowerCase())) {
+        try {
+          await prisma.$executeRawUnsafe(`TRUNCATE TABLE \`${table}\`;`);
+          console.log(`  ✓ Tabla vaciada: ${table}`);
+        } catch (err: any) {
+          // Si TRUNCATE falla por alguna restricción, intentamos DELETE
+          await prisma.$executeRawUnsafe(`DELETE FROM \`${table}\`;`);
+          console.log(`  ✓ Registros eliminados de: ${table}`);
+        }
+      } else {
+        console.log(`  ℹ️  Omitida (no existe): ${table}`);
+      }
+    }
 
     // Reactivar foreign keys
     await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
 
-    console.log('=============================================================');
+    console.log('\n=============================================================');
     console.log('✨ [SATEM Control] ¡Purga completada exitosamente!');
     console.log('📋 Estado del sistema:');
     console.log('   - Folios reiniciados: El próximo expediente, contrato o documento comenzará en 001.');

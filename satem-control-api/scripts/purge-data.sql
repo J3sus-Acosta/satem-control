@@ -14,9 +14,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE bank_reconciliations;
 TRUNCATE TABLE bank_receipts;
 TRUNCATE TABLE payment_allocations;
-TRUNCATE TABLE sumup_transactions;
-TRUNCATE TABLE payment_requests;
 TRUNCATE TABLE payments;
+TRUNCATE TABLE payment_requests;
 TRUNCATE TABLE invoices;
 
 -- 2. Expedientes, atenciones, recepciones conformes y órdenes de trabajo
