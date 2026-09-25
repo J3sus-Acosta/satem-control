@@ -2,21 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Building2, Plus, FileSignature, ArrowRight, ExternalLink } from 'lucide-react';
+import { Building2, Plus, FileSignature, ArrowRight, ExternalLink, Edit2, MapPin, Phone, Mail } from 'lucide-react';
 
 export const CustomersPage: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const isViewer = user?.role === 'VIEWER';
 
-  // Form Cliente
+  // Form Cliente (Crear / Editar)
   const [legalName, setLegalName] = useState('');
   const [taxId, setTaxId] = useState('');
   const [countryCode, setCountryCode] = useState('USA');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
 
   const fetchData = () => {
@@ -34,26 +38,62 @@ export const CustomersPage: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleCreateCustomer = async (e: React.FormEvent) => {
+  const openCreateModal = () => {
+    setEditingCustomer(null);
+    setLegalName('');
+    setTaxId('');
+    setCountryCode('USA');
+    setAddress('');
+    setCity('');
+    setPhone('');
+    setEmail('');
+    setShowCustomerModal(true);
+  };
+
+  const openEditModal = (c: any) => {
+    setEditingCustomer(c);
+    setLegalName(c.legalName || '');
+    setTaxId(c.taxId || '');
+    setCountryCode(c.countryCode || 'USA');
+    setAddress(c.address || '');
+    setCity(c.city || '');
+    setPhone(c.phone || '');
+    setEmail(c.email || '');
+    setShowCustomerModal(true);
+  };
+
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await api.post('/customers', {
-        legalName,
-        taxId,
-        countryCode,
-        email,
-      });
-      if (res.data.warning) {
-        alert(`Advertencia: ${res.data.warning}`);
+      if (editingCustomer) {
+        await api.put(`/customers/${editingCustomer.id}`, {
+          legalName,
+          taxId,
+          countryCode,
+          address,
+          city,
+          phone,
+          email,
+        });
+      } else {
+        const res = await api.post('/customers', {
+          legalName,
+          taxId,
+          countryCode,
+          address,
+          city,
+          phone,
+          email,
+        });
+        if (res.data.warning) {
+          alert(`Advertencia: ${res.data.warning}`);
+        }
       }
       setShowCustomerModal(false);
-      setLegalName('');
-      setTaxId('');
-      setCountryCode('USA');
-      setEmail('');
+      setEditingCustomer(null);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error?.message || 'Error al crear cliente');
+      alert(err.response?.data?.error?.message || 'Error al guardar cliente');
     }
   };
 
@@ -61,16 +101,16 @@ export const CustomersPage: React.FC = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Clientes Extranjeros & Contratos SOW</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
             Registro de empresas contratantes y sus contratos. Para generar un contrato SOW con PDF oficial usa el Wizard.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {!isViewer && (
-            <button onClick={() => setShowCustomerModal(true)} className="btn btn-secondary">
+            <button onClick={openCreateModal} className="btn btn-secondary">
               <Plus size={18} /> Nuevo Cliente
             </button>
           )}
@@ -95,6 +135,7 @@ export const CustomersPage: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        flexWrap: 'wrap',
         gap: '16px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -113,10 +154,10 @@ export const CustomersPage: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+      <div className="grid-split">
         {/* Tabla Clientes */}
         <div className="table-container">
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Building2 size={20} color="var(--accent-primary)" /> Clientes Internacionales
             </h3>
@@ -125,10 +166,10 @@ export const CustomersPage: React.FC = () => {
           <table className="custom-table">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Razón Social</th>
-                <th>País</th>
-                <th>Tax ID</th>
+                <th>Código / Razón Social</th>
+                <th>País / Tax ID</th>
+                <th>Domicilio & Contacto</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -141,12 +182,43 @@ export const CustomersPage: React.FC = () => {
               ) : (
                 customers.map((c) => (
                   <tr key={c.id}>
-                    <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{c.code}</td>
-                    <td>{c.legalName}</td>
                     <td>
-                      <span className="badge badge-info">{c.countryCode}</span>
+                      <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{c.code}</div>
+                      <div style={{ fontWeight: 600, marginTop: '2px' }}>{c.legalName}</div>
                     </td>
-                    <td style={{ fontSize: '13px' }}>{c.taxId}</td>
+                    <td>
+                      <span className="badge badge-info">{c.country?.name || c.countryCode}</span>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        Tax ID: {c.taxId}
+                      </div>
+                    </td>
+                    <td>
+                      {c.address ? (
+                        <div style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={12} color="var(--accent-primary)" /> {c.address}{c.city ? `, ${c.city}` : ''}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '12px', color: 'var(--warning)', fontStyle: 'italic' }}>
+                          ⚠ Sin domicilio registrado
+                        </div>
+                      )}
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {c.email && <span>{c.email}</span>}
+                        {c.phone && <span> {c.email ? '| ' : ''}{c.phone}</span>}
+                      </div>
+                    </td>
+                    <td>
+                      {!isViewer && (
+                        <button
+                          onClick={() => openEditModal(c)}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          title="Editar Domicilio, Teléfono y Datos"
+                        >
+                          <Edit2 size={13} /> Editar
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -156,7 +228,7 @@ export const CustomersPage: React.FC = () => {
 
         {/* Tabla Contratos */}
         <div className="table-container">
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FileSignature size={20} color="var(--success)" /> Contratos SOW Vigentes
             </h3>
@@ -166,24 +238,25 @@ export const CustomersPage: React.FC = () => {
             <thead>
               <tr>
                 <th>Código</th>
-                <th>Título</th>
                 <th>Cliente</th>
-                <th>Horas Consumidas</th>
+                <th>Consumo</th>
               </tr>
             </thead>
             <tbody>
               {contracts.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>
+                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>
                     Sin contratos. Usa el Wizard SOW para crear uno con PDF.
                   </td>
                 </tr>
               ) : (
                 contracts.map((ct) => (
                   <tr key={ct.id}>
-                    <td style={{ fontWeight: 'bold' }}>{ct.code}</td>
-                    <td>{ct.title}</td>
-                    <td>{ct.customer?.legalName}</td>
+                    <td>
+                      <div style={{ fontWeight: 'bold' }}>{ct.code}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{ct.title}</div>
+                    </td>
+                    <td style={{ fontSize: '13px' }}>{ct.customer?.legalName}</td>
                     <td>
                       <span className="badge badge-warning">
                         {ct.consumedHours} / {ct.contractedHours || '∞'} hrs
@@ -197,42 +270,61 @@ export const CustomersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Nuevo Cliente */}
+      {/* Modal Crear / Editar Cliente */}
       {showCustomerModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '480px' }}>
-            <h3 style={{ fontSize: '18px', marginBottom: '4px' }}>Crear Cliente Internacional</h3>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '520px' }}>
+            <h3 style={{ fontSize: '18px', marginBottom: '4px' }}>
+              {editingCustomer ? `Editar Cliente: ${editingCustomer.legalName}` : 'Crear Cliente Internacional'}
+            </h3>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              Una vez creado, podrás generar un Contrato SOW desde el Wizard.
+              El domicilio y datos de contacto se incorporarán automáticamente en los contratos SOW y expedientes.
             </p>
-            <form onSubmit={handleCreateCustomer}>
+            <form onSubmit={handleSaveCustomer}>
               <div className="form-group">
                 <label className="form-label">Razón Social del Cliente</label>
-                <input type="text" className="form-input" value={legalName} onChange={(e) => setLegalName(e.target.value)} required />
+                <input type="text" className="form-input" value={legalName} onChange={(e) => setLegalName(e.target.value)} placeholder="Ej: FAMILIA SEGURA LLC" required />
+              </div>
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Tax ID / Identificación Fiscal</label>
+                  <input type="text" className="form-input" value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="Ej: 93-2163996" required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">País</label>
+                  <select className="form-select" value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
+                    <option value="USA">Estados Unidos</option>
+                    <option value="PER">Perú</option>
+                    <option value="COL">Colombia</option>
+                    <option value="MEX">México</option>
+                    <option value="ESP">España</option>
+                    <option value="ARG">Argentina</option>
+                    <option value="BRA">Brasil</option>
+                    <option value="CHL">Chile</option>
+                  </select>
+                </div>
               </div>
               <div className="form-group">
-                <label className="form-label">Tax ID / Identificación Fiscal Extranjera</label>
-                <input type="text" className="form-input" value={taxId} onChange={(e) => setTaxId(e.target.value)} required />
+                <label className="form-label">Domicilio / Dirección del Cliente</label>
+                <input type="text" className="form-input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ej: 123 Main Street, Suite 400" />
               </div>
               <div className="form-group">
-                <label className="form-label">País</label>
-                <select className="form-select" value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
-                  <option value="USA">Estados Unidos</option>
-                  <option value="PER">Perú</option>
-                  <option value="COL">Colombia</option>
-                  <option value="MEX">México</option>
-                  <option value="ESP">España</option>
-                  <option value="ARG">Argentina</option>
-                  <option value="BRA">Brasil</option>
-                </select>
+                <label className="form-label">Ciudad / Estado</label>
+                <input type="text" className="form-input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej: Miami, FL" />
               </div>
-              <div className="form-group">
-                <label className="form-label">Email de Contacto (opcional)</label>
-                <input type="email" className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Email de Contacto</label>
+                  <input type="email" className="form-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contacto@cliente.com" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Teléfono de Contacto</label>
+                  <input type="text" className="form-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 305 123 4567" />
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                <button type="button" onClick={() => setShowCustomerModal(false)} className="btn btn-secondary">Cancelar</button>
-                <button type="submit" className="btn btn-primary">Guardar Cliente</button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => { setShowCustomerModal(false); setEditingCustomer(null); }} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">{editingCustomer ? 'Guardar Cambios' : 'Crear Cliente'}</button>
               </div>
             </form>
           </div>

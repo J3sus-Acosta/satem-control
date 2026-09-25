@@ -12,7 +12,7 @@ export function getAccessToken() {
 
 const API_URL = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
   ? import.meta.env.VITE_API_URL
-  : (import.meta.env.DEV ? '' : 'https://api.satem.cl');
+  : (import.meta.env.DEV ? '' : 'https://api.satemsoluciones.com');
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,

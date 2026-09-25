@@ -11,6 +11,7 @@ import { NotFoundError, AppError } from '../../common/errors/app-error.js';
 import { compileTemplate } from '../../common/utils/template-engine.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 import { generateSequence, SequencePrefix } from '../../common/utils/sequence.js';
+import { getUsdToClpExchangeRate } from '../exchange-rates/exchange-rates.service.js';
 
 const generateDocumentSchema = z.object({
   templateId: z.string().uuid(),
@@ -148,6 +149,30 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
 
   const defaultExportClause = 'Servicio prestado desde Chile y aprovechado íntegramente en el extranjero por el Cliente, exento de IVA conforme al Art. 12 letra E Nº 7 del D.L. 825 de la Ley sobre Impuesto a las Ventas y Servicios.';
 
+  // Obtener Dólar Observado congelado del día (Banco Central de Chile)
+  let exchangeRateInfo: any = null;
+  try {
+    exchangeRateInfo = await getUsdToClpExchangeRate();
+  } catch (err: any) {
+    console.warn('No se pudo obtener tipo de cambio para documento:', err.message);
+  }
+
+  const rateVal = exchangeRateInfo?.rate ? Number(exchangeRateInfo.rate) : null;
+  const rateDateFormatted = exchangeRateInfo?.rateDate ? formatDateStr(exchangeRateInfo.rateDate) : todayFormatted;
+  const rateFormatted = rateVal ? `$${rateVal.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CLP/USD` : '';
+  const totalClp = (rateVal && rawTotal > 0) ? Math.round(rawTotal * rateVal) : 0;
+  const totalClpFormatted = totalClp > 0 ? `$${totalClp.toLocaleString('es-CL')} CLP` : '';
+  const hourlyRateClp = (rateVal && rawHours > 0 && rawTotal > 0) ? Math.round((rawTotal / rawHours) * rateVal) : 0;
+  const hourlyRateClpFormatted = hourlyRateClp > 0 ? `$${hourlyRateClp.toLocaleString('es-CL')} CLP/hr` : '';
+
+  const valorConEquivalente = totalClpFormatted
+    ? `${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'} ${formattedAmount} (Equivalente: ${totalClpFormatted} al T.C. ${rateFormatted})`
+    : `${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'} ${formattedAmount}`;
+
+  const tarifaHoraConEquivalente = hourlyRateClpFormatted
+    ? `${calculatedRate || 'Según acuerdo'} (Ref. ${hourlyRateClpFormatted})`
+    : (calculatedRate || 'Según acuerdo');
+
   const variables: Record<string, any> = {
     ...sanitizeCustomVars,
     empresa: {
@@ -156,9 +181,9 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
       direccion: company.address || 'Av. Providencia 1234, Of. 601',
       ciudad: company.city || 'Santiago',
       pais: company.country || 'Chile',
-      email: company.email || 'contacto@satem.cl',
-      telefono: company.phone || '+56 2 2999 8888',
-      website: company.website || 'https://www.satem.cl',
+      email: company.email || 'contacto@satemsoluciones.com',
+      telefono: company.phone || '',
+      website: company.website || 'https://satemsoluciones.com',
       representanteLegal: company.legalRepresentative || 'Representante Legal SATEM',
       cargoRepresentante: company.legalRepresentativeTitle || 'Gerente General',
       logoFull: company.logoFullUrl || '',
@@ -171,6 +196,7 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
       ciudad: customer.city || sanitizeCustomVars.cliente?.ciudad || '',
       direccion: customer.address || sanitizeCustomVars.cliente?.direccion || '',
       email: customer.email || sanitizeCustomVars.cliente?.email || '',
+      telefono: customer.phone || sanitizeCustomVars.cliente?.telefono || '',
       contacto: (customer.contacts && customer.contacts[0]?.name) || sanitizeCustomVars.cliente?.contacto || customer.legalName || '',
     },
     contrato: {
@@ -185,11 +211,19 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
       valor: formattedAmount,
       moneda: contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD',
       tarifaHora: calculatedRate || 'Según acuerdo',
+      tarifaHoraConEquivalente,
+      valorConEquivalente,
+      tipoCambio: rateFormatted || 'Consultar Banco Central',
+      tipoCambioValor: rateVal ? String(rateVal) : '',
+      tipoCambioFecha: rateDateFormatted,
+      tipoCambioInfo: rateVal ? `${rateFormatted} (al ${rateDateFormatted} - Banco Central de Chile)` : 'N/A',
+      montoEquivalenteClp: totalClpFormatted || 'N/A',
       metodoPago: contract.paymentTerms || sanitizeCustomVars.contrato?.metodoPago || 'Zelle / SumUp / Wire Transfer en USD',
       fechaEmision: todayFormatted,
       fechaInicio: startFormatted,
       fechaTermino: endFormatted,
       clausulaExportacion: sanitizeCustomVars.contrato?.clausulaExportacion || defaultExportClause,
+      clausulaTipoCambio: rateVal ? `El tipo de cambio del dólar observado queda congelado a la fecha de emisión del presente instrumento (T.C. ${rateFormatted} al ${rateDateFormatted}) para efectos contables, referenciales y de facturación de exportación conforme a los registros del Banco Central de Chile.` : '',
     },
     documento: {
       codigo: finalDocNumber,

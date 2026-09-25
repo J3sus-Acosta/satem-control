@@ -211,9 +211,9 @@ model CompanyConfig {
   address                  String   @default("Av. Providencia 1234, Of. 601, Santiago")
   city                     String   @default("Santiago")
   country                  String   @default("Chile")
-  email                    String   @default("contacto@satem.cl")
-  phone                    String   @default("+56 2 2999 8888")
-  website                  String   @default("https://www.satem.cl")
+  email                    String   @default("contacto@satemsoluciones.com")
+  phone                    String   @default("")
+  website                  String   @default("https://satemsoluciones.com")
   logoFullUrl              String?  @db.LongText
   logoShortUrl             String?  @db.LongText
   signatureUrl             String?  @db.LongText

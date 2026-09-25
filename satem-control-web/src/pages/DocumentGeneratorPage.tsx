@@ -243,9 +243,9 @@ export const DocumentGeneratorPage: React.FC = () => {
     let rendered = rawTemplate
       .replace(/\{\{empresa\.nombre\}\}/g, companyConfig?.legalName || 'SATEM Soluciones Inteligentes SpA')
       .replace(/\{\{empresa\.rut\}\}/g, companyConfig?.taxId || '77.654.321-K')
-      .replace(/\{\{empresa\.email\}\}/g, companyConfig?.email || 'contacto@satem.cl')
-      .replace(/\{\{empresa\.telefono\}\}/g, companyConfig?.phone || '+56 2 2999 8888')
-      .replace(/\{\{empresa\.website\}\}/g, companyConfig?.website || 'https://www.satem.cl')
+      .replace(/\{\{empresa\.email\}\}/g, companyConfig?.email || 'contacto@satemsoluciones.com')
+      .replace(/\{\{empresa\.telefono\}\}/g, companyConfig?.phone || '')
+      .replace(/\{\{empresa\.website\}\}/g, companyConfig?.website || 'https://satemsoluciones.com')
       .replace(/\{\{empresa\.direccion\}\}/g, companyConfig?.address || 'Av. Providencia 1234, Of. 601')
       .replace(/\{\{empresa\.ciudad\}\}/g, companyConfig?.city || 'Santiago')
       .replace(/\{\{empresa\.pais\}\}/g, companyConfig?.country || 'Chile')
@@ -257,6 +257,7 @@ export const DocumentGeneratorPage: React.FC = () => {
       .replace(/\{\{cliente\.ciudad\}\}/g, customer.city || '[Ciudad Cliente]')
       .replace(/\{\{cliente\.direccion\}\}/g, customer.address || '[Dirección Cliente]')
       .replace(/\{\{cliente\.email\}\}/g, customer.email || '[Email Cliente]')
+      .replace(/\{\{cliente\.telefono\}\}/g, customer.phone || '')
       .replace(/\{\{contrato\.codigo\}\}/g, contract.code || 'SOW-2026-XXXX')
       .replace(/\{\{contrato\.titulo\}\}/g, contract.title || docTitle)
       .replace(/\{\{contrato\.descripcion\}\}/g, docDescription)
@@ -373,7 +374,7 @@ export const DocumentGeneratorPage: React.FC = () => {
       </div>
 
       {/* Grid Principal: Formulario a la izquierda y Previsualización a la derecha */}
-      <div style={{ display: 'grid', gridTemplateColumns: '460px 1fr', gap: '24px', alignItems: 'start' }}>
+      <div className="generator-layout">
         {/* Panel Izquierdo de Selección y Resumen */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
@@ -544,7 +545,7 @@ export const DocumentGeneratorPage: React.FC = () => {
                     <textarea className="form-textarea" rows={3} style={{ fontSize: '12px' }} value={docDescription} onChange={(e) => setDocDescription(e.target.value)} />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="grid-form-2" style={{ gap: '10px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label className="form-label" style={{ fontSize: '11px' }}>Monto ({docCurrency})</label>
                       <input type="text" className="form-input" style={{ fontSize: '12px' }} value={docAmount} onChange={(e) => setDocAmount(e.target.value)} />
@@ -581,8 +582,8 @@ export const DocumentGeneratorPage: React.FC = () => {
         </div>
 
         {/* Panel Derecho: Previsualización en Vivo */}
-        <div style={{ backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px', minHeight: '750px', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px' }}>
+        <div style={{ backgroundColor: '#fff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px', minHeight: '600px', display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxWidth: '100%', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Eye size={17} color="#00a896" /> Previsualización en Tiempo Real Oficial (Puppeteer PDF Output)
             </div>
@@ -591,7 +592,7 @@ export const DocumentGeneratorPage: React.FC = () => {
 
           <iframe
             title="preview"
-            style={{ width: '100%', flex: 1, minHeight: '680px', border: 'none', borderRadius: '4px' }}
+            style={{ width: '100%', flex: 1, minHeight: '580px', border: 'none', borderRadius: '4px' }}
             srcDoc={previewHtml}
           />
         </div>

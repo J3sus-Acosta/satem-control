@@ -100,16 +100,16 @@ export const TemplateEditorPage: React.FC = () => {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       {/* Encabezado Superior */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <button onClick={() => navigate('/admin/templates')} className="btn btn-secondary" style={{ padding: '8px' }}>
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 style={{ fontSize: '20px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ fontSize: '20px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <FileText size={22} color="var(--accent-primary)" /> Editor Visual WYSIWYG — {template?.name || 'Plantilla'}
             </h1>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="badge badge-info">{template?.code}</span>
               <span className="badge badge-secondary">Categoría: {template?.category}</span>
               <span className="badge badge-success">v{template?.currentVersion || 1}.0</span>
@@ -117,7 +117,7 @@ export const TemplateEditorPage: React.FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowHtmlCode(!showHtmlCode)}
             className="btn btn-secondary"
@@ -210,7 +210,7 @@ export const TemplateEditorPage: React.FC = () => {
       )}
 
       {/* Layout Principal: Panel de Variables y Lienzo de Edición */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'start' }}>
+      <div className="template-editor-layout">
         {/* Panel Lateral Izquierdo: Variables Asistidas */}
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '18px', maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>

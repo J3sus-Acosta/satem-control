@@ -40,16 +40,24 @@ export const ContractWizardPage: React.FC = () => {
   const [currency, setCurrency] = useState('USD');
   const [paymentTerms, setPaymentTerms] = useState('Zelle / SumUp / Wire Transfer en USD');
   const [exportClause, setExportClause] = useState('Servicio prestado desde Chile y utilizado exclusivamente en el extranjero por el Cliente, exento de IVA conforme al Art. 12 letra E Nº 7 del D.L. 825 de la Ley sobre Impuesto a las Ventas y Servicios.');
+  const [liveExchangeRate, setLiveExchangeRate] = useState<any>(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    Promise.all([api.get('/customers'), api.get('/document-templates')])
-      .then(([custRes, tplRes]) => {
+    Promise.all([
+      api.get('/customers'),
+      api.get('/document-templates'),
+      api.get('/exchange-rates/usd').catch(() => null),
+    ])
+      .then(([custRes, tplRes, rateRes]) => {
         setCustomers(custRes.data.data);
         const tpls = tplRes.data.data.filter((t: any) => t.category === 'CONTRACT');
         setTemplates(tpls);
         if (tpls.length > 0) setSelectedTemplateId(tpls[0].id);
+        if (rateRes?.data?.data) {
+          setLiveExchangeRate(rateRes.data.data);
+        }
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
@@ -171,23 +179,23 @@ export const ContractWizardPage: React.FC = () => {
       </div>
 
       {/* Indicador de Pasos */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+      <div className="wizard-steps-container">
         {[
           { n: 1, label: '1. Cliente & Plantilla' },
           { n: 2, label: '2. Alcance & Servicios' },
           { n: 3, label: '3. Honorarios & Previa' },
           { n: 4, label: '4. Descarga & Expediente' },
         ].map(({ n, label }) => (
-          <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '8px', color: step === n ? 'var(--accent-primary)' : step > n ? 'var(--success)' : 'var(--text-muted)', fontWeight: 'bold', fontSize: '13px' }}>
+          <div key={n} className="wizard-step-item" style={{ color: step === n ? 'var(--accent-primary)' : step > n ? 'var(--success)' : 'var(--text-muted)', fontWeight: 'bold', fontSize: '13px' }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '50%',
               backgroundColor: step === n ? 'var(--accent-primary)' : step > n ? 'var(--success)' : 'var(--border-color)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '13px', fontWeight: 800, color: '#fff',
+              fontSize: '13px', fontWeight: 800, color: '#fff', flexShrink: 0
             }}>
               {step > n ? '✓' : n}
             </div>
-            {label}
+            <span>{label}</span>
           </div>
         ))}
       </div>
@@ -220,6 +228,22 @@ export const ContractWizardPage: React.FC = () => {
               </div>
             )}
           </div>
+
+          {selectedCustomer && (
+            <div style={{ padding: '14px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '20px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Datos del Cliente en el SOW</div>
+              <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)', fontSize: '14px' }}>{selectedCustomer.legalName}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <strong>Tax ID / RUT:</strong> {selectedCustomer.taxId} | <strong>País:</strong> {selectedCustomer.country?.name || selectedCustomer.countryCode}
+              </div>
+              <div style={{ fontSize: '12px', color: selectedCustomer.address ? 'var(--text-secondary)' : 'var(--warning)', marginTop: '2px' }}>
+                <strong>Domicilio:</strong> {selectedCustomer.address ? `${selectedCustomer.address}${selectedCustomer.city ? `, ${selectedCustomer.city}` : ''}` : '⚠ Sin domicilio (puedes editarlo en Clientes)'}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                <strong>Contacto:</strong> {selectedCustomer.email || 'Sin email'} {selectedCustomer.phone ? `| Tel: ${selectedCustomer.phone}` : ''}
+              </div>
+            </div>
+          )}
 
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label className="form-label">Plantilla Contractual Oficial</label>
@@ -263,7 +287,7 @@ export const ContractWizardPage: React.FC = () => {
             <input type="text" className="form-input" value={contractTitle} onChange={(e) => setContractTitle(e.target.value)} required />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="grid-form-2">
             <div className="form-group">
               <label className="form-label">Tipo de Contrato</label>
               <select className="form-select" value={contractType} onChange={(e) => setContractType(e.target.value)}>
@@ -286,7 +310,7 @@ export const ContractWizardPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="grid-form-2">
             <div className="form-group">
               <label className="form-label">Fecha de Inicio</label>
               <input type="date" className="form-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
@@ -319,7 +343,7 @@ export const ContractWizardPage: React.FC = () => {
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '28px' }}>
           <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 3: Honorarios, Condiciones & Confirmación</h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+          <div className="grid-form-3">
             <div className="form-group">
               <label className="form-label">Horas / Unidades</label>
               <input type="number" className="form-input" value={contractedHours} onChange={(e) => setContractedHours(e.target.value)} required />
@@ -347,6 +371,30 @@ export const ContractWizardPage: React.FC = () => {
             </div>
           )}
 
+          {/* Banner Dólar Observado Oficial */}
+          {currency === 'USD' && liveExchangeRate?.rate && (
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: 'rgba(0, 168, 150, 0.08)',
+              border: '1px solid var(--accent-primary)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  💵 Dólar Observado Banco Central de Chile: ${Number(liveExchangeRate.rate).toFixed(2)} CLP/USD
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Equivalente referencial estimado: <strong>${Math.round(parseFloat(totalAmount || '0') * Number(liveExchangeRate.rate)).toLocaleString('es-CL')} CLP</strong> (se congelará en el SOW)
+                </div>
+              </div>
+              <span className="badge badge-success">✓ Dólar en Vivo</span>
+            </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">Forma y Condiciones de Pago</label>
             <input type="text" className="form-input" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} required />
@@ -362,11 +410,16 @@ export const ContractWizardPage: React.FC = () => {
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Eye size={16} /> Resumen de Datos que se Plasmarán en el SOW:
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
+            <div className="grid-form-2" style={{ gap: '8px', fontSize: '12px' }}>
               <div><strong>Cliente:</strong> {selectedCustomer?.legalName} ({selectedCustomer?.taxId})</div>
               <div><strong>País:</strong> {selectedCustomer?.countryCode}</div>
               <div><strong>Plantilla:</strong> {selectedTemplate?.name || 'SOW Oficial'}</div>
               <div><strong>Monto:</strong> ${totalAmount} {currency} ({contractedHours} hrs)</div>
+              {liveExchangeRate?.rate && currency === 'USD' && (
+                <div style={{ gridColumn: 'span 2', color: 'var(--accent-primary)', fontWeight: 600 }}>
+                  <strong>T.C. Observado Congelado:</strong> ${Number(liveExchangeRate.rate).toFixed(2)} CLP/USD → ${Math.round(parseFloat(totalAmount || '0') * Number(liveExchangeRate.rate)).toLocaleString('es-CL')} CLP
+                </div>
+              )}
               <div><strong>Vigencia:</strong> {startDate} {endDate ? `al ${endDate}` : '(Indefinida)'}</div>
               <div><strong>Modalidad:</strong> {modality}</div>
             </div>
@@ -397,7 +450,7 @@ export const ContractWizardPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+          <div className="grid-2" style={{ marginBottom: '28px' }}>
             {/* Tarjeta de Descarga y Envío */}
             <div style={{ backgroundColor: '#0f172a', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
               <h4 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', marginBottom: '10px' }}>

@@ -154,7 +154,7 @@ export const BankPage: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+      <div className="grid-2" style={{ marginBottom: '24px' }}>
         {/* Subida PDF / Excel / CSV */}
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
           <h3 style={{ fontSize: '17px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)' }}>
@@ -215,7 +215,7 @@ export const BankPage: React.FC = () => {
       {/* Preview anti-duplicados */}
       {previewData && (
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-md)', padding: '24px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h3 style={{ fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success)' }}>
                 <FileCheck size={20} /> Previsualización de Cartola ({previewData.totalRows} movimientos válidos)
@@ -224,7 +224,7 @@ export const BankPage: React.FC = () => {
                 Cuenta detectada: <strong>{previewData.accountNumber}</strong> | Duplicados existentes: <strong style={{ color: previewData.duplicateRowsCount > 0 ? 'var(--warning)' : 'var(--success)' }}>{previewData.duplicateRowsCount}</strong>
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
               {previewData.rawSourceFileId && (
                 <button
                   type="button"
@@ -465,32 +465,16 @@ export const BankPage: React.FC = () => {
 
       {/* Modal Visor de Documento de Cartola Santander */}
       {docModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.75)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-          }}
-        >
+        <div className="modal-overlay">
           <div
+            className="modal-dialog"
             style={{
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: 'var(--radius-lg)',
-              width: '95%',
               maxWidth: '900px',
               height: '85vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: 'var(--shadow-xl)',
-              border: '1px solid var(--border-color)',
+              padding: 0,
+              overflow: 'hidden',
             }}
           >
             <div

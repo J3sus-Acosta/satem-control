@@ -159,3 +159,66 @@ export async function addContactHandler(request: FastifyRequest<{ Params: { id: 
 
   return reply.status(201).send({ success: true, data: contact });
 }
+
+const updateCustomerSchema = z.object({
+  legalName: z.string().min(2, 'Razón Social requerida').optional(),
+  tradeName: z.string().optional().nullable(),
+  taxId: z.string().min(3, 'Tax ID / RUT requerido').optional(),
+  countryCode: z.string().length(3).optional(),
+  address: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  postalCode: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable().or(z.literal('')),
+  defaultCurrency: z.string().optional(),
+  notes: z.string().optional().nullable(),
+});
+
+export async function updateCustomerHandler(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+  const { id } = request.params;
+  const body = updateCustomerSchema.parse(request.body);
+  const userId = (request.user as any)?.userId;
+
+  const existing = await prisma.customer.findUnique({
+    where: { id, deletedAt: null },
+  });
+
+  if (!existing) {
+    throw new NotFoundError('Cliente no encontrado');
+  }
+
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const customer = await tx.customer.update({
+      where: { id },
+      data: {
+        legalName: body.legalName ?? existing.legalName,
+        tradeName: body.tradeName !== undefined ? body.tradeName : existing.tradeName,
+        taxId: body.taxId ?? existing.taxId,
+        countryCode: body.countryCode ?? existing.countryCode,
+        address: body.address !== undefined ? body.address : existing.address,
+        city: body.city !== undefined ? body.city : existing.city,
+        postalCode: body.postalCode !== undefined ? body.postalCode : existing.postalCode,
+        phone: body.phone !== undefined ? body.phone : existing.phone,
+        email: body.email !== undefined ? (body.email || null) : existing.email,
+        defaultCurrency: body.defaultCurrency ?? existing.defaultCurrency,
+        notes: body.notes !== undefined ? body.notes : existing.notes,
+      },
+      include: { country: true, entities: true, contacts: true },
+    });
+
+    await createAuditLog(tx, {
+      userId,
+      action: 'UPDATE_CUSTOMER',
+      entity: 'Customer',
+      entityId: id,
+      beforeData: existing,
+      afterData: customer,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    return customer;
+  });
+
+  return reply.send({ success: true, data: updated });
+}

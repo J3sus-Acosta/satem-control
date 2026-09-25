@@ -774,6 +774,8 @@ export const UsersPage: React.FC = () => {
               width: '100%',
               maxWidth: '520px',
               padding: '24px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
               border: '1px solid var(--border-light)',
             }}
@@ -831,7 +833,7 @@ export const UsersPage: React.FC = () => {
                 <input
                   type="email"
                   required
-                  placeholder="usuario@satem.cl"
+                  placeholder="usuario@satemsoluciones.com"
                   className="input-field"
                   style={{ width: '100%' }}
                   value={newEmail}
@@ -948,6 +950,8 @@ export const UsersPage: React.FC = () => {
               width: '100%',
               maxWidth: '500px',
               padding: '24px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
               border: '1px solid var(--border-light)',
             }}
@@ -1101,6 +1105,8 @@ export const UsersPage: React.FC = () => {
               width: '100%',
               maxWidth: '480px',
               padding: '24px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
               border: '1px solid var(--border-light)',
             }}
@@ -1251,6 +1257,8 @@ export const UsersPage: React.FC = () => {
               width: '100%',
               maxWidth: '460px',
               padding: '24px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
               border: '1px solid rgba(239, 68, 68, 0.4)',
             }}

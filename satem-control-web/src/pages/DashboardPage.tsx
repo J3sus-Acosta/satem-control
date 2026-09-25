@@ -110,58 +110,36 @@ export const DashboardPage: React.FC = () => {
         <h3 style={{ fontSize: '15px', marginBottom: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Ciclo Operativo SATEM
         </h3>
-        <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-          {cycle.map((item, idx) => (
-            <React.Fragment key={item.step}>
-              <div
-                onClick={() => navigate(item.route)}
-                style={{
-                  flex: 1,
-                  backgroundColor: 'var(--bg-card)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: idx === 0 ? 'var(--radius-md) 0 0 var(--radius-md)' : idx === cycle.length - 1 ? '0 var(--radius-md) var(--radius-md) 0' : '0',
-                  borderLeft: idx > 0 ? 'none' : '1px solid var(--border-color)',
-                  padding: '14px 16px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  position: 'relative',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'var(--bg-card)')}
-              >
-                <div style={{ fontSize: '20px', fontWeight: 800, color: item.color, marginBottom: '4px', fontFamily: 'var(--font-heading)' }}>{item.step}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '13px', color: item.color, marginBottom: '4px' }}>
-                  {item.icon} {item.label}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>{item.desc}</div>
+        <div className="operating-cycle-grid">
+          {cycle.map((item) => (
+            <div
+              key={item.step}
+              className="cycle-step-card"
+              onClick={() => navigate(item.route)}
+              title={`Ir a ${item.label}`}
+            >
+              <div style={{ fontSize: '20px', fontWeight: 800, color: item.color, marginBottom: '4px', fontFamily: 'var(--font-heading)' }}>{item.step}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '13px', color: item.color, marginBottom: '4px' }}>
+                {item.icon} <span>{item.label}</span>
               </div>
-              {idx < cycle.length - 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', zIndex: 1 }}>
-                  <div style={{
-                    width: 0, height: 0,
-                    borderTop: '38px solid transparent',
-                    borderBottom: '38px solid transparent',
-                    borderLeft: '14px solid var(--border-color)',
-                  }} />
-                </div>
-              )}
-            </React.Fragment>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>{item.desc}</div>
+            </div>
           ))}
         </div>
       </div>
 
       {/* Secciones de Estado Operacional */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div className="grid-2">
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
           <h3 style={{ fontSize: '16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileCheck2 size={20} color="var(--info)" /> Resumen Tributario Exportación
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
               <span>Tratamiento Tributario Dominante:</span>
               <span className="badge badge-info">EXPORT_SERVICE (Sin IVA)</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
               <span>Facturas Folio SII Registradas:</span>
               <span style={{ fontWeight: 'bold' }}>{metrics?.operations?.completeExpedients || 0} documentos</span>
             </div>
@@ -173,11 +151,11 @@ export const DashboardPage: React.FC = () => {
             <CheckCircle2 size={20} color="var(--success)" /> Integridad de Expedientes
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
               <span>Expedientes Auditados y Cerrados:</span>
               <span className="badge badge-success">{metrics?.operations?.completeExpedients || 0} 100% Completo</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
               <span>Snapshots de Cierre Congelados:</span>
               <span style={{ fontWeight: 'bold' }}>Inmutables en DB</span>
             </div>

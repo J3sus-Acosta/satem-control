@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -13,36 +13,57 @@ import {
   FileCode,
   ChevronRight,
   FilePlus,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROUTE_LABELS: Record<string, string> = {
-  '/':                   'Dashboard',
-  '/control-center':    'Centro de Control',
-  '/expedients':        'Expedientes',
-  '/customers':         'Clientes & Contratos',
-  '/contracts/wizard':  'Wizard SOW',
-  '/documents/generator':'Generador de Documentos',
-  '/billing':           'Facturación & SumUp',
-  '/bank':              'Conciliación Bancaria',
-  '/admin/templates':   'Plantillas Documentales',
-  '/admin/users':       'Gestión de Usuarios',
+  '/':                    'Dashboard',
+  '/control-center':     'Centro de Control',
+  '/expedients':         'Expedientes',
+  '/customers':          'Clientes & Contratos',
+  '/contracts/wizard':   'Wizard SOW',
+  '/documents/generator': 'Generador de Documentos',
+  '/billing':            'Facturación & SumUp',
+  '/bank':               'Conciliación Bancaria',
+  '/admin/templates':    'Plantillas Documentales',
+  '/admin/users':        'Gestión de Usuarios',
 };
 
-const BreadcrumbHeader: React.FC = () => {
+interface BreadcrumbHeaderProps {
+  onToggleMobileMenu: () => void;
+  isMobileMenuOpen: boolean;
+}
+
+const BreadcrumbHeader: React.FC<BreadcrumbHeaderProps> = ({ onToggleMobileMenu, isMobileMenuOpen }) => {
   const location = useLocation();
   const { user } = useAuth();
   const currentLabel = ROUTE_LABELS[location.pathname] || location.pathname;
 
   return (
     <header className="header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
-        <span style={{ color: 'var(--text-muted)' }}>SATEM Control</span>
-        <ChevronRight size={14} color="var(--text-muted)" />
-        <span style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{currentLabel}</span>
+      <div className="header-left">
+        <button
+          type="button"
+          onClick={onToggleMobileMenu}
+          className="mobile-menu-toggle"
+          aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+        >
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', minWidth: 0 }}>
+          <span style={{ color: 'var(--text-muted)' }} className="header-user-email">SATEM</span>
+          <ChevronRight size={13} color="var(--text-muted)" className="header-user-email" />
+          <span style={{ color: 'var(--accent-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="breadcrumb-text">
+            {currentLabel}
+          </span>
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user?.email}</span>
+      <div className="header-right">
+        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }} className="header-user-email">
+          {user?.email}
+        </span>
         <span className="badge badge-info">{user?.role}</span>
       </div>
     </header>
@@ -52,28 +73,58 @@ const BreadcrumbHeader: React.FC = () => {
 export const AppLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Cerrar sidebar al cambiar de ruta
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  const closeSidebar = () => setMobileSidebarOpen(false);
+
   return (
     <div className="app-container">
-      {/* Sidebar Navigation */}
-      <aside className="sidebar">
-        <div style={{ marginBottom: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <img src="/assets/logo-icon.png" alt="SATEM Icon" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
-            <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--accent-primary)', letterSpacing: '0.5px' }}>SATEM Control</span>
+      {/* Backdrop para móviles */}
+      <div
+        className={`sidebar-backdrop ${mobileSidebarOpen ? 'open' : ''}`}
+        onClick={closeSidebar}
+        aria-hidden="true"
+      />
+
+      {/* Sidebar Navigation Drawer */}
+      <aside className={`sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <img src="/assets/logo-icon.png" alt="SATEM Icon" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
+              <span style={{ fontSize: '19px', fontWeight: 'bold', color: 'var(--accent-primary)', letterSpacing: '0.5px' }}>
+                SATEM Control
+              </span>
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Soluciones Inteligentes SpA</span>
           </div>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Soluciones Inteligentes SpA — Operaciones</span>
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="mobile-menu-toggle"
+            style={{ display: mobileSidebarOpen ? 'inline-flex' : 'none' }}
+            aria-label="Cerrar menú"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
           <NavLink
             to="/"
             end
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
@@ -82,6 +133,7 @@ export const AppLayout: React.FC = () => {
 
           <NavLink
             to="/control-center"
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
@@ -90,6 +142,7 @@ export const AppLayout: React.FC = () => {
 
           <NavLink
             to="/expedients"
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
@@ -98,6 +151,7 @@ export const AppLayout: React.FC = () => {
 
           <NavLink
             to="/customers"
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
@@ -106,14 +160,16 @@ export const AppLayout: React.FC = () => {
 
           <NavLink
             to="/documents/generator"
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
-            <FilePlus size={18} /> Generar Documento / Propuesta
+            <FilePlus size={18} /> Generar Documento
           </NavLink>
 
           <NavLink
             to="/billing"
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
@@ -122,6 +178,7 @@ export const AppLayout: React.FC = () => {
 
           <NavLink
             to="/bank"
+            onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
@@ -133,6 +190,7 @@ export const AppLayout: React.FC = () => {
               <div style={{ margin: '8px 0', borderTop: '1px dashed var(--border-color)' }} />
               <NavLink
                 to="/admin/templates"
+                onClick={closeSidebar}
                 className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ justifyContent: 'flex-start' }}
               >
@@ -144,6 +202,7 @@ export const AppLayout: React.FC = () => {
           {user?.role === 'ADMIN' && (
             <NavLink
               to="/admin/users"
+              onClick={closeSidebar}
               className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
               style={{ justifyContent: 'flex-start' }}
             >
@@ -152,13 +211,15 @@ export const AppLayout: React.FC = () => {
           )}
         </nav>
 
-        <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <User size={20} color="#fff" />
             </div>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>{user?.fullName}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.fullName}
+              </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{user?.role}</div>
             </div>
           </div>
@@ -170,8 +231,10 @@ export const AppLayout: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="main-content">
-        <BreadcrumbHeader />
-
+        <BreadcrumbHeader
+          onToggleMobileMenu={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          isMobileMenuOpen={mobileSidebarOpen}
+        />
 
         <div className="content-body">
           <Outlet />

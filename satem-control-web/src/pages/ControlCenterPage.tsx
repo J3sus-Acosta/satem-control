@@ -215,7 +215,7 @@ export const ControlCenterPage: React.FC = () => {
           ))}
         </div>
         <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)' }} />
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {(['ALL', 'OPEN', 'RESOLVED'] as StatusFilter[]).map((s) => (
             <button
               key={s}
@@ -227,7 +227,7 @@ export const ControlCenterPage: React.FC = () => {
             </button>
           ))}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {(severityFilter !== 'ALL' || statusFilter !== 'OPEN') && (
             <button
               onClick={() => { setSeverityFilter('ALL'); setStatusFilter('OPEN'); }}
@@ -244,7 +244,7 @@ export const ControlCenterPage: React.FC = () => {
 
       {/* Tabla de Excepciones */}
       <div className="table-container">
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ fontSize: '15px' }}>
             Excepciones Registradas
             <span style={{ marginLeft: '10px', fontSize: '13px', color: 'var(--text-muted)', fontWeight: 400 }}>

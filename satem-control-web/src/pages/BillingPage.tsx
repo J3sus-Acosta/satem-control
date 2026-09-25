@@ -150,14 +150,14 @@ export const BillingPage: React.FC = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Facturación SII & Cobros SumUp</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
             Registro de folios SII Tipo 110 (exportación sin IVA), carga de documentos PDF oficiales y simulación de cobro SumUp.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button onClick={handleExportCsv} className="btn btn-secondary" style={{ fontSize: '13px' }}>
             <Download size={15} /> Exportar CSV
           </button>
@@ -204,7 +204,7 @@ export const BillingPage: React.FC = () => {
 
       {/* Tabla de Facturas SII con paginación */}
       <div className="table-container" style={{ marginBottom: '24px' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileSpreadsheet size={18} color="var(--accent-primary)" /> Facturas SII Registradas (Tipo 110 — Exportación)
             <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({invoices.length} total)</span>
@@ -287,7 +287,7 @@ export const BillingPage: React.FC = () => {
 
             {/* Paginación MEJ-09 */}
             {totalPages > 1 && (
-              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                   Página {page} de {totalPages} ({invoices.length} registros)
                 </span>
@@ -329,8 +329,8 @@ export const BillingPage: React.FC = () => {
 
       {/* Modal Registrar Folio SII */}
       {showInvoiceModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '480px' }}>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '480px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '4px' }}>Registrar Folio SII</h3>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
               La factura se emite externamente en el portal SII (Tipo 110). Aquí se registra el folio y se adjunta el PDF para trazabilidad y auditoría.
@@ -364,7 +364,7 @@ export const BillingPage: React.FC = () => {
               <div style={{ padding: '10px 14px', backgroundColor: 'rgba(0,168,150,0.08)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-sm)', fontSize: '12px', marginBottom: '20px', color: 'var(--accent-primary)' }}>
                 🔒 Tratamiento tributario: <strong>EXPORT_SERVICE (Sin IVA)</strong> — normativa de exportación de servicios.
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => setShowInvoiceModal(false)} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={submittingInvoice}>
                   {submittingInvoice ? 'Guardando...' : 'Registrar Folio'}

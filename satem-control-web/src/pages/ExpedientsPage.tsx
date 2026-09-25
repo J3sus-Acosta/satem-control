@@ -453,7 +453,7 @@ export const ExpedientsPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Gestión de Expedientes (EXP-YYYY-NNNNNN)</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
@@ -467,9 +467,9 @@ export const ExpedientsPage: React.FC = () => {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px' }}>
+      <div className="expedients-layout">
         {/* Lista lateral */}
-        <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 180px)' }}>
+        <div className="expedients-sidebar" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 180px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', margin: 0 }}>
               Expedientes ({expedients.length})
@@ -533,7 +533,7 @@ export const ExpedientsPage: React.FC = () => {
         {selectedExpedient ? (
           <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
             {/* Header expediente */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <h2 style={{ fontSize: '22px' }}>{selectedExpedient.code}</h2>
@@ -1057,8 +1057,8 @@ export const ExpedientsPage: React.FC = () => {
 
                 {/* Modal subir PDF firmado */}
                 {uploadingDocId && (
-                  <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-                    <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '24px', width: '420px' }}>
+                  <div className="modal-overlay">
+                    <div className="modal-dialog" style={{ maxWidth: '440px' }}>
                       <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>Cargar Documento Firmado por Cliente</h3>
                       <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
                         Selecciona el archivo PDF firmado por el cliente. Este archivo quedará incorporado permanentemente en el expediente y en el paquete ZIP de auditoría.
@@ -1068,7 +1068,7 @@ export const ExpedientsPage: React.FC = () => {
                           <label className="form-label">Archivo PDF Firmado</label>
                           <input type="file" accept="application/pdf" className="form-input" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} required />
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           <button type="button" onClick={() => setUploadingDocId(null)} className="btn btn-secondary">Cancelar</button>
                           <button type="submit" className="btn btn-primary" disabled={!selectedFile}>Confirmar y Guardar en Expediente</button>
                         </div>
@@ -1134,8 +1134,8 @@ export const ExpedientsPage: React.FC = () => {
 
       {/* Modal Cargar Factura SII */}
       {showInvoiceModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '500px' }}>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '520px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Receipt size={20} color="var(--accent-primary)" /> Cargar Factura SII al Expediente
             </h3>
@@ -1151,7 +1151,7 @@ export const ExpedientsPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="grid-form-2">
                 <div className="form-group">
                   <label className="form-label">Tipo Documento SII</label>
                   <select className="form-select" value={invDocType} onChange={(e) => setInvDocType(e.target.value)}>
@@ -1201,8 +1201,8 @@ export const ExpedientsPage: React.FC = () => {
 
       {/* Modal Cargar Comprobante de Pago / Informe SumUp */}
       {showPaymentModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '540px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '580px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CreditCard size={20} color="var(--accent-primary)" /> Registrar Informe de Depósito SumUp / Pago
             </h3>
@@ -1232,7 +1232,7 @@ export const ExpedientsPage: React.FC = () => {
                   <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '6px', fontSize: '13px' }}>
                     ✓ Informe de Depósito SumUp Extraído Exitosamente
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', color: 'var(--text-secondary)' }}>
+                  <div className="grid-form-2" style={{ gap: '6px', color: 'var(--text-secondary)' }}>
                     <div><strong>Bruto Tarjeta:</strong> ${sumUpInfo.grossAmount?.toLocaleString('es-CL')} CLP</div>
                     <div><strong>Comisión SumUp:</strong> -${sumUpInfo.feeAmount?.toLocaleString('es-CL')} CLP</div>
                     <div style={{ color: 'var(--success)', fontWeight: 600 }}><strong>Depósito Neto:</strong> ${sumUpInfo.netAmount?.toLocaleString('es-CL')} CLP</div>
@@ -1243,7 +1243,7 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px' }}>
+              <div className="grid-form-2">
                 <div className="form-group">
                   <label className="form-label">Monto Bruto Pagado *</label>
                   <input
@@ -1261,7 +1261,7 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="grid-form-2">
                 <div className="form-group">
                   <label className="form-label">Método de Pago *</label>
                   <select className="form-select" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
@@ -1282,7 +1282,7 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="grid-form-2">
                 <div className="form-group">
                   <label className="form-label">Equivalente en USD Pactado <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span></label>
                   <input
@@ -1309,7 +1309,7 @@ export const ExpedientsPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => { setShowPaymentModal(false); setSumUpInfo(null); }} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={uploadingPayment || !payFile}>
                   {uploadingPayment ? 'Subiendo e Integrando...' : 'Cargar Informe / Pago'}
@@ -1322,8 +1322,8 @@ export const ExpedientsPage: React.FC = () => {
 
       {/* Modal Nuevo Expediente — MEJ-05: selector de contrato */}
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '500px' }}>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '520px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Crear Nuevo Expediente</h3>
             <form onSubmit={handleCreateExpedient}>
               <div className="form-group">
@@ -1379,7 +1379,7 @@ export const ExpedientsPage: React.FC = () => {
                 </select>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary">Crear Expediente</button>
               </div>
@@ -1390,8 +1390,8 @@ export const ExpedientsPage: React.FC = () => {
 
       {/* Modal Registrar Excepción Manual — MEJ-02 */}
       {showExceptionModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '28px', width: '480px' }}>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '500px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '4px' }}>Registrar Excepción Manual</h3>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
               Expediente: <strong style={{ color: 'var(--accent-primary)' }}>{selectedExpedient?.code}</strong>
@@ -1415,7 +1415,7 @@ export const ExpedientsPage: React.FC = () => {
                   <option value="CRITICAL">🔴 CRITICAL — Acción inmediata</option>
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => setShowExceptionModal(false)} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary">Registrar Excepción</button>
               </div>
@@ -1425,8 +1425,8 @@ export const ExpedientsPage: React.FC = () => {
       )}
       {/* Modal Calculadora SumUp */}
       {showSumUpModal && selectedExpedient && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '20px' }}>
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', width: '800px', maxWidth: '95vw', overflow: 'hidden' }}>
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '820px', padding: 0 }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Calculator size={18} color="var(--accent-primary)" />

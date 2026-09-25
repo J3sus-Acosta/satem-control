@@ -136,9 +136,8 @@ async function main() {
       address: 'Av. Providencia 1234, Of. 601, Santiago',
       city: 'Santiago',
       country: 'Chile',
-      email: 'contacto@satem.cl',
-      phone: '+56 2 2999 8888',
-      website: 'https://www.satem.cl',
+      email: 'contacto@satemsoluciones.com',
+      website: 'https://satemsoluciones.com',
       logoFullUrl: LOGO_FULL_BASE64,
       logoShortUrl: LOGO_SHORT_BASE64,
       legalRepresentative: 'Representante Legal SATEM',
@@ -151,9 +150,9 @@ async function main() {
       address: 'Av. Providencia 1234, Of. 601, Santiago',
       city: 'Santiago',
       country: 'Chile',
-      email: 'contacto@satem.cl',
-      phone: '+56 2 2999 8888',
-      website: 'https://www.satem.cl',
+      email: 'contacto@satemsoluciones.com',
+      phone: '',
+      website: 'https://satemsoluciones.com',
       logoFullUrl: LOGO_FULL_BASE64,
       logoShortUrl: LOGO_SHORT_BASE64,
       legalRepresentative: 'Representante Legal SATEM',
@@ -237,7 +236,7 @@ async function main() {
                 <strong>Tax ID / RUT / EIN:</strong> {{cliente.taxId}}<br>
                 <strong>País / Ciudad:</strong> {{cliente.pais}} {{cliente.ciudad}}<br>
                 <strong>Domicilio:</strong> {{cliente.direccion}}<br>
-                <strong>Contacto:</strong> {{cliente.email}}
+                <strong>Contacto:</strong> {{cliente.email}} | {{cliente.telefono}}
               </td>
             </tr>
           </table>
@@ -278,14 +277,23 @@ async function main() {
             <tr>
               <td class="label">Bolsa / Horas Contratadas:</td>
               <td>{{contrato.horas}} Horas</td>
-              <td class="label">Tarifa por Hora (Referencial):</td>
-              <td>{{contrato.tarifaHora}}</td>
+              <td class="label">Tarifa por Hora:</td>
+              <td>{{contrato.tarifaHoraConEquivalente}}</td>
+            </tr>
+            <tr>
+              <td class="label">T.C. Dólar Observado (Chile):</td>
+              <td><strong>{{contrato.tipoCambioInfo}}</strong></td>
+              <td class="label">Total Equivalente en CLP:</td>
+              <td><strong style="color: #00a896;">{{contrato.montoEquivalenteClp}}</strong></td>
             </tr>
             <tr>
               <td class="label">Condiciones y Métodos de Pago:</td>
               <td colspan="3"><strong>{{contrato.metodoPago}}</strong></td>
             </tr>
           </table>
+          <div style="font-size: 9px; color: #64748b; margin-top: 4px; font-style: italic;">
+            * El tipo de cambio del dólar observado (Banco Central de Chile) queda congelado a la fecha de emisión del presente instrumento para efectos contables, referenciales y de facturación de exportación.
+          </div>
           <div class="section-title">5. DECLARACIÓN TRIBUTARIA DE EXPORTACIÓN / TAX EXEMPTION</div>
           <div class="legal-clause">
             <strong>DECLARACIÓN TRIBUTARIA DE EXPORTACIÓN DE SERVICIOS:</strong><br>

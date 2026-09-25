@@ -134,7 +134,7 @@ export const SumUpCalculator: React.FC<SumUpCalculatorProps> = ({
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '1fr 1.15fr', gap: '24px' }}>
+      <div className={compact ? "" : "grid-split"} style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : undefined, gap: '24px' }}>
         {/* Columna Izquierda: Parámetros */}
         <div>
           {/* Campo USD */}
@@ -240,7 +240,7 @@ export const SumUpCalculator: React.FC<SumUpCalculatorProps> = ({
             </div>
 
             {/* Desglose de Liquidación */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingTop: '12px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+            <div className="grid-form-2" style={{ gap: '10px', paddingTop: '12px', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Abono Líquido en Banco (96.19%):</div>
                 <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '2px' }}>
@@ -265,13 +265,13 @@ export const SumUpCalculator: React.FC<SumUpCalculatorProps> = ({
           </div>
 
           {/* Botones de acción */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={handleCopyMonto}
               disabled={montoLinkClp <= 0}
               className="btn btn-secondary"
-              style={{ flex: 1, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ flex: '1 1 140px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
             >
               {copiedMonto ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
               {copiedMonto ? '¡Monto Copiado!' : 'Copiar Monto CLP'}
@@ -282,7 +282,7 @@ export const SumUpCalculator: React.FC<SumUpCalculatorProps> = ({
               onClick={handleCopyMensaje}
               disabled={montoLinkClp <= 0 || numAmount <= 0}
               className="btn btn-primary"
-              style={{ flex: 1.3, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              style={{ flex: '1 1 180px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
             >
               {copiedMensaje ? <Check size={14} /> : <Sparkles size={14} />}
               {copiedMensaje ? '¡Mensaje Copiado!' : 'Copiar Detalle Cliente'}
