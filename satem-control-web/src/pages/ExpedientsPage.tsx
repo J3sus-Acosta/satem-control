@@ -76,9 +76,10 @@ export const ExpedientsPage: React.FC = () => {
     setLoading(true);
     api.get('/expedients')
       .then((res) => {
-        setExpedients(res.data.data);
-        if (res.data.data.length > 0 && !selectedExpedient) {
-          fetchExpedientDetail(res.data.data[0].id);
+        const list = res.data.data || [];
+        setExpedients(list);
+        if (list.length > 0) {
+          fetchExpedientDetail(list[0].id);
         }
       })
       .catch((err) => console.error(err))
@@ -87,8 +88,19 @@ export const ExpedientsPage: React.FC = () => {
 
   const fetchExpedientDetail = (id: string) => {
     api.get(`/expedients/${id}`)
-      .then((res) => setSelectedExpedient(res.data.data))
-      .catch((err) => console.error(err));
+      .then((res) => {
+        if (res.data?.data) {
+          setSelectedExpedient(res.data.data);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching expedient detail:', err);
+        setExpedients((prev) => {
+          const item = prev.find((e) => e.id === id);
+          if (item) setSelectedExpedient(item);
+          return prev;
+        });
+      });
   };
 
   const fetchContractsByCustomer = (customerId: string) => {
