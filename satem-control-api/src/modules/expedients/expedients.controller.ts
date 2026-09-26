@@ -107,20 +107,78 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
   });
 
   // Eliminar ítems obsoletos de ATTENTION_REGISTERED si existieran previamente en la base de datos
+  // Eliminar ítems obsoletos de ATTENTION_REGISTERED si existieran previamente en la base de datos
   const deletedOld = await prisma.expedientIntegrityItem.deleteMany({
     where: { expedientId: expedient.id, code: 'ATTENTION_REGISTERED' },
   });
 
-  // Auto-sincronización de integridad con instancias documentales generadas/firmadas
   let needsIntegrityReload = deletedOld.count > 0;
-  for (const item of expedient.integrityItems) {
+
+  // Auto-asegurar que existan los ítems base de integridad si faltaran
+  const standardCodes = [
+    { code: 'CUSTOMER_DATA_COMPLETE', name: 'Datos del Cliente completos', category: 'DOCUMENTAL', isRequired: true },
+    { code: 'WORK_ORDER_PRESENT', name: 'Orden de Trabajo autorizada', category: 'OPERATIONAL', isRequired: true },
+    { code: 'RECEPTION_SIGNED', name: 'Recepción Conforme firmada por cliente', category: 'OPERATIONAL', isRequired: true },
+  ];
+  if (expedient.taxTreatment !== TaxTreatment.NO_INVOICE) {
+    standardCodes.push(
+      { code: 'INVOICE_REGISTERED', name: 'Factura SII registrada', category: 'TAX', isRequired: true },
+      { code: 'PAYMENT_PROOF_PRESENT', name: 'Comprobante de pago registrado', category: 'FINANCIAL', isRequired: true },
+      { code: 'RECONCILIATION_COMPLETED', name: 'Conciliación bancaria Santander', category: 'FINANCIAL', isRequired: true }
+    );
+  }
+
+  const existingCodes = new Set(expedient.integrityItems.map((i) => i.code));
+  for (const std of standardCodes) {
+    if (!existingCodes.has(std.code)) {
+      await prisma.expedientIntegrityItem.create({
+        data: {
+          expedientId: expedient.id,
+          code: std.code,
+          name: std.name,
+          category: std.category,
+          isRequired: std.isRequired,
+          status: 'PENDING',
+        },
+      });
+      needsIntegrityReload = true;
+    }
+  }
+
+  // Auto-vincular documentos de Facturas en DocumentLinks si no están enlazados
+  if (expedient.invoices && expedient.invoices.length > 0) {
+    for (const inv of expedient.invoices) {
+      const invDocId = inv.pdfDocumentId || inv.pdfDocument?.id;
+      if (invDocId) {
+        const linkExists = (expedient.documentLinks || []).some((l) => l.documentId === invDocId);
+        if (!linkExists) {
+          await prisma.documentLink.create({
+            data: {
+              documentId: invDocId,
+              entityType: 'EXPEDIENT',
+              entityId: expedient.id,
+              expedientId: expedient.id,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  // Sincronización activa de ítems de integridad
+  const currentItems = needsIntegrityReload
+    ? await prisma.expedientIntegrityItem.findMany({ where: { expedientId: expedient.id }, include: { document: true } })
+    : expedient.integrityItems;
+
+  for (const item of currentItems) {
     if (item.code === 'ATTENTION_REGISTERED') continue;
-    if (item.status === 'PENDING') {
-      if (item.code === 'WORK_ORDER_PRESENT') {
-        const wo = docInstances.find((d) => d.category === 'WORK_ORDER');
-        if (wo || (expedient.workOrders && expedient.workOrders.length > 0)) {
-          const isSigned = wo?.status === 'SIGNED';
-          const docNum = wo?.documentNumber || (expedient.workOrders[0] && expedient.workOrders[0].code) || 'OT';
+
+    if (item.code === 'WORK_ORDER_PRESENT') {
+      const wo = docInstances.find((d) => d.category === 'WORK_ORDER');
+      if (wo || (expedient.workOrders && expedient.workOrders.length > 0)) {
+        const isSigned = wo?.status === 'SIGNED';
+        const docNum = wo?.documentNumber || (expedient.workOrders[0] && expedient.workOrders[0].code) || 'OT';
+        if (item.status !== 'COMPLETED') {
           await prisma.expedientIntegrityItem.update({
             where: { id: item.id },
             data: {
@@ -131,11 +189,13 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
           });
           needsIntegrityReload = true;
         }
-      } else if (item.code === 'CONTRACT_PRESENT') {
-        const sow = docInstances.find((d) => d.category === 'CONTRACT');
-        if (sow || expedient.contractId) {
-          const isSigned = sow?.status === 'SIGNED';
-          const docNum = sow?.documentNumber || expedient.contract?.code || 'SOW';
+      }
+    } else if (item.code === 'CONTRACT_PRESENT') {
+      const sow = docInstances.find((d) => d.category === 'CONTRACT');
+      if (sow || expedient.contractId) {
+        const isSigned = sow?.status === 'SIGNED';
+        const docNum = sow?.documentNumber || expedient.contract?.code || 'SOW';
+        if (item.status !== 'COMPLETED') {
           await prisma.expedientIntegrityItem.update({
             where: { id: item.id },
             data: {
@@ -146,105 +206,128 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
           });
           needsIntegrityReload = true;
         }
-      } else if (item.code === 'RECEPTION_SIGNED') {
-        const rc = docInstances.find((d) => d.category === 'RECEPTION_CONFORMITY' && d.status === 'SIGNED');
-        if (rc) {
+      }
+    } else if (item.code === 'RECEPTION_SIGNED') {
+      const rc = docInstances.find((d) => d.category === 'RECEPTION_CONFORMITY' && d.status === 'SIGNED');
+      if (rc && item.status !== 'COMPLETED') {
+        await prisma.expedientIntegrityItem.update({
+          where: { id: item.id },
+          data: {
+            status: 'COMPLETED',
+            observation: `Recepción Conforme firmada por cliente cargada (${rc.documentNumber})`,
+            completedAt: new Date(),
+          },
+        });
+        needsIntegrityReload = true;
+      }
+    } else if (item.code === 'INVOICE_REGISTERED') {
+      if (expedient.invoices && expedient.invoices.length > 0) {
+        const inv = expedient.invoices[0];
+        const invDocId = inv.pdfDocumentId || inv.pdfDocument?.id;
+        if (item.status !== 'COMPLETED' || (!item.documentId && invDocId)) {
           await prisma.expedientIntegrityItem.update({
             where: { id: item.id },
             data: {
               status: 'COMPLETED',
-              observation: `Recepción Conforme firmada por cliente cargada (${rc.documentNumber})`,
-              completedAt: new Date(),
-            },
-          });
-          needsIntegrityReload = true;
-        }
-      } else if (item.code === 'INVOICE_REGISTERED') {
-        if (expedient.invoices && expedient.invoices.length > 0) {
-          const inv = expedient.invoices[0];
-          await prisma.expedientIntegrityItem.update({
-            where: { id: item.id },
-            data: {
-              status: 'COMPLETED',
-              documentId: inv.pdfDocumentId || undefined,
+              documentId: invDocId || item.documentId || null,
               observation: `Factura SII N° ${inv.siiFolio} registrada y verificada`,
-              completedAt: new Date(),
+              completedAt: item.completedAt || new Date(),
             },
           });
           needsIntegrityReload = true;
         }
-      } else if (item.code === 'RECONCILIATION_COMPLETED') {
-        let totalReconciledClp = 0;
-        let totalReconciledUsd = 0;
-        const receiptCodes: string[] = [];
-        const seenRecs = new Set<string>();
+      }
+    } else if (item.code === 'PAYMENT_PROOF_PRESENT') {
+      const payLink = (expedient.documentLinks || []).find(
+        (l) => l.document?.category === 'PAYMENT_PROOF' || l.document?.category === 'SUMUP_PROOF'
+      );
+      if (payLink?.documentId) {
+        if (item.status !== 'COMPLETED' || !item.documentId) {
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'COMPLETED',
+              documentId: payLink.documentId,
+              observation: `Comprobante de pago registrado (${payLink.document?.originalName || 'Comprobante'})`,
+              completedAt: item.completedAt || new Date(),
+            },
+          });
+          needsIntegrityReload = true;
+        }
+      }
+    } else if (item.code === 'RECONCILIATION_COMPLETED') {
+      let totalReconciledClp = 0;
+      let totalReconciledUsd = 0;
+      const receiptCodes: string[] = [];
+      const seenRecs = new Set<string>();
 
-        for (const inv of expedient.invoices) {
-          for (const pr of inv.paymentRequests) {
-            for (const p of pr.payments) {
-              for (const alloc of p.allocations) {
-                for (const rec of alloc.reconciliations) {
-                  if (!seenRecs.has(rec.id)) {
-                    seenRecs.add(rec.id);
-                    totalReconciledClp += Number(rec.receivedAmountClp || 0);
-                    const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
-                    totalReconciledUsd += pUsd;
-                    if (rec.bankReceipt?.code && !receiptCodes.includes(rec.bankReceipt.code)) {
-                      receiptCodes.push(rec.bankReceipt.code);
-                    }
+      for (const inv of expedient.invoices) {
+        for (const pr of inv.paymentRequests) {
+          for (const p of pr.payments) {
+            for (const alloc of p.allocations) {
+              for (const rec of alloc.reconciliations) {
+                if (!seenRecs.has(rec.id)) {
+                  seenRecs.add(rec.id);
+                  totalReconciledClp += Number(rec.receivedAmountClp || 0);
+                  const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
+                  totalReconciledUsd += pUsd;
+                  if (rec.bankReceipt?.code && !receiptCodes.includes(rec.bankReceipt.code)) {
+                    receiptCodes.push(rec.bankReceipt.code);
                   }
                 }
               }
             }
           }
         }
+      }
 
-        for (const link of (expedient.documentLinks || [])) {
-          if (link.document?.paymentProof) {
-            for (const p of link.document.paymentProof) {
-              for (const alloc of p.allocations) {
-                for (const rec of alloc.reconciliations) {
-                  if (!seenRecs.has(rec.id)) {
-                    seenRecs.add(rec.id);
-                    totalReconciledClp += Number(rec.receivedAmountClp || 0);
-                    const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
-                    totalReconciledUsd += pUsd;
-                    if (rec.bankReceipt?.code && !receiptCodes.includes(rec.bankReceipt.code)) {
-                      receiptCodes.push(rec.bankReceipt.code);
-                    }
+      for (const link of expedient.documentLinks || []) {
+        if (link.document?.paymentProof) {
+          for (const p of link.document.paymentProof) {
+            for (const alloc of p.allocations) {
+              for (const rec of alloc.reconciliations) {
+                if (!seenRecs.has(rec.id)) {
+                  seenRecs.add(rec.id);
+                  totalReconciledClp += Number(rec.receivedAmountClp || 0);
+                  const pUsd = Number(p.usdEquivalent || 0) || (p.currency === 'USD' ? Number(p.amount) : 0);
+                  totalReconciledUsd += pUsd;
+                  if (rec.bankReceipt?.code && !receiptCodes.includes(rec.bankReceipt.code)) {
+                    receiptCodes.push(rec.bankReceipt.code);
                   }
                 }
               }
             }
           }
         }
+      }
 
-        if (totalReconciledClp > 0) {
-          const contractAmount = Number(expedient.contract?.totalAmount || 0);
-          const totalInvoiceAmount = expedient.invoices.reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
-          const currency = expedient.contract?.currency || expedient.invoices[0]?.currency || 'USD';
-          const codesStr = receiptCodes.length > 0 ? receiptCodes.join(', ') : 'Santander';
+      if (totalReconciledClp > 0) {
+        const contractAmount = Number(expedient.contract?.totalAmount || 0);
+        const totalInvoiceAmount = expedient.invoices.reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+        const currency = expedient.contract?.currency || expedient.invoices[0]?.currency || 'USD';
+        const codesStr = receiptCodes.length > 0 ? receiptCodes.join(', ') : 'Santander';
 
-          let progressText = '';
-          if (currency === 'USD' && (contractAmount > 0 || totalInvoiceAmount > 0)) {
-            const targetUsd = contractAmount > 0 ? contractAmount : totalInvoiceAmount;
-            let pct = Math.min(100, Math.round((totalReconciledUsd / targetUsd) * 100));
-            if (pct >= 99) pct = 100;
-            progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Progreso: ${pct}% ($${totalReconciledUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / $${targetUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD) • Total Líquido Santander: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
-          } else if (currency === 'CLP' && contractAmount > 0) {
-            let pct = Math.min(100, Math.round((totalReconciledClp / contractAmount) * 100));
-            if (pct >= 99) pct = 100;
-            progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Pagado y Conciliado: ${pct}% ($${totalReconciledClp.toLocaleString('es-CL')} / $${contractAmount.toLocaleString('es-CL')} CLP)`;
-          } else {
-            progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Total Conciliado en Banco: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
-          }
+        let progressText = '';
+        if (currency === 'USD' && (contractAmount > 0 || totalInvoiceAmount > 0)) {
+          const targetUsd = contractAmount > 0 ? contractAmount : totalInvoiceAmount;
+          let pct = Math.min(100, Math.round((totalReconciledUsd / targetUsd) * 100));
+          if (pct >= 99) pct = 100;
+          progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Progreso: ${pct}% ($${totalReconciledUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / $${targetUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD) • Total Líquido Santander: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
+        } else if (currency === 'CLP' && contractAmount > 0) {
+          let pct = Math.min(100, Math.round((totalReconciledClp / contractAmount) * 100));
+          if (pct >= 99) pct = 100;
+          progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Pagado y Conciliado: ${pct}% ($${totalReconciledClp.toLocaleString('es-CL')} / $${contractAmount.toLocaleString('es-CL')} CLP)`;
+        } else {
+          progressText = `Conciliación bancaria Santander confirmada (${codesStr}) • Total Conciliado en Banco: $${totalReconciledClp.toLocaleString('es-CL')} CLP`;
+        }
 
+        if (item.status !== 'COMPLETED' || item.observation !== progressText) {
           await prisma.expedientIntegrityItem.update({
             where: { id: item.id },
             data: {
               status: 'COMPLETED',
               observation: progressText,
-              completedAt: new Date(),
+              completedAt: item.completedAt || new Date(),
             },
           });
           needsIntegrityReload = true;
@@ -253,7 +336,7 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     }
   }
 
-  let finalIntegrityItems = expedient.integrityItems.filter((i) => i.code !== 'ATTENTION_REGISTERED');
+  let finalIntegrityItems = currentItems.filter((i) => i.code !== 'ATTENTION_REGISTERED');
   if (needsIntegrityReload) {
     finalIntegrityItems = await prisma.expedientIntegrityItem.findMany({
       where: { expedientId: expedient.id },
@@ -261,10 +344,33 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     });
   }
 
+  // Recargar documentLinks actualizados
+  const finalDocumentLinks = await prisma.documentLink.findMany({
+    where: { expedientId: expedient.id },
+    include: {
+      document: {
+        include: {
+          paymentProof: {
+            include: {
+              allocations: {
+                include: {
+                  reconciliations: {
+                    include: { bankReceipt: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
   return reply.send({
     success: true,
     data: {
       ...expedient,
+      documentLinks: finalDocumentLinks,
       integrityItems: finalIntegrityItems,
       documentInstances: docInstances,
     },

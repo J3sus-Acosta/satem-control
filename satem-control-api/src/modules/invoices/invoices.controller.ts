@@ -72,15 +72,52 @@ export async function createInvoiceHandler(request: FastifyRequest, reply: Fasti
       });
     }
 
-    await tx.expedientIntegrityItem.updateMany({
+    if (body.pdfDocumentId) {
+      const existingLink = await tx.documentLink.findFirst({
+        where: { documentId: body.pdfDocumentId, expedientId: body.expedientId },
+      });
+      if (!existingLink) {
+        await tx.documentLink.create({
+          data: {
+            documentId: body.pdfDocumentId,
+            entityType: 'EXPEDIENT',
+            entityId: body.expedientId,
+            expedientId: body.expedientId,
+          },
+        });
+      }
+    }
+
+    const integrityItem = await tx.expedientIntegrityItem.findFirst({
       where: { expedientId: body.expedientId, code: 'INVOICE_REGISTERED' },
-      data: {
-        status: 'COMPLETED',
-        observation: `Factura SII N° ${body.siiFolio} registrada correctamente`,
-        completedAt: new Date(),
-        completedById: userId,
-      },
     });
+    if (integrityItem) {
+      await tx.expedientIntegrityItem.update({
+        where: { id: integrityItem.id },
+        data: {
+          status: 'COMPLETED',
+          documentId: body.pdfDocumentId || integrityItem.documentId,
+          observation: `Factura SII N° ${body.siiFolio} registrada correctamente`,
+          completedAt: new Date(),
+          completedById: userId,
+        },
+      });
+    } else {
+      await tx.expedientIntegrityItem.create({
+        data: {
+          expedientId: body.expedientId,
+          code: 'INVOICE_REGISTERED',
+          name: 'Factura SII registrada',
+          category: 'TAX',
+          isRequired: true,
+          status: 'COMPLETED',
+          documentId: body.pdfDocumentId || null,
+          observation: `Factura SII N° ${body.siiFolio} registrada correctamente`,
+          completedAt: new Date(),
+          completedById: userId,
+        },
+      });
+    }
 
     await createAuditLog(tx, {
       userId,
@@ -208,17 +245,37 @@ export async function uploadInvoiceHandler(request: FastifyRequest, reply: Fasti
       },
     });
 
-    // 4. Actualizar checklist de integridad del expediente
-    await tx.expedientIntegrityItem.updateMany({
+    // 4. Actualizar checklist de integridad del expediente (Upsert)
+    const integrityItem = await tx.expedientIntegrityItem.findFirst({
       where: { expedientId, code: 'INVOICE_REGISTERED' },
-      data: {
-        status: 'COMPLETED',
-        documentId: document.id,
-        observation: `Factura SII N° ${siiFolio} cargada y verificada (Hash SHA-256: ${sha256.substring(0, 16)}...)`,
-        completedAt: new Date(),
-        completedById: userId,
-      },
     });
+    if (integrityItem) {
+      await tx.expedientIntegrityItem.update({
+        where: { id: integrityItem.id },
+        data: {
+          status: 'COMPLETED',
+          documentId: document.id,
+          observation: `Factura SII N° ${siiFolio} cargada y verificada (Hash SHA-256: ${sha256.substring(0, 16)}...)`,
+          completedAt: new Date(),
+          completedById: userId,
+        },
+      });
+    } else {
+      await tx.expedientIntegrityItem.create({
+        data: {
+          expedientId,
+          code: 'INVOICE_REGISTERED',
+          name: 'Factura SII registrada',
+          category: 'TAX',
+          isRequired: true,
+          status: 'COMPLETED',
+          documentId: document.id,
+          observation: `Factura SII N° ${siiFolio} cargada y verificada (Hash SHA-256: ${sha256.substring(0, 16)}...)`,
+          completedAt: new Date(),
+          completedById: userId,
+        },
+      });
+    }
 
     // 5. Audit Log
     await createAuditLog(tx, {

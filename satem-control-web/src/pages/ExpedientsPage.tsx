@@ -581,13 +581,20 @@ export const ExpedientsPage: React.FC = () => {
 
             {/* Tabs */}
             <div className="tabs-nav">
-              {[
-                { key: 'integrity',  label: `Integridad (${selectedExpedient.integrityItems?.filter((i: any) => i.status === 'COMPLETED').length || 0}/${selectedExpedient.integrityItems?.length || 0})` },
-                { key: 'exceptions', label: `Excepciones (${selectedExpedient.exceptions?.length || 0})` },
-                { key: 'documents',  label: `Documentos (${(selectedExpedient.documentInstances?.length || 0) + (selectedExpedient.documentLinks?.length || 0)})` },
-                { key: 'summary',    label: 'Resumen Operativo' },
-                { key: 'history',    label: 'Historial' },
-              ].map(({ key, label }) => (
+              {(() => {
+                const totalExternalDocs = new Set([
+                  ...(selectedExpedient.documentLinks || []).map((l: any) => l.document?.id || l.documentId),
+                  ...(selectedExpedient.invoices || []).map((i: any) => i.pdfDocumentId || i.pdfDocument?.id),
+                ].filter(Boolean)).size;
+
+                return [
+                  { key: 'integrity',  label: `Integridad (${selectedExpedient.integrityItems?.filter((i: any) => i.status === 'COMPLETED').length || 0}/${selectedExpedient.integrityItems?.length || 0})` },
+                  { key: 'exceptions', label: `Excepciones (${selectedExpedient.exceptions?.length || 0})` },
+                  { key: 'documents',  label: `Documentos (${(selectedExpedient.documentInstances?.length || 0) + totalExternalDocs})` },
+                  { key: 'summary',    label: 'Resumen Operativo' },
+                  { key: 'history',    label: 'Historial' },
+                ];
+              })().map(({ key, label }) => (
                 <button
                   key={key}
                   className={`tab-btn ${activeTab === key ? 'active' : ''}`}
@@ -739,15 +746,18 @@ export const ExpedientsPage: React.FC = () => {
                           {/* Botones de acción contextual para cada regla */}
                           {item.code === 'INVOICE_REGISTERED' && (
                             <div style={{ display: 'flex', gap: '6px' }}>
-                              {docId && (
-                                <button
-                                  onClick={() => handleViewAttachedDoc(docId, `FACTURA_SII_${selectedExpedient.code}.pdf`)}
-                                  className="btn btn-secondary"
-                                  style={{ fontSize: '11px', padding: '4px 10px' }}
-                                >
-                                  <FileText size={13} /> Ver Factura
-                                </button>
-                              )}
+                              {(() => {
+                                const invoiceDocId = docId || selectedExpedient.invoices?.find((i: any) => i.pdfDocumentId || i.pdfDocument?.id)?.pdfDocumentId || selectedExpedient.invoices?.[0]?.pdfDocument?.id;
+                                return invoiceDocId ? (
+                                  <button
+                                    onClick={() => handleViewAttachedDoc(invoiceDocId, `FACTURA_SII_${selectedExpedient.code}.pdf`)}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '11px', padding: '4px 10px' }}
+                                  >
+                                    <FileText size={13} /> Ver Factura
+                                  </button>
+                                ) : null;
+                              })()}
                               {!isViewer && (
                                 <button
                                   onClick={() => setShowInvoiceModal(true)}
@@ -762,15 +772,18 @@ export const ExpedientsPage: React.FC = () => {
 
                           {item.code === 'PAYMENT_PROOF_PRESENT' && (
                             <div style={{ display: 'flex', gap: '6px' }}>
-                              {docId && (
-                                <button
-                                  onClick={() => handleViewAttachedDoc(docId, `COMPROBANTE_PAGO_${selectedExpedient.code}.pdf`)}
-                                  className="btn btn-secondary"
-                                  style={{ fontSize: '11px', padding: '4px 10px' }}
-                                >
-                                  <FileText size={13} /> Ver Comprobante
-                                </button>
-                              )}
+                              {(() => {
+                                const paymentDocId = docId || selectedExpedient.payments?.find((p: any) => p.proofDocumentId || p.proofDocument?.id)?.proofDocumentId || selectedExpedient.documentLinks?.find((l: any) => l.document?.category === 'PAYMENT_PROOF' || l.document?.category === 'SUMUP_PROOF')?.document?.id;
+                                return paymentDocId ? (
+                                  <button
+                                    onClick={() => handleViewAttachedDoc(paymentDocId, `COMPROBANTE_PAGO_${selectedExpedient.code}.pdf`)}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '11px', padding: '4px 10px' }}
+                                  >
+                                    <FileText size={13} /> Ver Comprobante
+                                  </button>
+                                ) : null;
+                              })()}
                               {!isViewer && (
                                 <button
                                   onClick={() => setShowPaymentModal(true)}
@@ -987,73 +1000,101 @@ export const ExpedientsPage: React.FC = () => {
                 )}
 
                 {/* 2. Documentos Adjuntos Externos (Facturas SII, Pagos, Evidencias) */}
-                <h4 style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.4px' }}>
-                  Documentos Externos & Adjuntos ({selectedExpedient.documentLinks?.length || 0})
-                </h4>
+                {(() => {
+                  const externalDocsMap = new Map<string, any>();
 
-                {selectedExpedient.documentLinks?.length === 0 ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)' }}>
-                    <Receipt size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.3 }} />
-                    No hay facturas SII ni comprobantes externos cargados.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {selectedExpedient.documentLinks?.map((link: any) => {
-                      const doc = link.document;
-                      if (!doc) return null;
-                      return (
-                        <div
-                          key={link.id || doc.id}
-                          style={{
-                            padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
-                            border: '1px solid var(--border-color)',
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          }}
-                        >
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>{doc.originalName}</span>
-                              <span className="badge badge-success">{doc.category}</span>
-                            </div>
-                            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                              SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {new Date(doc.createdAt).toLocaleString('es-CL')}
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <button
-                              onClick={() => handleViewAttachedDoc(doc.id, doc.originalName)}
-                              className="btn btn-secondary"
-                              style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
-                              <FileText size={14} /> Ver Documento
-                            </button>
-                            {!isViewer && (
-                              <button
-                                onClick={() => handleDeleteAttachedDoc(doc.id, doc.originalName)}
-                                className="btn btn-danger"
-                                style={{
-                                  fontSize: '12px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                  color: '#f87171',
-                                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                                  padding: '6px 12px',
-                                  borderRadius: 'var(--radius-sm)',
-                                  cursor: 'pointer'
-                                }}
-                                title="Eliminar documento adjunto del expediente"
-                              >
-                                <Trash2 size={14} /> Eliminar
-                              </button>
-                            )}
-                          </div>
+                  // a) Documentos desde documentLinks
+                  (selectedExpedient.documentLinks || []).forEach((link: any) => {
+                    const doc = link.document || link;
+                    if (doc?.id) {
+                      externalDocsMap.set(doc.id, {
+                        ...doc,
+                        linkId: link.id,
+                      });
+                    }
+                  });
+
+                  // b) Documentos desde Facturas SII
+                  (selectedExpedient.invoices || []).forEach((inv: any) => {
+                    if (inv.pdfDocument?.id && !externalDocsMap.has(inv.pdfDocument.id)) {
+                      externalDocsMap.set(inv.pdfDocument.id, {
+                        ...inv.pdfDocument,
+                        category: inv.pdfDocument.category || 'INVOICE',
+                        originalName: inv.pdfDocument.originalName || `Factura_SII_Folio_${inv.siiFolio}.pdf`,
+                      });
+                    }
+                  });
+
+                  const externalDocs = Array.from(externalDocsMap.values());
+
+                  return (
+                    <div>
+                      <h4 style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.4px' }}>
+                        Documentos Externos & Adjuntos ({externalDocs.length})
+                      </h4>
+
+                      {externalDocs.length === 0 ? (
+                        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)' }}>
+                          <Receipt size={24} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.3 }} />
+                          No hay facturas SII ni comprobantes externos cargados.
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {externalDocs.map((doc: any) => (
+                            <div
+                              key={doc.id}
+                              style={{
+                                padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)',
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              }}
+                            >
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>{doc.originalName}</span>
+                                  <span className="badge badge-success">{doc.category}</span>
+                                </div>
+                                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                  SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {doc.createdAt ? new Date(doc.createdAt).toLocaleString('es-CL') : 'N/A'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                  onClick={() => handleViewAttachedDoc(doc.id, doc.originalName)}
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                  <FileText size={14} /> Ver Documento
+                                </button>
+                                {!isViewer && (
+                                  <button
+                                    onClick={() => handleDeleteAttachedDoc(doc.id, doc.originalName)}
+                                    className="btn btn-danger"
+                                    style={{
+                                      fontSize: '12px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                      color: '#f87171',
+                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      padding: '6px 12px',
+                                      borderRadius: 'var(--radius-sm)',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="Eliminar documento adjunto del expediente"
+                                  >
+                                    <Trash2 size={14} /> Eliminar
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Modal subir PDF firmado */}
                 {uploadingDocId && (
