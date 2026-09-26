@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Calculator, FileSpreadsheet, RefreshCw,
-  FileText, ChevronDown, ChevronUp, Plus, Download, Upload
+  FileText, ChevronDown, ChevronUp, Plus, Download, Upload, Trash2
 } from 'lucide-react';
 import { SumUpCalculator } from '../components/SumUpCalculator';
 
@@ -109,6 +109,19 @@ export const BillingPage: React.FC = () => {
       }
     } catch (err: any) {
       alert('Error al visualizar o descargar el PDF de la factura');
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string, folioInfo: string) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la Factura SII "${folioInfo}"? Esta acción removerá el registro y actualizará la integridad del expediente.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/invoices/${invoiceId}`);
+      alert('Factura eliminada exitosamente.');
+      fetchInvoices();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al eliminar la factura');
     }
   };
 
@@ -228,12 +241,13 @@ export const BillingPage: React.FC = () => {
                   <th>Fecha Emisión</th>
                   <th>Estado</th>
                   <th>Documento PDF</th>
+                  {!isViewer && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
                 {pagedInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                    <td colSpan={isViewer ? 7 : 8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
                       <FileText size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
                       No hay facturas registradas.
                       {!isViewer && (
@@ -278,6 +292,29 @@ export const BillingPage: React.FC = () => {
                             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sin PDF</span>
                           )}
                         </td>
+                        {!isViewer && (
+                          <td>
+                            <button
+                              onClick={() => handleDeleteInvoice(inv.id, `Folio ${inv.siiFolio || inv.code}`)}
+                              className="btn btn-danger"
+                              style={{
+                                fontSize: '11px',
+                                padding: '4px 8px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                color: '#f87171',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: 'pointer'
+                              }}
+                              title="Eliminar factura duplicada o errónea"
+                            >
+                              <Trash2 size={13} /> Eliminar
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })

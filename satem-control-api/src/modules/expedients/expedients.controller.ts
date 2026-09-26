@@ -95,10 +95,11 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     throw new NotFoundError('Expediente no encontrado');
   }
 
-  // Buscar todas las instancias vinculadas por expedientId o por contractId/quotationId
+  // Buscar todas las instancias vinculadas por expedientId o por contractId/quotationId/customerId
   const orConditions: any[] = [{ expedientId: expedient.id }];
   if (expedient.contractId) orConditions.push({ contractId: expedient.contractId });
   if (expedient.quotationId) orConditions.push({ quotationId: expedient.quotationId });
+  if (expedient.customerId) orConditions.push({ customerId: expedient.customerId });
 
   const docInstances = await prisma.documentInstance.findMany({
     where: { OR: orConditions },

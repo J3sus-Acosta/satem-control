@@ -754,17 +754,245 @@ export const ExpedientsPage: React.FC = () => {
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {/* Botones de acción contextual para cada regla */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {/* 1. Contrato SOW */}
+                          {item.code === 'CONTRACT_PRESENT' && (
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(() => {
+                                const contractDoc = (selectedExpedient.documentInstances || []).find(
+                                  (d: any) => d.category === 'CONTRACT' || d.template?.category === 'CONTRACT'
+                                );
+                                const contractAttachedDocId = (selectedExpedient.documentLinks || []).find(
+                                  (l: any) => l.document?.category === 'CONTRACT' || l.document?.category === 'SOW'
+                                )?.document?.id;
+
+                                return (
+                                  <>
+                                    {contractDoc ? (
+                                      <>
+                                        {contractDoc.status === 'SIGNED' && contractDoc.signedPdfPath && (
+                                          <button
+                                            onClick={() => handleViewSignedPdf(contractDoc.id, contractDoc.documentNumber || 'SOW')}
+                                            className="btn btn-success"
+                                            style={{ fontSize: '11px', padding: '4px 10px', backgroundColor: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <CheckCircle size={13} /> Ver SOW Firmado
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleViewPdf(contractDoc.id, contractDoc.documentNumber || 'SOW')}
+                                          className="btn btn-secondary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FileText size={13} /> Ver SOW Emitido
+                                        </button>
+                                        {!isViewer && (
+                                          <button
+                                            onClick={() => setUploadingDocId(contractDoc.id)}
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <Upload size={13} /> {contractDoc.status === 'SIGNED' ? 'Reemplazar Firmado' : 'Subir SOW Firmado'}
+                                          </button>
+                                        )}
+                                      </>
+                                    ) : contractAttachedDocId ? (
+                                      <button
+                                        onClick={() => handleViewAttachedDoc(contractAttachedDocId, `CONTRATO_SOW_${selectedExpedient.code}.pdf`)}
+                                        className="btn btn-secondary"
+                                        style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                      >
+                                        <FileText size={13} /> Ver Contrato SOW
+                                      </button>
+                                    ) : (
+                                      !isViewer && (
+                                        <button
+                                          onClick={() => navigate(`/documents/generator?customerId=${selectedExpedient.customerId}&expedientId=${selectedExpedient.id}${selectedExpedient.contractId ? `&contractId=${selectedExpedient.contractId}` : ''}`)}
+                                          className="btn btn-primary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FilePlus size={13} /> + Generar SOW
+                                        </button>
+                                      )
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* 2. Orden de Trabajo (OT) */}
+                          {item.code === 'WORK_ORDER_PRESENT' && (
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(() => {
+                                const woDoc = (selectedExpedient.documentInstances || []).find(
+                                  (d: any) => d.category === 'WORK_ORDER' || d.template?.category === 'WORK_ORDER'
+                                );
+                                return (
+                                  <>
+                                    {woDoc ? (
+                                      <>
+                                        {woDoc.status === 'SIGNED' && woDoc.signedPdfPath && (
+                                          <button
+                                            onClick={() => handleViewSignedPdf(woDoc.id, woDoc.documentNumber || 'OT')}
+                                            className="btn btn-success"
+                                            style={{ fontSize: '11px', padding: '4px 10px', backgroundColor: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <CheckCircle size={13} /> Ver OT Firmada
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleViewPdf(woDoc.id, woDoc.documentNumber || 'OT')}
+                                          className="btn btn-secondary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FileText size={13} /> Ver OT Emitida
+                                        </button>
+                                        {!isViewer && (
+                                          <button
+                                            onClick={() => setUploadingDocId(woDoc.id)}
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <Upload size={13} /> {woDoc.status === 'SIGNED' ? 'Reemplazar Firmada' : 'Subir OT Firmada'}
+                                          </button>
+                                        )}
+                                      </>
+                                    ) : (
+                                      !isViewer && (
+                                        <button
+                                          onClick={() => navigate(`/documents/generator?customerId=${selectedExpedient.customerId}&expedientId=${selectedExpedient.id}`)}
+                                          className="btn btn-primary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FilePlus size={13} /> + Generar OT
+                                        </button>
+                                      )
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* 3. Recepción Conforme */}
+                          {item.code === 'RECEPTION_SIGNED' && (
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(() => {
+                                const rcDoc = (selectedExpedient.documentInstances || []).find(
+                                  (d: any) => d.category === 'RECEPTION_CONFORMITY' || d.template?.category === 'RECEPTION_CONFORMITY'
+                                );
+                                return (
+                                  <>
+                                    {rcDoc ? (
+                                      <>
+                                        {rcDoc.status === 'SIGNED' && rcDoc.signedPdfPath && (
+                                          <button
+                                            onClick={() => handleViewSignedPdf(rcDoc.id, rcDoc.documentNumber || 'RC')}
+                                            className="btn btn-success"
+                                            style={{ fontSize: '11px', padding: '4px 10px', backgroundColor: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <CheckCircle size={13} /> Ver Recepción Firmada
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleViewPdf(rcDoc.id, rcDoc.documentNumber || 'RC')}
+                                          className="btn btn-secondary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FileText size={13} /> Ver Acta Emitida
+                                        </button>
+                                        {!isViewer && (
+                                          <button
+                                            onClick={() => setUploadingDocId(rcDoc.id)}
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <Upload size={13} /> {rcDoc.status === 'SIGNED' ? 'Reemplazar Firmada' : 'Subir Acta Firmada'}
+                                          </button>
+                                        )}
+                                      </>
+                                    ) : (
+                                      !isViewer && (
+                                        <button
+                                          onClick={() => navigate(`/documents/generator?customerId=${selectedExpedient.customerId}&expedientId=${selectedExpedient.id}`)}
+                                          className="btn btn-primary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FilePlus size={13} /> + Generar Recepción
+                                        </button>
+                                      )
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* 4. Cotización */}
+                          {item.code === 'QUOTATION_PRESENT' && (
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(() => {
+                                const quotDoc = (selectedExpedient.documentInstances || []).find(
+                                  (d: any) => d.category === 'QUOTATION' || d.template?.category === 'QUOTATION'
+                                );
+                                return (
+                                  <>
+                                    {quotDoc ? (
+                                      <>
+                                        {quotDoc.status === 'SIGNED' && quotDoc.signedPdfPath && (
+                                          <button
+                                            onClick={() => handleViewSignedPdf(quotDoc.id, quotDoc.documentNumber || 'COT')}
+                                            className="btn btn-success"
+                                            style={{ fontSize: '11px', padding: '4px 10px', backgroundColor: 'var(--success)', color: '#fff', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <CheckCircle size={13} /> Ver Cotización Firmada
+                                          </button>
+                                        )}
+                                        <button
+                                          onClick={() => handleViewPdf(quotDoc.id, quotDoc.documentNumber || 'COT')}
+                                          className="btn btn-secondary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FileText size={13} /> Ver Cotización Emitida
+                                        </button>
+                                        {!isViewer && (
+                                          <button
+                                            onClick={() => setUploadingDocId(quotDoc.id)}
+                                            className="btn btn-secondary"
+                                            style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                          >
+                                            <Upload size={13} /> {quotDoc.status === 'SIGNED' ? 'Reemplazar' : 'Subir Firmada'}
+                                          </button>
+                                        )}
+                                      </>
+                                    ) : (
+                                      !isViewer && (
+                                        <button
+                                          onClick={() => navigate(`/documents/generator?customerId=${selectedExpedient.customerId}&expedientId=${selectedExpedient.id}`)}
+                                          className="btn btn-primary"
+                                          style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                        >
+                                          <FilePlus size={13} /> + Generar Cotización
+                                        </button>
+                                      )
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* 5. Factura SII */}
                           {item.code === 'INVOICE_REGISTERED' && (
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {(() => {
                                 const invoiceDocId = docId || selectedExpedient.invoices?.find((i: any) => i.pdfDocumentId || i.pdfDocument?.id)?.pdfDocumentId || selectedExpedient.invoices?.[0]?.pdfDocument?.id;
                                 return invoiceDocId ? (
                                   <button
                                     onClick={() => handleViewAttachedDoc(invoiceDocId, `FACTURA_SII_${selectedExpedient.code}.pdf`)}
                                     className="btn btn-secondary"
-                                    style={{ fontSize: '11px', padding: '4px 10px' }}
+                                    style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                   >
                                     <FileText size={13} /> Ver Factura
                                   </button>
@@ -774,7 +1002,7 @@ export const ExpedientsPage: React.FC = () => {
                                 <button
                                   onClick={() => setShowInvoiceModal(true)}
                                   className={`btn ${isCompleted ? 'btn-secondary' : 'btn-primary'}`}
-                                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                                  style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                 >
                                   <Upload size={13} /> {isCompleted ? 'Reemplazar Factura' : '+ Cargar Factura SII'}
                                 </button>
@@ -782,15 +1010,16 @@ export const ExpedientsPage: React.FC = () => {
                             </div>
                           )}
 
+                          {/* 6. Comprobante de Pago */}
                           {item.code === 'PAYMENT_PROOF_PRESENT' && (
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {(() => {
                                 const paymentDocId = docId || selectedExpedient.payments?.find((p: any) => p.proofDocumentId || p.proofDocument?.id)?.proofDocumentId || selectedExpedient.documentLinks?.find((l: any) => l.document?.category === 'PAYMENT_PROOF' || l.document?.category === 'SUMUP_PROOF')?.document?.id;
                                 return paymentDocId ? (
                                   <button
                                     onClick={() => handleViewAttachedDoc(paymentDocId, `COMPROBANTE_PAGO_${selectedExpedient.code}.pdf`)}
                                     className="btn btn-secondary"
-                                    style={{ fontSize: '11px', padding: '4px 10px' }}
+                                    style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                   >
                                     <FileText size={13} /> Ver Comprobante
                                   </button>
@@ -800,7 +1029,7 @@ export const ExpedientsPage: React.FC = () => {
                                 <button
                                   onClick={() => setShowPaymentModal(true)}
                                   className={`btn ${isCompleted ? 'btn-secondary' : 'btn-primary'}`}
-                                  style={{ fontSize: '11px', padding: '4px 10px' }}
+                                  style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                 >
                                   <Upload size={13} /> {isCompleted ? 'Reemplazar' : '+ Cargar Comprobante'}
                                 </button>
@@ -808,23 +1037,14 @@ export const ExpedientsPage: React.FC = () => {
                             </div>
                           )}
 
+                          {/* 7. Conciliación Bancaria */}
                           {item.code === 'RECONCILIATION_COMPLETED' && (
                             <button
                               onClick={() => navigate('/bank')}
                               className="btn btn-secondary"
-                              style={{ fontSize: '11px', padding: '4px 10px' }}
+                              style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                             >
                               <ExternalLink size={13} /> Ir a Conciliación Bancaria
-                            </button>
-                          )}
-
-                          {item.code === 'WORK_ORDER_PRESENT' && !isCompleted && !isViewer && (
-                            <button
-                              onClick={() => navigate(`/documents/generator?customerId=${selectedExpedient.customerId}&expedientId=${selectedExpedient.id}`)}
-                              className="btn btn-primary"
-                              style={{ fontSize: '11px', padding: '4px 10px' }}
-                            >
-                              <FilePlus size={13} /> + Generar OT
                             </button>
                           )}
 
@@ -1108,27 +1328,6 @@ export const ExpedientsPage: React.FC = () => {
                   );
                 })()}
 
-                {/* Modal subir PDF firmado */}
-                {uploadingDocId && (
-                  <div className="modal-overlay">
-                    <div className="modal-dialog" style={{ maxWidth: '440px' }}>
-                      <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>Cargar Documento Firmado por Cliente</h3>
-                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                        Selecciona el archivo PDF firmado por el cliente. Este archivo quedará incorporado permanentemente en el expediente y en el paquete ZIP de auditoría.
-                      </p>
-                      <form onSubmit={handleUploadSignedPdf}>
-                        <div className="form-group" style={{ marginBottom: '16px' }}>
-                          <label className="form-label">Archivo PDF Firmado</label>
-                          <input type="file" accept="application/pdf" className="form-input" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} required />
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                          <button type="button" onClick={() => setUploadingDocId(null)} className="btn btn-secondary">Cancelar</button>
-                          <button type="submit" className="btn btn-primary" disabled={!selectedFile}>Confirmar y Guardar en Expediente</button>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1500,6 +1699,27 @@ export const ExpedientsPage: React.FC = () => {
                 customerName={selectedExpedient.customer?.legalName}
               />
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal subir PDF firmado */}
+      {uploadingDocId && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '440px' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>Cargar Documento Firmado por Cliente</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Selecciona el archivo PDF firmado por el cliente. Este archivo quedará incorporado permanentemente en el expediente y en el paquete ZIP de auditoría.
+            </p>
+            <form onSubmit={handleUploadSignedPdf}>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Archivo PDF Firmado</label>
+                <input type="file" accept="application/pdf" className="form-input" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} required />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => setUploadingDocId(null)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={!selectedFile}>Confirmar y Guardar en Expediente</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

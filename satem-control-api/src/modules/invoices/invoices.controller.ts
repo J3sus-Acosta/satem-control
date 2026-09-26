@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Prisma, TaxTreatment, InvoiceStatus, DocumentCategory } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { env } from '../../config/env.js';
-import { AppError } from '../../common/errors/app-error.js';
+import { AppError, NotFoundError } from '../../common/errors/app-error.js';
 import { generateSequence } from '../../common/utils/sequence.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 
@@ -303,3 +303,84 @@ export async function uploadInvoiceHandler(request: FastifyRequest, reply: Fasti
     message: `Factura SII Folio ${siiFolio} registrada y documento PDF incorporado exitosamente al expediente.`,
   });
 }
+
+export async function deleteInvoiceHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  const userId = (request.user as any)?.userId;
+  const { id } = request.params;
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    include: { pdfDocument: true, xmlDocument: true },
+  });
+
+  if (!invoice) {
+    throw new NotFoundError('Factura no encontrada');
+  }
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // 1. Desvincular de atenciones
+    await tx.attention.updateMany({
+      where: { invoiceId: id },
+      data: { invoiceId: null },
+    });
+
+    // 2. Marcar factura como eliminada (Soft delete)
+    await tx.invoice.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    // 3. Verificar si quedan otras facturas activas para el expediente
+    const remainingInvoices = await tx.invoice.findMany({
+      where: { expedientId: invoice.expedientId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (remainingInvoices.length > 0) {
+      const latestInv = remainingInvoices[0];
+      await tx.expedientIntegrityItem.updateMany({
+        where: { expedientId: invoice.expedientId, code: 'INVOICE_REGISTERED' },
+        data: {
+          status: 'COMPLETED',
+          documentId: latestInv.pdfDocumentId || null,
+          observation: `Factura SII N° ${latestInv.siiFolio} registrada y verificada`,
+        },
+      });
+    } else {
+      await tx.expedientIntegrityItem.updateMany({
+        where: { expedientId: invoice.expedientId, code: 'INVOICE_REGISTERED' },
+        data: {
+          status: 'PENDING',
+          documentId: null,
+          observation: null,
+          completedAt: null,
+          completedById: null,
+        },
+      });
+    }
+
+    // 4. Audit Log
+    await createAuditLog(tx, {
+      userId,
+      action: 'DELETE_INVOICE',
+      entity: 'Invoice',
+      entityId: id,
+      beforeData: {
+        code: invoice.code,
+        siiFolio: invoice.siiFolio,
+        expedientId: invoice.expedientId,
+      },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+  });
+
+  return reply.send({
+    success: true,
+    message: `Factura SII Folio ${invoice.siiFolio} (${invoice.code}) eliminada exitosamente.`,
+  });
+}
+
