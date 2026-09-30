@@ -141,7 +141,7 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
               <span>Facturas Folio SII Registradas:</span>
-              <span style={{ fontWeight: 'bold' }}>{metrics?.operations?.completeExpedients || 0} documentos</span>
+              <span style={{ fontWeight: 'bold' }}>{metrics?.operations?.totalInvoicesCount ?? 0} documentos</span>
             </div>
           </div>
         </div>

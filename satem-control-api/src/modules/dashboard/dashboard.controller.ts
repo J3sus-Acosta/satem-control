@@ -3,21 +3,25 @@ import { prisma } from '../../config/prisma.js';
 
 export async function getDashboardMetricsHandler(request: FastifyRequest, reply: FastifyReply) {
   const openExpedients = await prisma.expedient.count({
-    where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+    where: { status: { in: ['OPEN', 'IN_PROGRESS'] }, deletedAt: null },
   });
 
   const activeContracts = await prisma.contract.count({
-    where: { status: 'ACTIVE' },
+    where: { status: 'ACTIVE', deletedAt: null },
   });
 
   const totalInvoiced = await prisma.invoice.aggregate({
     _sum: { netAmount: true, totalAmount: true },
-    where: { status: 'ISSUED' },
+    where: { status: 'ISSUED', deletedAt: null },
+  });
+
+  const totalInvoicesCount = await prisma.invoice.count({
+    where: { deletedAt: null },
   });
 
   const totalPayments = await prisma.payment.aggregate({
     _sum: { amount: true },
-    where: { status: 'CONFIRMED' },
+    where: { status: 'CONFIRMED', deletedAt: null },
   });
 
   const openExceptions = await prisma.systemException.count({
@@ -25,7 +29,7 @@ export async function getDashboardMetricsHandler(request: FastifyRequest, reply:
   });
 
   const completeExpedients = await prisma.expedient.count({
-    where: { status: 'CLOSED' },
+    where: { status: 'CLOSED', deletedAt: null },
   });
 
   return reply.send({
@@ -35,11 +39,12 @@ export async function getDashboardMetricsHandler(request: FastifyRequest, reply:
         openExpedients,
         activeContracts,
         completeExpedients,
+        totalInvoicesCount,
       },
       financial: {
-        totalNetInvoicedUSD: totalInvoiced._sum.netAmount || 0,
-        totalInvoicedUSD: totalInvoiced._sum.totalAmount || 0,
-        totalPaymentsCollectedUSD: totalPayments._sum.amount || 0,
+        totalNetInvoicedUSD: Number(totalInvoiced._sum.netAmount || 0),
+        totalInvoicedUSD: Number(totalInvoiced._sum.totalAmount || 0),
+        totalPaymentsCollectedUSD: Number(totalPayments._sum.amount || 0),
       },
       control: {
         openExceptions,
