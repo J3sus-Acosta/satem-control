@@ -524,27 +524,33 @@ export const ExpedientsPage: React.FC = () => {
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
-            {expedients.slice(0, sidebarLimit).map((exp) => (
-              <div
-                key={exp.id}
-                onClick={() => { fetchExpedientDetail(exp.id); }}
-                style={{
-                  padding: '12px', borderRadius: 'var(--radius-sm)',
-                  backgroundColor: selectedExpedient?.id === exp.id ? '#334155' : '#0f172a',
-                  border: '1px solid',
-                  borderColor: selectedExpedient?.id === exp.id ? 'var(--accent-primary)' : 'var(--border-color)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--accent-primary)' }}>{exp.code}</div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>{exp.title}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{exp.customer?.legalName}</div>
-                <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <span className="badge badge-info">{exp.status}</span>
-                  <span className="badge badge-success">{exp.taxTreatment}</span>
-                </div>
+            {expedients.length === 0 ? (
+              <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                Sin expedientes registrados aún.
               </div>
-            ))}
+            ) : (
+              expedients.slice(0, sidebarLimit).map((exp) => (
+                <div
+                  key={exp.id}
+                  onClick={() => { fetchExpedientDetail(exp.id); }}
+                  style={{
+                    padding: '12px', borderRadius: 'var(--radius-sm)',
+                    backgroundColor: selectedExpedient?.id === exp.id ? '#334155' : '#0f172a',
+                    border: '1px solid',
+                    borderColor: selectedExpedient?.id === exp.id ? 'var(--accent-primary)' : 'var(--border-color)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--accent-primary)' }}>{exp.code}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>{exp.title}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{exp.customer?.legalName}</div>
+                  <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <span className="badge badge-info">{exp.status}</span>
+                    <span className="badge badge-success">{exp.taxTreatment}</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {expedients.length > 6 && (
@@ -801,7 +807,7 @@ export const ExpedientsPage: React.FC = () => {
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {wo.attentions.map((att: any) => (
+                                {(wo.attentions || []).map((att: any) => (
                                   <div
                                     key={att.id}
                                     style={{
@@ -1566,8 +1572,21 @@ export const ExpedientsPage: React.FC = () => {
             )}
           </div>
         ) : (
-          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '40px' }}>
-            Seleccione un expediente para visualizar el detalle 360°.
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '48px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <FolderKanban size={48} color="var(--accent-primary)" style={{ opacity: 0.5, marginBottom: '16px' }} />
+            <h3 style={{ fontSize: '18px', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              {expedients.length === 0 ? 'No hay expedientes registrados aún' : 'Ningún expediente seleccionado'}
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', maxWidth: '460px', marginBottom: '20px' }}>
+              {expedients.length === 0
+                ? 'Crea tu primer expediente para gestionar contratos, órdenes de trabajo, facturación SII y trazabilidad tributaria SATEM.'
+                : 'Selecciona un expediente de la lista lateral para visualizar su detalle 360°, trazabilidad documental y estado de integridad.'}
+            </p>
+            {!isViewer && (
+              <button onClick={() => setShowCreateModal(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Plus size={16} /> Crear Nuevo Expediente
+              </button>
+            )}
           </div>
         )}
       </div>

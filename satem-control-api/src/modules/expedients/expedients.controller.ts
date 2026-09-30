@@ -33,11 +33,26 @@ export async function listExpedientsHandler(request: FastifyRequest, reply: Fast
   const expedients = await prisma.expedient.findMany({
     where: { deletedAt: null },
     include: {
-      customer: true,
+      customer: { include: { country: true } },
       contract: true,
-      workOrders: true,
-      invoices: true,
-      integrityItems: true,
+      workOrders: {
+        where: { deletedAt: null },
+        include: {
+          attentions: {
+            where: { deletedAt: null },
+            include: {
+              serviceType: true,
+              technicians: { include: { technician: true } },
+            },
+          },
+          receptionConformity: { include: { document: true } },
+        },
+      },
+      invoices: {
+        where: { deletedAt: null },
+        include: { pdfDocument: true },
+      },
+      integrityItems: { include: { document: true } },
       exceptions: { where: { status: 'OPEN' } },
     },
     orderBy: { createdAt: 'desc' },
