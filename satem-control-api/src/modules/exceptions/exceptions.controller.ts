@@ -10,6 +10,10 @@ const resolveExceptionSchema = z.object({
   resolutionNote: z.string().min(3, 'Nota de resolución requerida'),
 });
 
+const assignExceptionSchema = z.object({
+  assignedUserId: z.string().uuid().nullable().optional(),
+});
+
 const createExceptionSchema = z.object({
   expedientId: z.string().uuid().optional().nullable(),
   exceptionType: z.string().default('MANUAL_AUDIT_EXCEPTION'),
@@ -58,12 +62,55 @@ export async function listExceptionsHandler(request: FastifyRequest, reply: Fast
   const exceptions = await prisma.systemException.findMany({
     include: {
       expedient: { include: { customer: true } },
+      assignedUser: { select: { id: true, fullName: true, email: true, role: true } },
       resolvedBy: { select: { id: true, fullName: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
 
   return reply.send({ success: true, data: exceptions });
+}
+
+export async function assignExceptionHandler(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  const { id } = request.params;
+  const body = assignExceptionSchema.parse(request.body);
+  const userId = (request.user as any)?.userId;
+
+  const exception = await prisma.systemException.findUnique({ where: { id } });
+  if (!exception) {
+    throw new NotFoundError('Excepción no encontrada');
+  }
+
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const item = await tx.systemException.update({
+      where: { id },
+      data: {
+        assignedUserId: body.assignedUserId || null,
+      },
+      include: {
+        assignedUser: { select: { id: true, fullName: true, email: true, role: true } },
+        resolvedBy: { select: { id: true, fullName: true } },
+      },
+    });
+
+    await createAuditLog(tx, {
+      userId,
+      action: 'ASSIGN_EXCEPTION',
+      entity: 'SystemException',
+      entityId: id,
+      beforeData: { assignedUserId: exception.assignedUserId },
+      afterData: { assignedUserId: item.assignedUserId },
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    return item;
+  });
+
+  return reply.send({ success: true, data: updated });
 }
 
 export async function resolveExceptionHandler(
@@ -88,6 +135,10 @@ export async function resolveExceptionHandler(
         resolvedById: userId,
         resolutionNote: body.resolutionNote,
       },
+      include: {
+        assignedUser: { select: { id: true, fullName: true, email: true, role: true } },
+        resolvedBy: { select: { id: true, fullName: true } },
+      },
     });
 
     await createAuditLog(tx, {
@@ -110,6 +161,12 @@ export async function resolveExceptionHandler(
 export async function getControlCenterSummaryHandler(request: FastifyRequest, reply: FastifyReply) {
   const openExceptions = await prisma.systemException.findMany({
     where: { status: 'OPEN' },
+    include: {
+      expedient: { include: { customer: true } },
+      assignedUser: { select: { id: true, fullName: true, email: true, role: true } },
+      resolvedBy: { select: { id: true, fullName: true } },
+    },
+    orderBy: { createdAt: 'desc' },
   });
 
   const criticalCount = openExceptions.filter((e) => e.severity === ExceptionSeverity.CRITICAL).length;

@@ -51,15 +51,6 @@ enum ContractStatus {
   CANCELLED
 }
 
-enum QuotationStatus {
-  DRAFT
-  SENT
-  APPROVED
-  REJECTED
-  EXPIRED
-  CANCELLED
-}
-
 enum ExpedientStatus {
   DRAFT
   OPEN
@@ -146,12 +137,6 @@ enum ExceptionStatus {
   ACKNOWLEDGED
   RESOLVED
   DISMISSED
-}
-
-enum AlertSeverity {
-  INFO
-  WARNING
-  CRITICAL
 }
 
 enum IntegrityStatus {
@@ -307,7 +292,6 @@ model DocumentInstance {
   templateVersion DocumentTemplateVersion @relation(fields: [templateVersionId], references: [id])
   customer        Customer?               @relation(fields: [customerId], references: [id])
   contract        Contract?               @relation(fields: [contractId], references: [id])
-  quotation       Quotation?              @relation(fields: [quotationId], references: [id])
   expedient       Expedient?              @relation(fields: [expedientId], references: [id])
 
   @@map("document_instances")
@@ -331,6 +315,7 @@ model User {
   sessions           UserSession[]
   auditLogs          AuditLog[]
   attentions         AttentionTechnician[]
+  assignedExceptions SystemException[]     @relation("ExceptionAssignee")
   resolvedExceptions SystemException[]     @relation("ExceptionResolver")
   closedExpedients   Expedient[]           @relation("ExpedientCloser")
   documentsUploaded  Document[]
@@ -408,7 +393,6 @@ model Customer {
   entities          CustomerEntity[]
   contacts          CustomerContact[]
   contracts         Contract[]
-  quotations        Quotation[]
   expedients        Expedient[]
   documentInstances DocumentInstance[]
 
@@ -481,7 +465,6 @@ model Contract {
   customer          Customer           @relation(fields: [customerId], references: [id])
   customerEntity    CustomerEntity?    @relation(fields: [customerEntityId], references: [id])
   versions          ContractVersion[]
-  quotations        Quotation[]
   expedients        Expedient[]
   attentions        Attention[]
   documentInstances DocumentInstance[]
@@ -515,68 +498,6 @@ model ContractVersion {
 // COTIZACIONES Y VERSIONADO
 // ----------------------------------------------------
 
-model Quotation {
-  id             String          @id @default(uuid())
-  code           String          @unique @db.VarChar(50)
-  contractId     String?
-  customerId     String
-  currentVersion Int             @default(1)
-  status         QuotationStatus @default(DRAFT)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
-
-  contract          Contract?          @relation(fields: [contractId], references: [id])
-  customer          Customer           @relation(fields: [customerId], references: [id])
-  versions          QuotationVersion[]
-  expedients        Expedient[]
-  documentInstances DocumentInstance[]
-
-  @@map("quotations")
-}
-
-model QuotationVersion {
-  id                 String   @id @default(uuid())
-  quotationId        String
-  versionNumber      Int
-  versionCode        String   @db.VarChar(60)
-  currency           String   @db.VarChar(3)
-  subtotalCalculated Decimal  @db.Decimal(14, 2)
-  vatCalculated      Decimal  @db.Decimal(14, 2)
-  totalCalculated    Decimal  @db.Decimal(14, 2)
-  subtotalFinal      Decimal  @db.Decimal(14, 2)
-  vatFinal           Decimal  @db.Decimal(14, 2)
-  totalFinal         Decimal  @db.Decimal(14, 2)
-  isManualOverride   Boolean  @default(false)
-  overrideReason     String?  @db.Text
-  validUntil         DateTime
-  commercialTerms    String?  @db.Text
-  notes              String?  @db.Text
-  createdById        String
-  createdAt          DateTime @default(now())
-
-  quotation Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  items     QuotationItem[]
-
-  @@unique([quotationId, versionNumber])
-  @@map("quotation_versions")
-}
-
-model QuotationItem {
-  id                 String  @id @default(uuid())
-  quotationVersionId String
-  itemOrder          Int
-  description        String  @db.Text
-  quantity           Decimal @db.Decimal(10, 2)
-  unitPrice          Decimal @db.Decimal(14, 2)
-  discount           Decimal @default(0.00) @db.Decimal(14, 2)
-  subtotal           Decimal @db.Decimal(14, 2)
-
-  version QuotationVersion @relation(fields: [quotationVersionId], references: [id], onDelete: Cascade)
-
-  @@map("quotation_items")
-}
-
 // ----------------------------------------------------
 // EXPEDIENTE Y OPERACIONES
 // ----------------------------------------------------
@@ -608,7 +529,6 @@ model Expedient {
   customer       Customer        @relation(fields: [customerId], references: [id])
   customerEntity CustomerEntity? @relation(fields: [customerEntityId], references: [id])
   contract       Contract?       @relation(fields: [contractId], references: [id])
-  quotation      Quotation?      @relation(fields: [quotationId], references: [id])
   closedBy       User?           @relation("ExpedientCloser", fields: [closedById], references: [id])
 
   workOrders        WorkOrder[]
@@ -907,37 +827,19 @@ model SystemException {
   entityType     String?           @db.VarChar(50)
   entityId       String?           @db.VarChar(100)
   status         ExceptionStatus   @default(OPEN)
+  assignedUserId String?
   resolvedAt     DateTime?
   resolvedById   String?
   resolutionNote String?           @db.Text
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  expedient  Expedient? @relation(fields: [expedientId], references: [id], onDelete: SetNull)
-  resolvedBy User?      @relation("ExceptionResolver", fields: [resolvedById], references: [id])
+  expedient    Expedient? @relation(fields: [expedientId], references: [id], onDelete: SetNull)
+  assignedUser User?      @relation("ExceptionAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  resolvedBy   User?      @relation("ExceptionResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
 
   @@index([status, severity])
   @@map("system_exceptions")
-}
-
-// ----------------------------------------------------
-// ALERTAS Y REGLAS DE ALERTA
-// ----------------------------------------------------
-
-model AlertRule {
-  id               String        @id @default(uuid())
-  code             String        @unique @db.VarChar(50)
-  name             String
-  targetEntity     String        @db.VarChar(50)
-  triggerCondition String        @db.VarChar(100)
-  daysThreshold    Int?
-  percentThreshold Decimal?      @db.Decimal(5, 2)
-  severity         AlertSeverity @default(WARNING)
-  isActive         Boolean       @default(true)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-
-  @@map("alert_rules")
 }
 
 // ----------------------------------------------------

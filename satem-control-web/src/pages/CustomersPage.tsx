@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Building2, Plus, FileSignature, ArrowRight, ExternalLink, Edit2, MapPin, Phone, Mail } from 'lucide-react';
+import {
+  Building2, Plus, FileSignature, ArrowRight, ExternalLink, Edit2, MapPin,
+  Phone, Mail, Users, GitCommit, ChevronDown, ChevronUp
+} from 'lucide-react';
 
 export const CustomersPage: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -10,11 +13,18 @@ export const CustomersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
+  const [expandedCustomerId, setExpandedCustomerId] = useState<string | null>(null);
+
+  // Modales de Entidades / Contactos / Versión de Contrato
+  const [showEntityModal, setShowEntityModal] = useState<string | null>(null);
+  const [showContactModal, setShowContactModal] = useState<string | null>(null);
+  const [showVersionModal, setShowVersionModal] = useState<any | null>(null);
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const isViewer = user?.role === 'VIEWER';
 
-  // Form Cliente (Crear / Editar)
+  // Form Cliente
   const [legalName, setLegalName] = useState('');
   const [taxId, setTaxId] = useState('');
   const [countryCode, setCountryCode] = useState('USA');
@@ -22,6 +32,30 @@ export const CustomersPage: React.FC = () => {
   const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+
+  // Form Entidad / Sucursal
+  const [entityName, setEntityName] = useState('');
+  const [entityTaxId, setEntityTaxId] = useState('');
+  const [entityAddress, setEntityAddress] = useState('');
+  const [entityIsPrimary, setEntityIsPrimary] = useState(false);
+
+  // Form Contacto
+  const [contactName, setContactName] = useState('');
+  const [contactTitle, setContactTitle] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactType, setContactType] = useState('TECHNICAL');
+  const [contactIsPrimary, setContactIsPrimary] = useState(false);
+
+  // Form Versión / Adenda Contrato
+  const [versionTitle, setVersionTitle] = useState('');
+  const [versionDescription, setVersionDescription] = useState('');
+  const [versionStartDate, setVersionStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [versionEndDate, setVersionEndDate] = useState('');
+  const [versionTotalAmount, setVersionTotalAmount] = useState('');
+  const [versionRate, setVersionRate] = useState('');
+  const [versionHours, setVersionHours] = useState('');
+  const [versionReason, setVersionReason] = useState('');
 
   const fetchData = () => {
     setLoading(true);
@@ -97,6 +131,86 @@ export const CustomersPage: React.FC = () => {
     }
   };
 
+  const handleAddEntity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showEntityModal) return;
+    try {
+      await api.post(`/customers/${showEntityModal}/entities`, {
+        name: entityName,
+        taxId: entityTaxId || undefined,
+        address: entityAddress || undefined,
+        isPrimary: entityIsPrimary,
+      });
+      setShowEntityModal(null);
+      setEntityName('');
+      setEntityTaxId('');
+      setEntityAddress('');
+      setEntityIsPrimary(false);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al agregar entidad/sucursal');
+    }
+  };
+
+  const handleAddContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showContactModal) return;
+    try {
+      await api.post(`/customers/${showContactModal}/contacts`, {
+        name: contactName,
+        title: contactTitle || undefined,
+        email: contactEmail,
+        phone: contactPhone || undefined,
+        contactType,
+        isPrimary: contactIsPrimary,
+      });
+      setShowContactModal(null);
+      setContactName('');
+      setContactTitle('');
+      setContactEmail('');
+      setContactPhone('');
+      setContactType('TECHNICAL');
+      setContactIsPrimary(false);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al registrar contacto');
+    }
+  };
+
+  const openVersionModal = (contract: any) => {
+    setShowVersionModal(contract);
+    setVersionTitle(contract.title || '');
+    setVersionDescription(contract.description || '');
+    setVersionStartDate(contract.startDate ? new Date(contract.startDate).toISOString().slice(0, 10) : '');
+    setVersionEndDate(contract.endDate ? new Date(contract.endDate).toISOString().slice(0, 10) : '');
+    setVersionTotalAmount(contract.totalAmount ? String(contract.totalAmount) : '');
+    setVersionRate(contract.rate ? String(contract.rate) : '');
+    setVersionHours(contract.contractedHours ? String(contract.contractedHours) : '');
+    setVersionReason('');
+  };
+
+  const handleCreateVersion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showVersionModal) return;
+    try {
+      await api.post(`/contracts/${showVersionModal.id}/versions`, {
+        title: versionTitle,
+        description: versionDescription || undefined,
+        startDate: versionStartDate,
+        endDate: versionEndDate ? versionEndDate : undefined,
+        totalAmount: versionTotalAmount ? parseFloat(versionTotalAmount) : undefined,
+        rate: versionRate ? parseFloat(versionRate) : undefined,
+        contractedHours: versionHours ? parseFloat(versionHours) : undefined,
+        changeReason: versionReason,
+      });
+      setShowVersionModal(null);
+      fetchData();
+      alert('Nueva versión / adenda creada exitosamente');
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al generar nueva versión del contrato');
+    }
+  };
+
   if (loading) return <div style={{ color: 'var(--text-secondary)' }}>Cargando clientes y contratos...</div>;
 
   return (
@@ -105,7 +219,7 @@ export const CustomersPage: React.FC = () => {
         <div>
           <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Clientes Extranjeros & Contratos SOW</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Registro de empresas contratantes y sus contratos. Para generar un contrato SOW con PDF oficial usa el Wizard.
+            Registro de empresas contratantes, contactos, sucursales y contratos de exportación de servicios TI.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -180,47 +294,149 @@ export const CustomersPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                customers.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{c.code}</div>
-                      <div style={{ fontWeight: 600, marginTop: '2px' }}>{c.legalName}</div>
-                    </td>
-                    <td>
-                      <span className="badge badge-info">{c.country?.name || c.countryCode}</span>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        Tax ID: {c.taxId}
-                      </div>
-                    </td>
-                    <td>
-                      {c.address ? (
-                        <div style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={12} color="var(--accent-primary)" /> {c.address}{c.city ? `, ${c.city}` : ''}
-                        </div>
-                      ) : (
-                        <div style={{ fontSize: '12px', color: 'var(--warning)', fontStyle: 'italic' }}>
-                          ⚠ Sin domicilio registrado
-                        </div>
+                customers.map((c) => {
+                  const isExpanded = expandedCustomerId === c.id;
+                  const contactsCount = c.contacts?.length || 0;
+                  const entitiesCount = c.entities?.length || 0;
+
+                  return (
+                    <React.Fragment key={c.id}>
+                      <tr>
+                        <td>
+                          <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{c.code}</div>
+                          <div style={{ fontWeight: 600, marginTop: '2px' }}>{c.legalName}</div>
+                          <div style={{ marginTop: '4px', display: 'flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedCustomerId(isExpanded ? null : c.id)}
+                              style={{
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '4px',
+                                color: 'var(--text-secondary)',
+                                fontSize: '11px',
+                                padding: '2px 6px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Users size={12} /> {contactsCount} contactos | {entitiesCount} sucursales
+                              {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            </button>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge badge-info">{c.country?.name || c.countryCode}</span>
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            Tax ID: {c.taxId}
+                          </div>
+                        </td>
+                        <td>
+                          {c.address ? (
+                            <div style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <MapPin size={12} color="var(--accent-primary)" /> {c.address}{c.city ? `, ${c.city}` : ''}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '12px', color: 'var(--warning)', fontStyle: 'italic' }}>
+                              ⚠ Sin domicilio registrado
+                            </div>
+                          )}
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            {c.email && <span>{c.email}</span>}
+                            {c.phone && <span> {c.email ? '| ' : ''}{c.phone}</span>}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {!isViewer && (
+                              <button
+                                onClick={() => openEditModal(c)}
+                                className="btn btn-secondary"
+                                style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                title="Editar Cliente"
+                              >
+                                <Edit2 size={13} /> Editar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Fila expandible de Contactos y Sucursales */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={4} style={{ backgroundColor: 'rgba(0,0,0,0.25)', padding: '16px 20px', borderLeft: '3px solid var(--accent-primary)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                              {/* Contactos */}
+                              <div style={{ backgroundColor: '#0f172a', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <Users size={14} /> Contactos Directos ({contactsCount})
+                                  </span>
+                                  {!isViewer && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowContactModal(c.id)}
+                                      className="btn btn-secondary"
+                                      style={{ padding: '2px 6px', fontSize: '11px' }}
+                                    >
+                                      + Contacto
+                                    </button>
+                                  )}
+                                </div>
+                                {contactsCount === 0 ? (
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sin contactos adicionales registrados.</div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {c.contacts.map((ct: any) => (
+                                      <div key={ct.id} style={{ fontSize: '12px', padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+                                        <div style={{ fontWeight: 600 }}>{ct.name} {ct.isPrimary && <span className="badge badge-success" style={{ fontSize: '9px' }}>Principal</span>}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ct.title || ct.contactType} • {ct.email} {ct.phone ? `• ${ct.phone}` : ''}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Sucursales / Entidades */}
+                              <div style={{ backgroundColor: '#0f172a', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <Building2 size={14} /> Sucursales / Entidades ({entitiesCount})
+                                  </span>
+                                  {!isViewer && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowEntityModal(c.id)}
+                                      className="btn btn-secondary"
+                                      style={{ padding: '2px 6px', fontSize: '11px' }}
+                                    >
+                                      + Sucursal
+                                    </button>
+                                  )}
+                                </div>
+                                {entitiesCount === 0 ? (
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Opera con la razón social principal.</div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {c.entities.map((ent: any) => (
+                                      <div key={ent.id} style={{ fontSize: '12px', padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
+                                        <div style={{ fontWeight: 600 }}>{ent.name} {ent.isPrimary && <span className="badge badge-success" style={{ fontSize: '9px' }}>Principal</span>}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ent.taxId ? `Tax ID: ${ent.taxId}` : ''} {ent.address ? `• ${ent.address}` : ''}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        {c.email && <span>{c.email}</span>}
-                        {c.phone && <span> {c.email ? '| ' : ''}{c.phone}</span>}
-                      </div>
-                    </td>
-                    <td>
-                      {!isViewer && (
-                        <button
-                          onClick={() => openEditModal(c)}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          title="Editar Domicilio, Teléfono y Datos"
-                        >
-                          <Edit2 size={13} /> Editar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -237,15 +453,16 @@ export const CustomersPage: React.FC = () => {
           <table className="custom-table">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Consumo</th>
+                <th>Código / Versión</th>
+                <th>Cliente & Título</th>
+                <th>Consumo & Monto</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {contracts.length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '30px' }}>
                     Sin contratos. Usa el Wizard SOW para crear uno con PDF.
                   </td>
                 </tr>
@@ -254,13 +471,36 @@ export const CustomersPage: React.FC = () => {
                   <tr key={ct.id}>
                     <td>
                       <div style={{ fontWeight: 'bold' }}>{ct.code}</div>
+                      <span className="badge badge-info" style={{ fontSize: '10px' }}>
+                        v{ct.currentVersion || 1} ({ct.versions?.length || 1} adendas)
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, fontSize: '13px' }}>{ct.customer?.legalName}</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{ct.title}</div>
                     </td>
-                    <td style={{ fontSize: '13px' }}>{ct.customer?.legalName}</td>
                     <td>
                       <span className="badge badge-warning">
                         {ct.consumedHours} / {ct.contractedHours || '∞'} hrs
                       </span>
+                      {ct.totalAmount && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          ${Number(ct.totalAmount).toLocaleString('en-US')} {ct.currency}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {!isViewer && (
+                        <button
+                          type="button"
+                          onClick={() => openVersionModal(ct)}
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          title="Crear Nueva Versión / Adenda"
+                        >
+                          <GitCommit size={12} /> + Adenda
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -325,6 +565,146 @@ export const CustomersPage: React.FC = () => {
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => { setShowCustomerModal(false); setEditingCustomer(null); }} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary">{editingCustomer ? 'Guardar Cambios' : 'Crear Cliente'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agregar Entidad / Sucursal */}
+      {showEntityModal && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '460px' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '6px' }}>Agregar Sucursal / Entidad</h3>
+            <form onSubmit={handleAddEntity}>
+              <div className="form-group">
+                <label className="form-label">Nombre de Sucursal / Razón Social Local</label>
+                <input type="text" className="form-input" value={entityName} onChange={(e) => setEntityName(e.target.value)} placeholder="Ej: Sede Miami Operaciones" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Tax ID Local (Opcional)</label>
+                <input type="text" className="form-input" value={entityTaxId} onChange={(e) => setEntityTaxId(e.target.value)} placeholder="Tax ID específico" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dirección / Domicilio</label>
+                <input type="text" className="form-input" value={entityAddress} onChange={(e) => setEntityAddress(e.target.value)} placeholder="Dirección completa" />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <input type="checkbox" id="entPrimary" checked={entityIsPrimary} onChange={(e) => setEntityIsPrimary(e.target.checked)} />
+                <label htmlFor="entPrimary" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>Es la entidad principal de facturación</label>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowEntityModal(null)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">Guardar Sucursal</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agregar Contacto */}
+      {showContactModal && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '460px' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '6px' }}>Registrar Contacto</h3>
+            <form onSubmit={handleAddContact}>
+              <div className="form-group">
+                <label className="form-label">Nombre Completo *</label>
+                <input type="text" className="form-input" value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Ej: John Doe" required />
+              </div>
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Cargo / Título</label>
+                  <input type="text" className="form-input" value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} placeholder="Ej: CTO / Director TI" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tipo de Contacto</label>
+                  <select className="form-select" value={contactType} onChange={(e) => setContactType(e.target.value)}>
+                    <option value="TECHNICAL">Técnico</option>
+                    <option value="ADMINISTRATIVE">Administrativo</option>
+                    <option value="FINANCIAL">Financiero / Pagos</option>
+                    <option value="MANAGER">Gerencia / Representante</option>
+                    <option value="OTHER">Otro</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Email Oficial *</label>
+                  <input type="email" className="form-input" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="john@company.com" required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Teléfono</label>
+                  <input type="text" className="form-input" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+1 ..." />
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <input type="checkbox" id="contPrimary" checked={contactIsPrimary} onChange={(e) => setContactIsPrimary(e.target.checked)} />
+                <label htmlFor="contPrimary" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>Contacto principal para notificaciones</label>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowContactModal(null)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">Registrar Contacto</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Crear Nueva Versión / Adenda de Contrato */}
+      {showVersionModal && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '520px' }}>
+            <h3 style={{ fontSize: '17px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <GitCommit size={18} color="var(--accent-primary)" />
+              Nueva Versión / Adenda: {showVersionModal.code}
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Se registrará la versión v{(showVersionModal.currentVersion || 1) + 1} conservando el historial y trazabilidad inmutable.
+            </p>
+            <form onSubmit={handleCreateVersion}>
+              <div className="form-group">
+                <label className="form-label">Título del Contrato</label>
+                <input type="text" className="form-input" value={versionTitle} onChange={(e) => setVersionTitle(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Motivo del Cambio / Justificación de la Adenda *</label>
+                <textarea
+                  className="form-textarea"
+                  value={versionReason}
+                  onChange={(e) => setVersionReason(e.target.value)}
+                  placeholder="Ej: Aumento de bolsa de horas a 80 hrs y ampliación de vigencia al Q4"
+                  rows={2}
+                  required
+                />
+              </div>
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Fecha Inicio</label>
+                  <input type="date" className="form-input" value={versionStartDate} onChange={(e) => setVersionStartDate(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Fecha Término (Opcional)</label>
+                  <input type="date" className="form-input" value={versionEndDate} onChange={(e) => setVersionEndDate(e.target.value)} />
+                </div>
+              </div>
+              <div className="grid-form-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label className="form-label">Horas Totales</label>
+                  <input type="number" step="0.5" className="form-input" value={versionHours} onChange={(e) => setVersionHours(e.target.value)} placeholder="Horas" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Monto ({showVersionModal.currency})</label>
+                  <input type="number" step="0.01" className="form-input" value={versionTotalAmount} onChange={(e) => setVersionTotalAmount(e.target.value)} placeholder="Total" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tarifa/Hora</label>
+                  <input type="number" step="0.01" className="form-input" value={versionRate} onChange={(e) => setVersionRate(e.target.value)} placeholder="USD/h" />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button type="button" onClick={() => setShowVersionModal(null)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">Emitir Nueva Versión</button>
               </div>
             </form>
           </div>

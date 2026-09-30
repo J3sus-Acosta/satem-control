@@ -20,7 +20,6 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { usersRoutes } from './modules/users/users.routes.js';
 import { customersRoutes } from './modules/customers/customers.routes.js';
 import { contractsRoutes } from './modules/contracts/contracts.routes.js';
-import { quotationsRoutes } from './modules/quotations/quotations.routes.js';
 import { expedientsRoutes } from './modules/expedients/expedients.routes.js';
 import { workOrdersRoutes } from './modules/work-orders/work-orders.routes.js';
 import { invoicesRoutes } from './modules/invoices/invoices.routes.js';
@@ -107,7 +106,6 @@ export async function buildServer() {
   await fastify.register(usersRoutes, { prefix: '/api/v1/users' });
   await fastify.register(customersRoutes, { prefix: '/api/v1/customers' });
   await fastify.register(contractsRoutes, { prefix: '/api/v1/contracts' });
-  await fastify.register(quotationsRoutes, { prefix: '/api/v1/quotations' });
   await fastify.register(expedientsRoutes, { prefix: '/api/v1/expedients' });
   await fastify.register(workOrdersRoutes, { prefix: '/api/v1/work-orders' });
   await fastify.register(invoicesRoutes, { prefix: '/api/v1/invoices' });

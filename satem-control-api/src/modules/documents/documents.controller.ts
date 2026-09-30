@@ -8,6 +8,7 @@ import { env } from '../../config/env.js';
 import { NotFoundError, AppError } from '../../common/errors/app-error.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 import { convertImageToPdf } from '../../common/utils/image-to-pdf.js';
+import { resolveStoragePath } from '../../common/utils/storage-path.js';
 
 export async function uploadDocumentHandler(request: FastifyRequest, reply: FastifyReply) {
   const userId = (request.user as any)?.userId;
@@ -148,13 +149,15 @@ export async function downloadDocumentHandler(
     where: { id: request.params.id },
   });
 
-  if (!doc || !fs.existsSync(doc.storagePath)) {
+  const physicalPath = doc ? resolveStoragePath(doc.storagePath) : null;
+
+  if (!doc || !physicalPath) {
     throw new NotFoundError('Documento no encontrado o archivo físico no existente');
   }
 
   reply.header('Content-Type', doc.mimeType);
   reply.header('Content-Disposition', `inline; filename="${doc.originalName}"`);
-  const stream = fs.createReadStream(doc.storagePath);
+  const stream = fs.createReadStream(physicalPath);
   return reply.send(stream);
 }
 

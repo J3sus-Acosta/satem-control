@@ -6,7 +6,7 @@ import {
   FolderKanban, Plus, CheckCircle, AlertTriangle, Download,
   FileText, Lock, ShieldAlert, Clock, History, FilePlus, Upload,
   DollarSign, Receipt, CreditCard, ExternalLink, ChevronDown, ChevronUp, RotateCcw,
-  Trash2, Calculator, X
+  Trash2, Calculator, X, Wrench, ClipboardCheck, Users
 } from 'lucide-react';
 import { SumUpCalculator } from '../components/SumUpCalculator';
 
@@ -17,7 +17,7 @@ export const ExpedientsPage: React.FC = () => {
 
   const [expedients, setExpedients] = useState<any[]>([]);
   const [selectedExpedient, setSelectedExpedient] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'summary' | 'integrity' | 'exceptions' | 'documents' | 'history'>('integrity');
+  const [activeTab, setActiveTab] = useState<'summary' | 'integrity' | 'exceptions' | 'documents' | 'history' | 'workOrders'>('integrity');
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +68,35 @@ export const ExpedientsPage: React.FC = () => {
   // MEJ-07: Historial
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Operaciones / OTs / Atenciones / Recepción
+  const [serviceTypes, setServiceTypes] = useState<any[]>([]);
+  const [techniciansList, setTechniciansList] = useState<any[]>([]);
+
+  // Modal Crear OT
+  const [showWorkOrderModal, setShowWorkOrderModal] = useState(false);
+  const [otTitle, setOtTitle] = useState('');
+  const [otDescription, setOtDescription] = useState('');
+
+  // Modal Registrar Atención
+  const [showAttentionModal, setShowAttentionModal] = useState<any | null>(null);
+  const [attServiceTypeId, setAttServiceTypeId] = useState('');
+  const [attDate, setAttDate] = useState(new Date().toISOString().slice(0, 10));
+  const [attStartTime, setAttStartTime] = useState('09:00');
+  const [attEndTime, setAttEndTime] = useState('13:00');
+  const [attHours, setAttHours] = useState('4.0');
+  const [attProblem, setAttProblem] = useState('');
+  const [attWorkDone, setAttWorkDone] = useState('');
+  const [attResult, setAttResult] = useState('');
+  const [attSelectedTechs, setAttSelectedTechs] = useState<string[]>([]);
+
+  // Modal Registrar Recepción Conforme
+  const [showReceptionModal, setShowReceptionModal] = useState<any | null>(null);
+  const [recDate, setRecDate] = useState(new Date().toISOString().slice(0, 10));
+  const [recAcceptedByName, setRecAcceptedByName] = useState('');
+  const [recAcceptedByRole, setRecAcceptedByRole] = useState('');
+  const [recAcceptedByEmail, setRecAcceptedByEmail] = useState('');
+  const [recComments, setRecComments] = useState('');
 
   // ————————————————————————
   // Fetch expedients
@@ -123,7 +152,9 @@ export const ExpedientsPage: React.FC = () => {
 
   useEffect(() => {
     fetchExpedients();
-    api.get('/customers').then((res) => setCustomers(res.data.data));
+    api.get('/customers').then((res) => setCustomers(res.data.data)).catch(() => {});
+    api.get('/work-orders/service-types').then((res) => setServiceTypes(res.data.data || [])).catch(() => {});
+    api.get('/users').then((res) => setTechniciansList(res.data.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -601,6 +632,7 @@ export const ExpedientsPage: React.FC = () => {
 
                 return [
                   { key: 'integrity',  label: `Integridad (${selectedExpedient.integrityItems?.filter((i: any) => i.status === 'COMPLETED').length || 0}/${selectedExpedient.integrityItems?.length || 0})` },
+                  { key: 'workOrders', label: `Operaciones & OTs (${selectedExpedient.workOrders?.length || 0})` },
                   { key: 'exceptions', label: `Excepciones (${selectedExpedient.exceptions?.length || 0})` },
                   { key: 'documents',  label: `Documentos (${(selectedExpedient.documentInstances?.length || 0) + totalExternalDocs})` },
                   { key: 'summary',    label: 'Resumen Operativo' },
@@ -613,6 +645,7 @@ export const ExpedientsPage: React.FC = () => {
                   onClick={() => setActiveTab(key as any)}
                 >
                   {key === 'history' && <History size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
+                  {key === 'workOrders' && <Wrench size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />}
                   {label}
                 </button>
               ))}
@@ -653,6 +686,161 @@ export const ExpedientsPage: React.FC = () => {
                     <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                       SHA-256: <code>{selectedExpedient.snapshots[0].checksumSha256}</code>
                     </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: Órdenes de Trabajo, Atenciones y Recepción */}
+            {activeTab === 'workOrders' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '15px', margin: 0 }}>Órdenes de Trabajo (OT) & Atenciones Técnicas</h3>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Registro de horas trabajadas, técnicos asignados y estado de recepción conforme por el cliente.
+                    </div>
+                  </div>
+                  {!isViewer && (
+                    <button
+                      type="button"
+                      onClick={() => setShowWorkOrderModal(true)}
+                      className="btn btn-primary"
+                      style={{ fontSize: '12px', padding: '6px 12px' }}
+                    >
+                      <Plus size={14} /> + Nueva Orden de Trabajo (OT)
+                    </button>
+                  )}
+                </div>
+
+                {(!selectedExpedient.workOrders || selectedExpedient.workOrders.length === 0) ? (
+                  <div style={{ padding: '30px', textAlign: 'center', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    Sin Órdenes de Trabajo registradas para este expediente. Haz clic en "+ Nueva Orden de Trabajo (OT)" para autorizar el trabajo.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {selectedExpedient.workOrders.map((wo: any) => {
+                      const hasReception = Boolean(wo.receptionConformity);
+                      const attentionsCount = wo.attentions?.length || 0;
+                      const totalHoursWorked = (wo.attentions || []).reduce((acc: number, a: any) => acc + (parseFloat(a.hoursWorked) || 0), 0);
+
+                      return (
+                        <div
+                          key={wo.id}
+                          style={{
+                            backgroundColor: '#0f172a',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--border-color)',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div style={{ padding: '14px 18px', backgroundColor: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontWeight: 'bold', color: 'var(--accent-primary)', fontSize: '15px' }}>{wo.code}</span>
+                                <span className={`badge ${wo.status === 'CONFORMED' ? 'badge-success' : (wo.status === 'AUTHORIZED' || wo.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning')}`}>
+                                  {wo.status}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '14px', fontWeight: 600, marginTop: '2px' }}>{wo.title}</div>
+                              {wo.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{wo.description}</div>}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {!isViewer && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowAttentionModal(wo);
+                                      if (serviceTypes.length > 0) setAttServiceTypeId(serviceTypes[0].id);
+                                    }}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '11.5px', padding: '4px 8px' }}
+                                  >
+                                    <Wrench size={13} /> + Registrar Atención
+                                  </button>
+                                  {!hasReception && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowReceptionModal(wo)}
+                                      className="btn btn-secondary"
+                                      style={{ fontSize: '11.5px', padding: '4px 8px', color: 'var(--success)', borderColor: 'var(--success)' }}
+                                    >
+                                      <ClipboardCheck size={13} /> + Recepción Conforme
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Cuerpo de la OT: Atenciones y Recepción */}
+                          <div style={{ padding: '14px 18px' }}>
+                            {/* Recepción Conforme Badge */}
+                            {hasReception && (
+                              <div style={{ padding: '10px 14px', backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ fontSize: '12px' }}>
+                                  <strong style={{ color: 'var(--success)' }}>✓ Recepción Conforme Firmada:</strong> Aceptado por <strong>{wo.receptionConformity.acceptedByName}</strong> {wo.receptionConformity.acceptedByRole ? `(${wo.receptionConformity.acceptedByRole})` : ''} el {new Date(wo.receptionConformity.receptionDate).toLocaleDateString('es-CL')}.
+                                  {wo.receptionConformity.comments && <div style={{ fontStyle: 'italic', marginTop: '2px' }}>"{wo.receptionConformity.comments}"</div>}
+                                </div>
+                                <span className="badge badge-success">{wo.receptionConformity.code}</span>
+                              </div>
+                            )}
+
+                            {/* Resumen de Horas */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                              <span>Atenciones Técnicas: <strong>{attentionsCount}</strong></span>
+                              <span>Total Horas Ejecutadas: <strong style={{ color: 'var(--text-primary)' }}>{totalHoursWorked} hrs</strong></span>
+                            </div>
+
+                            {/* Listado de Atenciones */}
+                            {attentionsCount === 0 ? (
+                              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                Sin atenciones técnicas ingresadas aún.
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {wo.attentions.map((att: any) => (
+                                  <div
+                                    key={att.id}
+                                    style={{
+                                      padding: '10px 12px',
+                                      backgroundColor: 'rgba(255,255,255,0.02)',
+                                      border: '1px solid rgba(255,255,255,0.05)',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                      <span style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>
+                                        {att.code} • {att.serviceType?.name || 'Servicio TI'}
+                                      </span>
+                                      <span className="badge badge-info" style={{ fontSize: '10px' }}>
+                                        {att.hoursWorked} hrs • {new Date(att.attentionDate).toLocaleDateString('es-CL')}
+                                      </span>
+                                    </div>
+                                    <div style={{ color: 'var(--text-primary)' }}>
+                                      <strong>Trabajo Realizado:</strong> {att.workDone}
+                                    </div>
+                                    {att.result && (
+                                      <div style={{ color: 'var(--text-secondary)', marginTop: '2px', fontSize: '11px' }}>
+                                        <strong>Resultado:</strong> {att.result}
+                                      </div>
+                                    )}
+                                    {att.technicians && att.technicians.length > 0 && (
+                                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <Users size={11} /> Técnicos: {att.technicians.map((t: any) => t.technician?.fullName || t.technician?.email).join(', ')}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1702,6 +1890,224 @@ export const ExpedientsPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Modal Crear Orden de Trabajo */}
+      {showWorkOrderModal && selectedExpedient && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '480px' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '6px' }}>Nueva Orden de Trabajo (OT)</h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Autoriza una nueva Orden de Trabajo para el expediente {selectedExpedient.code}.
+            </p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await api.post('/work-orders', {
+                  expedientId: selectedExpedient.id,
+                  title: otTitle,
+                  description: otDescription || undefined,
+                });
+                setShowWorkOrderModal(false);
+                setOtTitle('');
+                setOtDescription('');
+                fetchExpedientDetail(selectedExpedient.id);
+                fetchExpedients();
+              } catch (err: any) {
+                alert(err.response?.data?.error?.message || 'Error al crear OT');
+              }
+            }}>
+              <div className="form-group">
+                <label className="form-label">Título de la Orden de Trabajo *</label>
+                <input type="text" className="form-input" value={otTitle} onChange={(e) => setOtTitle(e.target.value)} placeholder="Ej: Implementación Módulo de Facturación" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Descripción / Alcance</label>
+                <textarea className="form-textarea" value={otDescription} onChange={(e) => setOtDescription(e.target.value)} placeholder="Detalle de tareas a realizar" rows={3} />
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button type="button" onClick={() => setShowWorkOrderModal(false)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">Autorizar OT</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Atención Técnica */}
+      {showAttentionModal && selectedExpedient && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '540px' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '6px' }}>
+              Registrar Atención Técnica — {showAttentionModal.code}
+            </h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (attSelectedTechs.length === 0) {
+                alert('Debe asignar al menos 1 técnico');
+                return;
+              }
+              try {
+                const startDateTime = new Date(`${attDate}T${attStartTime}:00`);
+                const endDateTime = new Date(`${attDate}T${attEndTime}:00`);
+                await api.post('/work-orders/attentions', {
+                  expedientId: selectedExpedient.id,
+                  workOrderId: showAttentionModal.id,
+                  contractId: selectedExpedient.contractId || undefined,
+                  serviceTypeId: attServiceTypeId,
+                  attentionDate: new Date(attDate).toISOString(),
+                  startTime: startDateTime.toISOString(),
+                  endTime: endDateTime.toISOString(),
+                  hoursWorked: parseFloat(attHours) || 1,
+                  problem: attProblem,
+                  workDone: attWorkDone,
+                  result: attResult,
+                  technicianIds: attSelectedTechs,
+                });
+                setShowAttentionModal(null);
+                setAttProblem('');
+                setAttWorkDone('');
+                setAttResult('');
+                fetchExpedientDetail(selectedExpedient.id);
+                fetchExpedients();
+              } catch (err: any) {
+                alert(err.response?.data?.error?.message || 'Error al registrar atención');
+              }
+            }}>
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Tipo de Servicio *</label>
+                  <select className="form-select" value={attServiceTypeId} onChange={(e) => setAttServiceTypeId(e.target.value)} required>
+                    {serviceTypes.map((st) => (
+                      <option key={st.id} value={st.id}>{st.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Fecha de Atención *</label>
+                  <input type="date" className="form-input" value={attDate} onChange={(e) => setAttDate(e.target.value)} required />
+                </div>
+              </div>
+
+              <div className="grid-form-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label className="form-label">Hora Inicio</label>
+                  <input type="time" className="form-input" value={attStartTime} onChange={(e) => setAttStartTime(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Hora Término</label>
+                  <input type="time" className="form-input" value={attEndTime} onChange={(e) => setAttEndTime(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Horas Trabajadas</label>
+                  <input type="number" step="0.5" className="form-input" value={attHours} onChange={(e) => setAttHours(e.target.value)} required />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Técnicos Asignados *</label>
+                <div style={{ maxHeight: '100px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px 10px', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                  {techniciansList.map((tech) => (
+                    <label key={tech.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', margin: '4px 0', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={attSelectedTechs.includes(tech.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setAttSelectedTechs([...attSelectedTechs, tech.id]);
+                          else setAttSelectedTechs(attSelectedTechs.filter(id => id !== tech.id));
+                        }}
+                      />
+                      {tech.fullName || tech.email} ({tech.role})
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Requerimiento / Problema *</label>
+                <textarea className="form-textarea" value={attProblem} onChange={(e) => setAttProblem(e.target.value)} placeholder="Descripción del requerimiento inicial" rows={2} required />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Trabajo Realizado *</label>
+                <textarea className="form-textarea" value={attWorkDone} onChange={(e) => setAttWorkDone(e.target.value)} placeholder="Acciones técnicas ejecutadas" rows={2} required />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Resultado / Estado Final *</label>
+                <textarea className="form-textarea" value={attResult} onChange={(e) => setAttResult(e.target.value)} placeholder="Resultado validado y conforme" rows={2} required />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button type="button" onClick={() => setShowAttentionModal(null)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">Registrar Atención</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar Recepción Conforme */}
+      {showReceptionModal && (
+        <div className="modal-overlay">
+          <div className="modal-dialog" style={{ maxWidth: '480px' }}>
+            <h3 style={{ fontSize: '16px', marginBottom: '6px' }}>
+              Registrar Recepción Conforme — {showReceptionModal.code}
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Registra la conformidad formal del cliente sobre los servicios ejecutados.
+            </p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await api.post('/work-orders/receptions', {
+                  workOrderId: showReceptionModal.id,
+                  receptionDate: new Date(recDate).toISOString(),
+                  acceptedByName: recAcceptedByName,
+                  acceptedByRole: recAcceptedByRole || undefined,
+                  acceptedByEmail: recAcceptedByEmail || undefined,
+                  comments: recComments || undefined,
+                });
+                setShowReceptionModal(null);
+                setRecAcceptedByName('');
+                setRecAcceptedByRole('');
+                setRecAcceptedByEmail('');
+                setRecComments('');
+                fetchExpedientDetail(selectedExpedient.id);
+                fetchExpedients();
+              } catch (err: any) {
+                alert(err.response?.data?.error?.message || 'Error al registrar recepción conforme');
+              }
+            }}>
+              <div className="form-group">
+                <label className="form-label">Fecha de Recepción *</label>
+                <input type="date" className="form-input" value={recDate} onChange={(e) => setRecDate(e.target.value)} required />
+              </div>
+              <div className="grid-form-2">
+                <div className="form-group">
+                  <label className="form-label">Nombre de Quien Acepta *</label>
+                  <input type="text" className="form-input" value={recAcceptedByName} onChange={(e) => setRecAcceptedByName(e.target.value)} placeholder="Ej: Robert Smith" required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Cargo / Rol</label>
+                  <input type="text" className="form-input" value={recAcceptedByRole} onChange={(e) => setRecAcceptedByRole(e.target.value)} placeholder="Ej: Project Manager" />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email de Quien Acepta</label>
+                <input type="email" className="form-input" value={recAcceptedByEmail} onChange={(e) => setRecAcceptedByEmail(e.target.value)} placeholder="robert@client.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Comentarios / Observaciones de Conformidad</label>
+                <textarea className="form-textarea" value={recComments} onChange={(e) => setRecComments(e.target.value)} placeholder="Servicio entregado a entera conformidad" rows={2} />
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button type="button" onClick={() => setShowReceptionModal(null)} className="btn btn-secondary">Cancelar</button>
+                <button type="submit" className="btn btn-primary">Firmar Recepción Conforme</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal subir PDF firmado */}
       {uploadingDocId && (
         <div className="modal-overlay">

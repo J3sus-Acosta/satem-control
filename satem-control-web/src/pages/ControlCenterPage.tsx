@@ -53,15 +53,13 @@ export const ControlCenterPage: React.FC = () => {
     }
   };
 
-  // MEJ-04: Asignar excepción a usuario
+  // Asignar excepción a usuario responsable
   const handleAssign = async (excId: string, assignedUserId: string) => {
     try {
-      await api.put(`/exceptions/${excId}/assign`, { assignedUserId });
+      await api.put(`/exceptions/${excId}/assign`, { assignedUserId: assignedUserId || null });
       fetchControlCenter();
     } catch (err: any) {
-      const msg = err.response?.data?.error?.message;
-      if (err.response?.status === 404) return; // silencioso si no implementado
-      alert(msg || 'Error al asignar excepción');
+      alert(err.response?.data?.error?.message || 'Error al asignar excepción');
     }
   };
 

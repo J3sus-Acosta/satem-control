@@ -12,6 +12,7 @@ import { compileTemplate } from '../../common/utils/template-engine.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 import { generateSequence, SequencePrefix } from '../../common/utils/sequence.js';
 import { getUsdToClpExchangeRate } from '../exchange-rates/exchange-rates.service.js';
+import { resolveStoragePath } from '../../common/utils/storage-path.js';
 
 const generateDocumentSchema = z.object({
   templateId: z.string().uuid(),
@@ -556,13 +557,15 @@ export async function downloadGeneratedPdfHandler(
     where: { id: request.params.id },
   });
 
-  if (!instance || !fs.existsSync(instance.generatedPdfPath)) {
+  const physicalPath = instance ? resolveStoragePath(instance.generatedPdfPath) : null;
+
+  if (!instance || !physicalPath) {
     throw new NotFoundError('Archivo PDF generado no encontrado');
   }
 
   reply.header('Content-Type', 'application/pdf');
   reply.header('Content-Disposition', `inline; filename="${instance.documentNumber}.pdf"`);
-  return reply.send(fs.createReadStream(instance.generatedPdfPath));
+  return reply.send(fs.createReadStream(physicalPath));
 }
 
 export async function downloadSignedPdfHandler(
@@ -573,11 +576,13 @@ export async function downloadSignedPdfHandler(
     where: { id: request.params.id },
   });
 
-  if (!instance || !instance.signedPdfPath || !fs.existsSync(instance.signedPdfPath)) {
+  const physicalPath = instance?.signedPdfPath ? resolveStoragePath(instance.signedPdfPath) : null;
+
+  if (!instance || !physicalPath) {
     throw new NotFoundError('Archivo PDF firmado no encontrado para este documento');
   }
 
   reply.header('Content-Type', 'application/pdf');
   reply.header('Content-Disposition', `inline; filename="${instance.documentNumber}-FIRMADO.pdf"`);
-  return reply.send(fs.createReadStream(instance.signedPdfPath));
+  return reply.send(fs.createReadStream(physicalPath));
 }

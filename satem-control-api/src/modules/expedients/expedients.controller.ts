@@ -9,6 +9,7 @@ import { prisma } from '../../config/prisma.js';
 import { NotFoundError, AppError } from '../../common/errors/app-error.js';
 import { generateSequence } from '../../common/utils/sequence.js';
 import { createAuditLog } from '../../common/utils/audit.js';
+import { resolveStoragePath } from '../../common/utils/storage-path.js';
 
 const createExpedientSchema = z.object({
   customerId: z.string().uuid(),
@@ -52,7 +53,6 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
       customer: { include: { country: true } },
       customerEntity: true,
       contract: true,
-      quotation: true,
       workOrders: {
         include: {
           attentions: { include: { technicians: { include: { technician: true } }, serviceType: true } },
@@ -645,7 +645,19 @@ export async function downloadExpedientBundleHandler(
   reply.header('Content-Disposition', `attachment; filename="${expedient.code}.zip"`);
 
   const archive = archiver('zip', { zlib: { level: 9 } });
-  archive.pipe(reply.raw);
+
+  archive.on('warning', (err) => {
+    if (err.code === 'ENOENT') {
+      request.log.warn({ err }, 'Advertencia al archivar archivo en bundle');
+    } else {
+      throw err;
+    }
+  });
+
+  archive.on('error', (err) => {
+    request.log.error({ err }, 'Error durante la compresión del bundle zip');
+    throw err;
+  });
 
   // Definición de las 12 carpetas estandarizadas de SATEM
   const folders = [
@@ -697,17 +709,19 @@ export async function downloadExpedientBundleHandler(
     manifestLines.push(`  - Plantilla: ${inst.template?.name || 'Documento Oficial'}`);
     manifestLines.push(`  - Generado: ${inst.generatedAt.toISOString()} | SHA-256: ${inst.generatedPdfHash}`);
 
-    if (fs.existsSync(inst.generatedPdfPath)) {
-      archive.file(inst.generatedPdfPath, { name: `${expedient.code}/${targetFolder}/${inst.documentNumber}.pdf` });
+    const resolvedPdf = resolveStoragePath(inst.generatedPdfPath);
+    if (resolvedPdf) {
+      archive.file(resolvedPdf, { name: `${expedient.code}/${targetFolder}/${inst.documentNumber}.pdf` });
     }
 
-    if (inst.signedPdfPath && fs.existsSync(inst.signedPdfPath)) {
+    const resolvedSignedPdf = resolveStoragePath(inst.signedPdfPath);
+    if (resolvedSignedPdf) {
       manifestLines.push(`  - FIRMA CLIENTE REGISTRADA:`);
       manifestLines.push(`    * Archivo: ${inst.documentNumber}-FIRMADO.pdf`);
       manifestLines.push(`    * Fecha Firma: ${inst.signedAt ? inst.signedAt.toISOString() : 'N/A'}`);
       manifestLines.push(`    * SHA-256 Firma: ${inst.signedPdfHash || 'N/A'}`);
 
-      archive.file(inst.signedPdfPath, { name: `${expedient.code}/${targetFolder}/${inst.documentNumber}-FIRMADO.pdf` });
+      archive.file(resolvedSignedPdf, { name: `${expedient.code}/${targetFolder}/${inst.documentNumber}-FIRMADO.pdf` });
     } else {
       manifestLines.push(`  - Firma Cliente: PENDIENTE DE CARGA`);
     }
@@ -716,7 +730,8 @@ export async function downloadExpedientBundleHandler(
 
   // 2. Agregar Documentos adjuntos tradicionales (Facturas, Evidencias, Bancos)
   for (const link of expedient.documentLinks) {
-    if (fs.existsSync(link.document.storagePath)) {
+    const resolvedDoc = resolveStoragePath(link.document.storagePath);
+    if (resolvedDoc) {
       let targetFolder = '10-Evidencias';
       const cat = link.document.category;
       if (cat === 'INVOICE') targetFolder = '06-Facturacion';
@@ -727,7 +742,7 @@ export async function downloadExpedientBundleHandler(
 
       const safeFileName = path.basename(link.document.originalName).replace(/[^a-zA-Z0-9._\-\s]/g, '_') || 'adjunto.pdf';
       manifestLines.push(`• [ADJUNTO ${cat}] ${safeFileName} (${link.document.sha256})`);
-      archive.file(link.document.storagePath, { name: `${expedient.code}/${targetFolder}/${safeFileName}` });
+      archive.file(resolvedDoc, { name: `${expedient.code}/${targetFolder}/${safeFileName}` });
     }
   }
 
@@ -737,5 +752,7 @@ export async function downloadExpedientBundleHandler(
 
   archive.append(manifestLines.join('\r\n'), { name: `${expedient.code}/00-MANIFIESTO-AUDITORIA.txt` });
 
-  await archive.finalize();
+  // Finalizar el archivo y enviarlo directamente como Stream nativo a Fastify
+  archive.finalize();
+  return reply.send(archive);
 }

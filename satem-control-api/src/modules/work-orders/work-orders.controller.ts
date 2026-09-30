@@ -37,12 +37,20 @@ const createReceptionSchema = z.object({
   documentId: z.string().uuid().optional(),
 });
 
+export async function listServiceTypesHandler(request: FastifyRequest, reply: FastifyReply) {
+  const types = await prisma.serviceType.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+  });
+  return reply.send({ success: true, data: types });
+}
+
 export async function listWorkOrdersHandler(request: FastifyRequest, reply: FastifyReply) {
   const workOrders = await prisma.workOrder.findMany({
     where: { deletedAt: null },
     include: {
       expedient: { include: { customer: true } },
-      attentions: { include: { technicians: { include: { technician: true } } } },
+      attentions: { include: { technicians: { include: { technician: true } }, serviceType: true } },
       receptionConformity: true,
     },
     orderBy: { createdAt: 'desc' },
