@@ -98,20 +98,29 @@ export const ExpedientsPage: React.FC = () => {
   const [recAcceptedByEmail, setRecAcceptedByEmail] = useState('');
   const [recComments, setRecComments] = useState('');
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   // ————————————————————————
   // Fetch expedients
   // ————————————————————————
   const fetchExpedients = () => {
     setLoading(true);
+    setFetchError(null);
     api.get('/expedients')
       .then((res) => {
         const list = res.data.data || [];
         setExpedients(list);
         if (list.length > 0) {
           fetchExpedientDetail(list[0].id);
+        } else {
+          setSelectedExpedient(null);
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error('Error fetching expedients:', err);
+        const errMsg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Error al comunicarse con el servidor';
+        setFetchError(errMsg);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -509,6 +518,18 @@ export const ExpedientsPage: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* Error Alert */}
+      {fetchError && (
+        <div style={{ padding: '14px 18px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: '#f87171', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong>Error al cargar expedientes:</strong> {fetchError}
+          </div>
+          <button onClick={fetchExpedients} className="btn btn-secondary" style={{ fontSize: '12px', padding: '4px 10px' }}>
+            Reintentar
+          </button>
+        </div>
+      )}
 
       <div className="expedients-layout">
         {/* Lista lateral */}

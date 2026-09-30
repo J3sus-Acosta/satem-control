@@ -30,35 +30,57 @@ const closeExpedientSchema = z.object({
 });
 
 export async function listExpedientsHandler(request: FastifyRequest, reply: FastifyReply) {
-  const expedients = await prisma.expedient.findMany({
-    where: { deletedAt: null },
-    include: {
-      customer: { include: { country: true } },
-      contract: true,
-      workOrders: {
+  try {
+    const expedients = await prisma.expedient.findMany({
+      where: { deletedAt: null },
+      include: {
+        customer: { include: { country: true } },
+        contract: true,
+        workOrders: {
+          where: { deletedAt: null },
+          include: {
+            attentions: {
+              where: { deletedAt: null },
+              include: {
+                serviceType: true,
+                technicians: { include: { technician: true } },
+              },
+            },
+            receptionConformity: { include: { document: true } },
+          },
+        },
+        invoices: {
+          where: { deletedAt: null },
+          include: { pdfDocument: true },
+        },
+        integrityItems: { include: { document: true } },
+        exceptions: { where: { status: 'OPEN' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reply.send({ success: true, data: expedients });
+  } catch (err: any) {
+    request.log.error({ err }, 'Error in listExpedientsHandler, attempting resilient query');
+    try {
+      const fallback = await prisma.expedient.findMany({
         where: { deletedAt: null },
         include: {
-          attentions: {
-            where: { deletedAt: null },
-            include: {
-              serviceType: true,
-              technicians: { include: { technician: true } },
-            },
-          },
-          receptionConformity: { include: { document: true } },
+          customer: true,
+          contract: true,
+          workOrders: true,
+          invoices: true,
+          integrityItems: true,
+          exceptions: true,
         },
-      },
-      invoices: {
-        where: { deletedAt: null },
-        include: { pdfDocument: true },
-      },
-      integrityItems: { include: { document: true } },
-      exceptions: { where: { status: 'OPEN' } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  return reply.send({ success: true, data: expedients });
+        orderBy: { createdAt: 'desc' },
+      });
+      return reply.send({ success: true, data: fallback });
+    } catch (fallbackErr) {
+      request.log.error({ fallbackErr }, 'Fatal error fetching expedients');
+      throw fallbackErr;
+    }
+  }
 }
 
 export async function getExpedientHandler(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
