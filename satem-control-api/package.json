@@ -1,6 +1,7 @@
 {
   "name": "satem-control-api",
   "version": "1.0.0",
+  "type": "module",
   "description": "Backend API REST para SATEM Control - Sistema de Control y Trazabilidad Operativa",
   "main": "dist/server.js",
   "scripts": {
