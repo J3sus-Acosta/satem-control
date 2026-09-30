@@ -186,8 +186,8 @@ async function main() {
   const defaultPasswordHash = await bcrypt.hash('admin@123', 10);
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@satemsoluciones.com' },
-    update: { fullName: 'Administrador SATEM', role: UserRole.ADMIN },
-    create: { email: 'admin@satemsoluciones.com', fullName: 'Administrador SATEM', role: UserRole.ADMIN, passwordHash: defaultPasswordHash },
+    update: { fullName: 'Administrador SATEM', role: UserRole.ADMIN, passwordHash: defaultPasswordHash, isActive: true },
+    create: { email: 'admin@satemsoluciones.com', fullName: 'Administrador SATEM', role: UserRole.ADMIN, passwordHash: defaultPasswordHash, isActive: true },
   });
 
   // 5. Sembrado de Plantillas con Branding Oficial SATEM (#00a896, #0a2540 y Logo Full)

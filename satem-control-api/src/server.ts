@@ -124,11 +124,14 @@ export async function buildServer() {
   return fastify;
 }
 
+import { ensureDefaultAdmin } from './common/utils/bootstrap.js';
+
 async function start() {
   const app = await buildServer();
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
     app.log.info(`🚀 SATEM Control API corriendo en http://${env.HOST}:${env.PORT}`);
+    await ensureDefaultAdmin();
   } catch (err) {
     app.log.error(err);
     process.exit(1);
