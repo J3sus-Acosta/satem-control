@@ -31,55 +31,80 @@ const closeExpedientSchema = z.object({
 
 export async function listExpedientsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
-    const expedients = await prisma.expedient.findMany({
+    const rawExpedients = await prisma.expedient.findMany({
       where: { deletedAt: null },
       include: {
         customer: { include: { country: true } },
         contract: true,
-        workOrders: {
-          where: { deletedAt: null },
-          include: {
-            attentions: {
-              where: { deletedAt: null },
-              include: {
-                serviceType: true,
-                technicians: { include: { technician: true } },
-              },
-            },
-            receptionConformity: { include: { document: true } },
-          },
-        },
-        invoices: {
-          where: { deletedAt: null },
-          include: { pdfDocument: true },
-        },
-        integrityItems: { include: { document: true } },
-        exceptions: { where: { status: 'OPEN' } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return reply.send({ success: true, data: expedients });
+    const fullExpedients = await Promise.all(
+      rawExpedients.map(async (exp) => {
+        let workOrders: any[] = [];
+        let invoices: any[] = [];
+        let integrityItems: any[] = [];
+        let exceptions: any[] = [];
+
+        try {
+          workOrders = await prisma.workOrder.findMany({
+            where: { expedientId: exp.id, deletedAt: null },
+            include: {
+              attentions: {
+                where: { deletedAt: null },
+                include: {
+                  serviceType: true,
+                  technicians: { include: { technician: true } },
+                },
+              },
+              receptionConformity: { include: { document: true } },
+            },
+          });
+        } catch (e) {
+          request.log.warn({ err: e }, `Failed to load workOrders for expedient ${exp.id}`);
+        }
+
+        try {
+          invoices = await prisma.invoice.findMany({
+            where: { expedientId: exp.id, deletedAt: null },
+            include: { pdfDocument: true },
+          });
+        } catch (e) {
+          request.log.warn({ err: e }, `Failed to load invoices for expedient ${exp.id}`);
+        }
+
+        try {
+          integrityItems = await prisma.expedientIntegrityItem.findMany({
+            where: { expedientId: exp.id },
+            include: { document: true },
+          });
+        } catch (e) {
+          request.log.warn({ err: e }, `Failed to load integrityItems for expedient ${exp.id}`);
+        }
+
+        try {
+          exceptions = await prisma.systemException.findMany({
+            where: { expedientId: exp.id, status: 'OPEN' },
+          });
+        } catch (e) {
+          request.log.warn({ err: e }, `Failed to load exceptions for expedient ${exp.id}`);
+        }
+
+        return {
+          ...exp,
+          workOrders,
+          invoices,
+          integrityItems,
+          exceptions,
+        };
+      })
+    );
+
+    return reply.send({ success: true, data: fullExpedients });
   } catch (err: any) {
-    request.log.error({ err }, 'Error in listExpedientsHandler, attempting resilient query');
-    try {
-      const fallback = await prisma.expedient.findMany({
-        where: { deletedAt: null },
-        include: {
-          customer: true,
-          contract: true,
-          workOrders: true,
-          invoices: true,
-          integrityItems: true,
-          exceptions: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      return reply.send({ success: true, data: fallback });
-    } catch (fallbackErr) {
-      request.log.error({ fallbackErr }, 'Fatal error fetching expedients');
-      throw fallbackErr;
-    }
+    request.log.error({ err }, 'Error in listExpedientsHandler');
+    throw err;
   }
 }
 

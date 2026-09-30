@@ -40,14 +40,13 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
     });
   }
 
-  // Error no controlado (nunca exponer stack trace en producción)
-  const isDev = process.env.NODE_ENV === 'development';
+  // Error no controlado
   return reply.status(500).send({
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Ocurrió un error interno en el servidor',
-      details: isDev ? error.message : undefined,
+      message: error.message || 'Ocurrió un error interno en el servidor',
+      details: process.env.NODE_ENV === 'development' ? error.stack : error.message,
       requestId,
     },
   });
