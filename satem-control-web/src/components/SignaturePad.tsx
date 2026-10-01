@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import SignaturePadLib from 'signature_pad';
 import { RotateCcw, Check, PenTool } from 'lucide-react';
 
@@ -14,54 +14,36 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   onSave,
   onCancel,
   title = 'Firma Digital Manuscrita',
-  subtitle = 'Dibuje su firma utilizando el mouse o pantalla táctil en el recuadro inferior.',
+  subtitle = 'Dibuje su firma utilizando el mouse o pantalla táctil en el recuadro blanco.',
   isSaving = false,
 }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const padRef = useRef<SignaturePadLib | null>(null);
   const [isEmpty, setIsEmpty] = useState(true);
 
-  const resizeCanvas = useCallback(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
 
-    // Guardar datos actuales si hay firma
-    const prevData = padRef.current && !padRef.current.isEmpty() ? padRef.current.toData() : null;
-
+    // Configuración de resolución nítida
     const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    const rect = container.getBoundingClientRect();
-    const width = rect.width > 0 ? rect.width : 300;
-    const height = Math.min(Math.max(window.innerHeight * 0.25, 180), 240);
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width > 0 ? rect.width : 400;
+    const height = 180;
 
     canvas.width = width * ratio;
     canvas.height = height * ratio;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.scale(ratio, ratio);
     }
 
-    if (padRef.current) {
-      padRef.current.clear();
-      if (prevData) {
-        padRef.current.fromData(prevData);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!canvasRef.current || !containerRef.current) return;
-
-    const canvas = canvasRef.current;
     const pad = new SignaturePadLib(canvas, {
-      penColor: '#0f172a',
-      backgroundColor: 'rgba(255, 255, 255, 0.98)',
-      minWidth: 1.2,
-      maxWidth: 2.8,
+      penColor: '#0a2540',
+      backgroundColor: '#ffffff',
+      minWidth: 1.5,
+      maxWidth: 3.2,
     });
 
     pad.addEventListener('endStroke', () => {
@@ -69,26 +51,34 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     });
 
     padRef.current = pad;
-    resizeCanvas();
 
     const handleResize = () => {
-      resizeCanvas();
+      if (!canvas || !padRef.current) return;
+      const prevData = !padRef.current.isEmpty() ? padRef.current.toData() : null;
+      const newRect = canvas.getBoundingClientRect();
+      const newWidth = newRect.width > 0 ? newRect.width : 400;
+      
+      canvas.width = newWidth * ratio;
+      canvas.height = height * ratio;
+      
+      const newCtx = canvas.getContext('2d');
+      if (newCtx) {
+        newCtx.scale(ratio, ratio);
+      }
+      
+      padRef.current.clear();
+      if (prevData) {
+        padRef.current.fromData(prevData);
+      }
     };
 
     window.addEventListener('resize', handleResize);
-    
-    // Resize observer para detectar cambios de ancho del contenedor
-    const ro = new ResizeObserver(() => {
-      resizeCanvas();
-    });
-    ro.observe(containerRef.current);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      ro.disconnect();
       pad.off();
     };
-  }, [resizeCanvas]);
+  }, []);
 
   const handleClear = () => {
     if (padRef.current) {
@@ -104,7 +94,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', boxSizing: 'border-box' }}>
       <div>
         <h4 style={{ margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15.5px', color: 'var(--text-primary)' }}>
           <PenTool size={18} color="var(--accent-primary)" /> {title}
@@ -113,34 +103,32 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
       </div>
 
       <div
-        ref={containerRef}
         style={{
           width: '100%',
           border: '2px dashed var(--border-light)',
           borderRadius: 'var(--radius-md)',
-          padding: '6px',
-          backgroundColor: 'var(--bg-input)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          padding: '8px',
+          backgroundColor: '#0f172a',
           boxSizing: 'border-box',
         }}
       >
-        <canvas
-          ref={canvasRef}
-          style={{
-            display: 'block',
-            width: '100%',
-            height: '190px',
-            borderRadius: 'var(--radius-sm)',
-            cursor: 'crosshair',
-            touchAction: 'none',
-          }}
-        />
+        <div style={{ width: '100%', height: '180px', backgroundColor: '#ffffff', borderRadius: 'var(--radius-sm)', overflow: 'hidden', position: 'relative' }}>
+          <canvas
+            ref={canvasRef}
+            style={{
+              width: '100%',
+              height: '180px',
+              display: 'block',
+              cursor: 'crosshair',
+              touchAction: 'none',
+              backgroundColor: '#ffffff',
+            }}
+          />
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: '6px', padding: '0 4px', flexWrap: 'wrap', gap: '4px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Área de captura de trazo táctil / ratón</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Área de captura de firma manuscrita</span>
           <span style={{ fontSize: '11px', fontWeight: 600, color: isEmpty ? 'var(--warning)' : 'var(--success)' }}>
-            {isEmpty ? '⚠️ Pendiente de firma' : '✓ Trazo detectado'}
+            {isEmpty ? '⚠️ Pendiente de trazo' : '✓ Trazo detectado'}
           </span>
         </div>
       </div>
@@ -151,12 +139,12 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           onClick={handleClear}
           disabled={isEmpty || isSaving}
           className="btn btn-secondary"
-          style={{ fontSize: '13px', flex: '1 1 120px', minHeight: '38px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center' }}
+          style={{ fontSize: '13px', flex: '1 1 130px', minHeight: '38px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
         >
           <RotateCcw size={15} /> Limpiar Trazo
         </button>
 
-        <div style={{ display: 'flex', gap: '10px', flex: '2 1 200px' }}>
+        <div style={{ display: 'flex', gap: '10px', flex: '2 1 220px' }}>
           {onCancel && (
             <button
               type="button"
@@ -173,7 +161,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
             onClick={handleConfirm}
             disabled={isEmpty || isSaving}
             className="btn btn-primary"
-            style={{ fontSize: '13px', flex: 2, minHeight: '38px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center' }}
+            style={{ fontSize: '13px', flex: 2, minHeight: '38px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
           >
             <Check size={16} /> {isSaving ? 'Estampando Firma...' : 'Confirmar y Estampar Firma'}
           </button>
