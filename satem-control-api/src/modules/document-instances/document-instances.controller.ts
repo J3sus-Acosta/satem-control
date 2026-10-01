@@ -13,6 +13,7 @@ import { createAuditLog } from '../../common/utils/audit.js';
 import { generateSequence, SequencePrefix } from '../../common/utils/sequence.js';
 import { getUsdToClpExchangeRate } from '../exchange-rates/exchange-rates.service.js';
 import { resolveStoragePath } from '../../common/utils/storage-path.js';
+import { SATEM_SIGNATURE_BASE64 } from '../../assets/signatures.js';
 
 const generateDocumentSchema = z.object({
   templateId: z.string().uuid(),
@@ -189,6 +190,8 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
       cargoRepresentante: company.legalRepresentativeTitle || 'Gerente General',
       logoFull: company.logoFullUrl || '',
       logoShort: company.logoShortUrl || '',
+      signatureUrl: company.signatureUrl || SATEM_SIGNATURE_BASE64,
+      firma: `<img src="${company.signatureUrl || SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" style="max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px;" />`,
     },
     cliente: {
       nombreLegal: customer.legalName || sanitizeCustomVars.cliente?.nombreLegal || '',
@@ -257,6 +260,16 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
   let rawCompiledHtml = body.customHtml && body.customHtml.trim().length > 0
     ? body.customHtml
     : compileTemplate(targetVersion.htmlTemplate, variables);
+
+  // Garantizar presencia de la firma de SATEM en cualquier plantilla antigua o personalizada
+  const effectiveSatemSig = company.signatureUrl || SATEM_SIGNATURE_BASE64;
+  if (!rawCompiledHtml.includes('alt="Firma SATEM"') && !rawCompiledHtml.includes('class="sig-img"')) {
+    const sigImgTag = `<img src="${effectiveSatemSig}" class="sig-img" alt="Firma SATEM" />`;
+    rawCompiledHtml = rawCompiledHtml.replace(
+      /(<strong>(?:POR \/ FOR|POR|EMITIDO POR|AUTORIZADO POR|PRESENTADO POR): (?:\{\{empresa\.nombre\}\}|SATEM Soluciones Inteligentes SpA)<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
+      `$1${sigImgTag}$2`
+    );
+  }
 
   const sanitizedHtml = rawCompiledHtml
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')

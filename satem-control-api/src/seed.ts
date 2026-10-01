@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole, TemplateCategory } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { LOGO_SHORT_BASE64, LOGO_FULL_BASE64 } from './assets/logos.js';
+import { SATEM_SIGNATURE_BASE64 } from './assets/signatures.js';
 
 const prisma = new PrismaClient();
 
@@ -108,7 +109,8 @@ const baseCss = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .sig-space { height: 40px; }
+  .sig-space { height: 44px; display: flex; align-items: flex-end; justify-content: center; }
+  .sig-img { max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px; display: block; margin-left: auto; margin-right: auto; }
 `;
 
 const fieldsSchemaStandard = {
@@ -140,6 +142,7 @@ async function main() {
       website: 'https://satemsoluciones.com',
       logoFullUrl: LOGO_FULL_BASE64,
       logoShortUrl: LOGO_SHORT_BASE64,
+      signatureUrl: SATEM_SIGNATURE_BASE64,
       legalRepresentative: 'Representante Legal SATEM',
       legalRepresentativeTitle: 'Gerente General',
     },
@@ -155,6 +158,7 @@ async function main() {
       website: 'https://satemsoluciones.com',
       logoFullUrl: LOGO_FULL_BASE64,
       logoShortUrl: LOGO_SHORT_BASE64,
+      signatureUrl: SATEM_SIGNATURE_BASE64,
       legalRepresentative: 'Representante Legal SATEM',
       legalRepresentativeTitle: 'Gerente General',
     },
@@ -307,7 +311,7 @@ async function main() {
             <div class="sig-box">
               <strong>POR / FOR: {{empresa.nombre}}</strong><br>
               <span style="font-size: 9.5px; color: #64748b;">Prestador de Servicios (Chile)</span>
-              <div class="sig-space"></div>
+              <div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>
               ____________________________________________<br>
               <strong>{{empresa.representanteLegal}}</strong><br>
               {{empresa.cargoRepresentante}}<br>
@@ -364,7 +368,7 @@ async function main() {
           </table>
           <div class="legal-clause"><strong>EXPORTACIÓN DE SERVICIOS:</strong> {{contrato.clausulaExportacion}}</div>
           <div class="signatures">
-            <div class="sig-box"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Representante Legal Cliente</div>
           </div>
         </body></html>`
@@ -406,7 +410,7 @@ async function main() {
           </table>
           <div class="legal-clause"><strong>CLÁUSULA TRIBUTARIA:</strong> {{contrato.clausulaExportacion}}</div>
           <div class="signatures">
-            <div class="sig-box"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Firma Autorizada</div>
           </div>
         </body></html>`
@@ -447,7 +451,7 @@ async function main() {
           </table>
           <div class="legal-clause"><strong>CLÁUSULA TRIBUTARIA:</strong> {{contrato.clausulaExportacion}}</div>
           <div class="signatures">
-            <div class="sig-box"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Firma Autorizada</div>
           </div>
         </body></html>`
@@ -503,7 +507,7 @@ async function main() {
           </table>
           <div class="legal-clause"><strong>TRATAMIENTO TRIBUTARIO:</strong> {{contrato.clausulaExportacion}}</div>
           <div class="signatures">
-            <div class="sig-box"><strong>EMITIDO POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>EMITIDO POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>ACEPTACIÓN CLIENTE: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Firma y Aceptación de Cotización</div>
           </div>
         </body></html>`
@@ -546,7 +550,7 @@ async function main() {
             <tr><td class="label">Valor Total:</td><td><strong>{{contrato.moneda}} {{contrato.valor}}</strong></td><td class="label">Fecha Programada:</td><td>{{contrato.fechaInicio}} al {{contrato.fechaTermino}}</td></tr>
           </table>
           <div class="signatures">
-            <div class="sig-box"><strong>AUTORIZADO POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>AUTORIZADO POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>CONFORMIDAD CLIENTE: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Aprobación Técnica Cliente</div>
           </div>
         </body></html>`
@@ -586,7 +590,7 @@ async function main() {
             <tr><td class="label">Horas Consumidas:</td><td><strong>{{contrato.horas}} Horas</strong></td><td class="label">Estado de la Atención:</td><td><strong>COMPLETADA CONFORME</strong></td></tr>
           </table>
           <div class="signatures" style="justify-content: flex-start;">
-            <div class="sig-box" style="width: 280px;"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>Especialista Técnico SATEM</div>
+            <div class="sig-box" style="width: 280px;"><strong>POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>Especialista Técnico SATEM</div>
           </div>
         </body></html>`
     },
@@ -626,7 +630,7 @@ async function main() {
             <tr><td class="label">Período:</td><td colspan="3">{{contrato.fechaInicio}} al {{contrato.fechaTermino}}</td></tr>
           </table>
           <div class="signatures">
-            <div class="sig-box"><strong>EMITIDO POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>EMITIDO POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>RECIBIDO POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Aprobación Ejecutiva Cliente</div>
           </div>
         </body></html>`
@@ -724,7 +728,7 @@ async function main() {
             <div class="sig-box">
               <strong>POR / FOR: {{empresa.nombre}}</strong><br>
               <span style="font-size: 9.5px; color: #64748b;">Prestador del Servicio (Chile)</span>
-              <div class="sig-space"></div>
+              <div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>
               ____________________________________________<br>
               <strong>{{empresa.representanteLegal}}</strong><br>
               {{empresa.cargoRepresentante}}<br>
@@ -781,7 +785,7 @@ async function main() {
           </table>
           <div class="legal-clause"><strong>CLÁUSULA TRIBUTARIA:</strong> {{contrato.clausulaExportacion}}</div>
           <div class="signatures">
-            <div class="sig-box"><strong>PRESENTADO POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+            <div class="sig-box"><strong>PRESENTADO POR: {{empresa.nombre}}</strong><div class="sig-space"><img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" /></div>______________________________<br>{{empresa.representanteLegal}}</div>
             <div class="sig-box"><strong>ACEPTADO POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Firma y Fecha de Aceptación</div>
           </div>
         </body></html>`
