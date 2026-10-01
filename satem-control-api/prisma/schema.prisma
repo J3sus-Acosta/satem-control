@@ -185,6 +185,17 @@ enum DocumentInstanceStatus {
   CANCELLED
 }
 
+enum SignatureRole {
+  CLIENT
+  SATEM
+}
+
+enum SignatureStatus {
+  PENDING
+  SIGNED
+  REJECTED
+}
+
 // ----------------------------------------------------
 // IDENTIDAD CORPORATIVA SATEM SPA
 // ----------------------------------------------------
@@ -293,6 +304,7 @@ model DocumentInstance {
   customer        Customer?               @relation(fields: [customerId], references: [id])
   contract        Contract?               @relation(fields: [contractId], references: [id])
   expedient       Expedient?              @relation(fields: [expedientId], references: [id])
+  signatures      DocumentSignature[]
 
   @@map("document_instances")
 }
@@ -395,6 +407,7 @@ model Customer {
   contracts         Contract[]
   expedients        Expedient[]
   documentInstances DocumentInstance[]
+  clientUsers       ClientUser[]
 
   @@map("customers")
 }
@@ -409,9 +422,10 @@ model CustomerEntity {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  contracts  Contract[]
-  expedients Expedient[]
+  customer     Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  contracts    Contract[]
+  expedients   Expedient[]
+  clientAccess ClientUserEntityAccess[]
 
   @@map("customer_entities")
 }
@@ -932,3 +946,79 @@ model ExchangeRate {
   @@unique([currencyFrom, currencyTo, rateDate, source])
   @@map("exchange_rates")
 }
+
+// ----------------------------------------------------
+// PORTAL DE CLIENTES Y FIRMA DIGITAL
+// ----------------------------------------------------
+
+model ClientUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  customerId   String
+  isActive     Boolean   @default(true)
+  inviteToken  String?   @unique @db.VarChar(100)
+  invitedAt    DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  customer           Customer                 @relation(fields: [customerId], references: [id])
+  sessions           ClientUserSession[]
+  entityRestrictions ClientUserEntityAccess[]
+  signatures         DocumentSignature[]
+
+  @@map("client_users")
+}
+
+model ClientUserSession {
+  id           String    @id @default(uuid())
+  clientUserId String
+  refreshToken String    @unique @db.VarChar(500)
+  ipAddress    String?
+  userAgent    String?   @db.Text
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  revokedAt    DateTime?
+
+  clientUser ClientUser @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+
+  @@map("client_user_sessions")
+}
+
+model ClientUserEntityAccess {
+  id               String @id @default(uuid())
+  clientUserId     String
+  customerEntityId String
+
+  clientUser     ClientUser     @relation(fields: [clientUserId], references: [id], onDelete: Cascade)
+  customerEntity CustomerEntity @relation(fields: [customerEntityId], references: [id], onDelete: Cascade)
+
+  @@unique([clientUserId, customerEntityId])
+  @@map("client_user_entity_access")
+}
+
+model DocumentSignature {
+  id                 String          @id @default(uuid())
+  documentInstanceId String
+  role               SignatureRole
+  status             SignatureStatus @default(PENDING)
+  signerName         String
+  signerEmail        String
+  signatureImagePath String?         @db.VarChar(500)
+  signedAt           DateTime?
+  ipAddress          String?
+  userAgent          String?         @db.Text
+  clientUserId       String?
+  internalUserId     String?
+  createdAt          DateTime        @default(now())
+
+  documentInstance DocumentInstance @relation(fields: [documentInstanceId], references: [id], onDelete: Cascade)
+  clientUser       ClientUser?      @relation(fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  @@map("document_signatures")
+}
+

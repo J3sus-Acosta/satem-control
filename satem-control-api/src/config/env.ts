@@ -14,6 +14,14 @@ const envSchema = z.object({
   COOKIE_SECRET: z.string().default('satem_cookie_secret_default_key'),
   STORAGE_PATH: z.string().default(path.join(process.cwd(), 'storage')),
   FRONTEND_URL: z.string().default('http://localhost:5173'),
+  PORTAL_BASE_URL: z.string().default('http://localhost:5173/portal'),
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.string().default('587').transform((v) => parseInt(v, 10)),
+  SMTP_SECURE: z.string().default('false').transform((v) => v === 'true'),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  SMTP_FROM_NAME: z.string().default('SATEM Soluciones'),
+  SMTP_FROM_EMAIL: z.string().default('notificaciones@satemsoluciones.com'),
 });
 
 const _env = envSchema.safeParse(process.env);

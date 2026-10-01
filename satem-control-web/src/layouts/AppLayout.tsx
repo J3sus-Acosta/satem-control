@@ -15,6 +15,7 @@ import {
   FilePlus,
   Menu,
   X,
+  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,6 +30,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/bank':               'Conciliación Bancaria',
   '/admin/templates':    'Plantillas Documentales',
   '/admin/users':        'Gestión de Usuarios',
+  '/admin/client-users': 'Usuarios Cliente (Portal)',
 };
 
 interface BreadcrumbHeaderProps {
@@ -200,14 +202,25 @@ export const AppLayout: React.FC = () => {
           )}
 
           {user?.role === 'ADMIN' && (
-            <NavLink
-              to="/admin/users"
-              onClick={closeSidebar}
-              className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ justifyContent: 'flex-start' }}
-            >
-              <Users size={18} /> Gestión de Usuarios
-            </NavLink>
+            <>
+              <NavLink
+                to="/admin/users"
+                onClick={closeSidebar}
+                className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ justifyContent: 'flex-start' }}
+              >
+                <Users size={18} /> Gestión de Usuarios
+              </NavLink>
+
+              <NavLink
+                to="/admin/client-users"
+                onClick={closeSidebar}
+                className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ justifyContent: 'flex-start' }}
+              >
+                <UserCheck size={18} /> Usuarios Cliente
+              </NavLink>
+            </>
           )}
         </nav>
 

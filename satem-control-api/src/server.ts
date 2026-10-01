@@ -34,6 +34,10 @@ import { templatesRoutes } from './modules/templates/templates.routes.js';
 import { documentInstancesRoutes } from './modules/document-instances/document-instances.routes.js';
 import { auditLogsRoutes } from './modules/audit-logs/audit-logs.routes.js';
 import { exchangeRatesRoutes } from './modules/exchange-rates/exchange-rates.routes.js';
+import { portalAuthRoutes } from './modules/portal-auth/portal-auth.routes.js';
+import { portalExpedientsRoutes } from './modules/portal-expedients/portal-expedients.routes.js';
+import { portalSignaturesRoutes, internalSignaturesRoutes } from './modules/portal-signatures/portal-signatures.routes.js';
+import { adminClientUsersRoutes } from './modules/admin-client-users/admin-client-users.routes.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -120,6 +124,11 @@ export async function buildServer() {
   await fastify.register(documentInstancesRoutes, { prefix: '/api/v1/document-instances' });
   await fastify.register(auditLogsRoutes, { prefix: '/api/v1/audit-logs' });
   await fastify.register(exchangeRatesRoutes, { prefix: '/api/v1/exchange-rates' });
+  await fastify.register(portalAuthRoutes, { prefix: '/api/v1/portal/auth' });
+  await fastify.register(portalExpedientsRoutes, { prefix: '/api/v1/portal/expedients' });
+  await fastify.register(portalSignaturesRoutes, { prefix: '/api/v1/portal/signatures' });
+  await fastify.register(internalSignaturesRoutes, { prefix: '/api/v1/signatures' });
+  await fastify.register(adminClientUsersRoutes, { prefix: '/api/v1/admin/client-users' });
 
   return fastify;
 }
