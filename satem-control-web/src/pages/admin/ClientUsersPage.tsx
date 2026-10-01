@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import {
   Users,
   UserPlus,
+  UserCheck,
   Search,
   Building2,
   Mail,
@@ -197,6 +198,24 @@ export const ClientUsersPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Sub-navegación Usuarios */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+        <button
+          onClick={() => navigate('/admin/users')}
+          className="btn btn-secondary"
+          style={{ fontSize: '13px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Users size={16} /> Personal Interno SATEM
+        </button>
+        <button
+          onClick={() => navigate('/admin/client-users')}
+          className="btn btn-primary"
+          style={{ fontSize: '13px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <UserCheck size={16} /> Usuarios Cliente (Portal)
+        </button>
+      </div>
+
       {/* Header */}
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>

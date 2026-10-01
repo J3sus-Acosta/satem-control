@@ -223,6 +223,13 @@ export const CustomersPage: React.FC = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/admin/client-users')}
+            className="btn btn-secondary"
+            title="Administrar accesos y contraseñas del Portal de Clientes"
+          >
+            <Users size={18} /> Usuarios Portal
+          </button>
           {!isViewer && (
             <button onClick={openCreateModal} className="btn btn-secondary">
               <Plus size={18} /> Nuevo Cliente

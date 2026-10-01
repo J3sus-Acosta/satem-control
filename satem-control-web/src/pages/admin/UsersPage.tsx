@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -80,6 +81,7 @@ const ROLE_CONFIG: Record<
 };
 
 export const UsersPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,6 +396,24 @@ export const UsersPage: React.FC = () => {
           <span>{toastMessage.text}</span>
         </div>
       )}
+
+      {/* Sub-navegación Usuarios */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '20px' }}>
+        <button
+          onClick={() => navigate('/admin/users')}
+          className="btn btn-primary"
+          style={{ fontSize: '13px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Users size={16} /> Personal Interno SATEM
+        </button>
+        <button
+          onClick={() => navigate('/admin/client-users')}
+          className="btn btn-secondary"
+          style={{ fontSize: '13px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <UserCheck size={16} /> Usuarios Cliente (Portal)
+        </button>
+      </div>
 
       {/* Header Principal */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
