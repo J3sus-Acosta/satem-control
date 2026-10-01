@@ -209,13 +209,17 @@ export async function createClientUserHandler(request: FastifyRequest, reply: Fa
 
   // Enviar email de invitación si corresponde
   if (inviteToken && body.sendInviteEmail) {
-    const inviteUrl = `${env.PORTAL_BASE_URL}/invite/${inviteToken}`;
-    await emailService.sendInvitation(
-      clientUser.email,
-      inviteUrl,
-      customer.legalName,
-      clientUser.fullName
-    );
+    try {
+      const inviteUrl = `${env.PORTAL_BASE_URL}/invite/${inviteToken}`;
+      await emailService.sendInvitation(
+        clientUser.email,
+        inviteUrl,
+        customer.legalName,
+        clientUser.fullName
+      );
+    } catch (mailErr) {
+      request.log.warn({ err: mailErr }, 'Aviso: No se pudo enviar el email de invitación, pero el usuario cliente fue creado correctamente.');
+    }
   }
 
   return reply.status(201).send({
@@ -380,16 +384,20 @@ export async function resendInviteHandler(
   });
 
   const inviteUrl = `${env.PORTAL_BASE_URL}/invite/${inviteToken}`;
-  await emailService.sendInvitation(
-    clientUser.email,
-    inviteUrl,
-    clientUser.customer?.legalName || 'SATEM Soluciones',
-    clientUser.fullName
-  );
+  try {
+    await emailService.sendInvitation(
+      clientUser.email,
+      inviteUrl,
+      clientUser.customer?.legalName || 'SATEM Soluciones',
+      clientUser.fullName
+    );
+  } catch (mailErr) {
+    request.log.warn({ err: mailErr }, 'Aviso: No se pudo enviar el correo de invitación SMTP.');
+  }
 
   return reply.send({
     success: true,
-    message: 'Invitación reenviada exitosamente por correo electrónico',
+    message: 'Invitación generada exitosamente.',
     data: { inviteUrl },
   });
 }
