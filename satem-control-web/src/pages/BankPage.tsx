@@ -8,15 +8,17 @@ import {
 
 export const BankPage: React.FC = () => {
   const [receipts, setReceipts] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [previewData, setPreviewData] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [matching, setMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<any>(null);
+  const [viewTab, setViewTab] = useState<'RECEIPTS' | 'PAYMENTS'>('RECEIPTS');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNRECONCILED' | 'RECONCILED' | 'DISCREPANCY'>('ALL');
 
-  // Modal de visualización de documento de cartola
+  // Modal de visualización de documento de cartola / comprobante
   const [docModal, setDocModal] = useState<{ isOpen: boolean; docId: string; title: string } | null>(null);
 
   // Paginación client-side
@@ -31,11 +33,15 @@ export const BankPage: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(filteredReceipts.length / PAGE_SIZE));
   const pagedReceipts = filteredReceipts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const fetchReceipts = () => {
+  const fetchData = () => {
     setLoading(true);
-    api.get('/bank/receipts')
-      .then((res) => {
-        setReceipts(res.data.data);
+    Promise.all([
+      api.get('/bank/receipts').catch(() => ({ data: { data: [] } })),
+      api.get('/payments').catch(() => ({ data: { data: [] } })),
+    ])
+      .then(([recRes, payRes]) => {
+        setReceipts(recRes.data.data || []);
+        setPayments(payRes.data.data || []);
         setPage(1);
       })
       .catch((err) => console.error(err))
@@ -43,7 +49,7 @@ export const BankPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchReceipts();
+    fetchData();
   }, []);
 
   const handlePreviewUpload = async (e: React.FormEvent) => {
@@ -75,7 +81,7 @@ export const BankPage: React.FC = () => {
       alert('Importación de abonos Santander confirmada exitosamente y respaldada en documentos');
       setPreviewData(null);
       setFile(null);
-      fetchReceipts();
+      fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Error al confirmar importación');
     }
@@ -87,7 +93,7 @@ export const BankPage: React.FC = () => {
     }
     try {
       await api.delete(`/bank/receipts/${id}`);
-      fetchReceipts();
+      fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Error al eliminar movimiento bancario');
     }
@@ -100,7 +106,7 @@ export const BankPage: React.FC = () => {
     try {
       const res = await api.post('/bank/auto-match', {});
       setMatchResult(res.data.data);
-      fetchReceipts();
+      fetchData();
     } catch (err: any) {
       const msg = err.response?.data?.error?.message || err.response?.data?.message;
       alert(msg || 'Error al ejecutar auto-match');
@@ -116,41 +122,90 @@ export const BankPage: React.FC = () => {
     return <span className="badge badge-secondary">{status}</span>;
   };
 
-  // KPIs rápidos
-  const reconciledCount   = receipts.filter(r => r.status === 'RECONCILED').length;
-  const unreconciledCount = receipts.filter(r => r.status === 'UNRECONCILED').length;
-  const discrepancyCount  = receipts.filter(r => r.status === 'DISCREPANCY').length;
+  // KPIs
+  const reconciledReceiptsCount = receipts.filter(r => r.status === 'RECONCILED').length;
+  const unreconciledReceiptsCount = receipts.filter(r => r.status === 'UNRECONCILED').length;
+  const pendingPaymentsCount = payments.filter(p => {
+    const hasRec = p.allocations?.some((a: any) => a.reconciliations?.length > 0);
+    return !hasRec;
+  }).length;
+  const reconciledPaymentsCount = payments.filter(p => {
+    return p.allocations?.some((a: any) => a.reconciliations?.length > 0);
+  }).length;
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Conciliación Bancaria Santander</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-          Importación oficial de cartola bancaria Santander (.pdf, .xlsx, .xls, .csv), archivo documental persistente, detección anti-duplicados y conciliación con expedientes.
-        </p>
+      <div className="page-header">
+        <div className="page-header-info">
+          <h1>Conciliación Bancaria Santander</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
+            Importación oficial de cartola bancaria Santander (.pdf, .xlsx, .xls, .csv), archivo documental persistente, detección anti-duplicados y conciliación con expedientes.
+          </p>
+        </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs Rápidos */}
       <div className="grid-4" style={{ marginBottom: '24px' }}>
         <div className="kpi-card">
-          <div className="kpi-title">Total Abonos</div>
-          <div className="kpi-value" style={{ color: 'var(--accent-primary)' }}>{receipts.length}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Registros importados</div>
+          <div className="kpi-title">Pagos / Comprobantes</div>
+          <div className="kpi-value" style={{ color: 'var(--accent-primary)' }}>{payments.length}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            {pendingPaymentsCount} pendiente(s) de abono
+          </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-title">Conciliados</div>
-          <div className="kpi-value" style={{ color: 'var(--success)' }}>{reconciledCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Match pago ↔ abono</div>
+          <div className="kpi-title">Abonos Cartola</div>
+          <div className="kpi-value" style={{ color: 'var(--info)' }}>{receipts.length}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            {unreconciledReceiptsCount} sin conciliar
+          </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-title">Sin Conciliar</div>
-          <div className="kpi-value" style={{ color: 'var(--warning)' }}>{unreconciledCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Pendientes de match</div>
+          <div className="kpi-title">Conciliados (Match)</div>
+          <div className="kpi-value" style={{ color: 'var(--success)' }}>{reconciledReceiptsCount}</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            {reconciledPaymentsCount} pago(s) confirmados
+          </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-title">Descalces</div>
-          <div className="kpi-value" style={{ color: 'var(--danger)' }}>{discrepancyCount}</div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Monto no coincide</div>
+          <div className="kpi-title">Descalces / Pendientes</div>
+          <div className="kpi-value" style={{ color: pendingPaymentsCount > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+            {pendingPaymentsCount}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Esperando cartola bancaria
+          </div>
+        </div>
+      </div>
+
+      {/* Banner Explicativo de Flujo Bancario */}
+      <div
+        style={{
+          padding: '16px 20px',
+          backgroundColor: 'rgba(0, 168, 150, 0.08)',
+          border: '1px solid var(--accent-primary)',
+          borderRadius: 'var(--radius-md)',
+          marginBottom: '24px',
+          display: 'flex',
+          gap: '14px',
+          alignItems: 'flex-start',
+        }}
+      >
+        <Info size={22} color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--text-primary)' }}>
+          <strong>📌 Flujo de Conciliación Bancaria SATEM:</strong>
+          <div style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
+            {payments.length > 0 ? (
+              <>
+                Tienes <strong>{payments.length} pago(s) registrado(s)</strong> en el sistema (por ejemplo, el comprobante SumUp cargado en el expediente/facturación). 
+                Para conciliarlo con la cuenta corriente de SATEM: descarga la <strong>Cartola Histórica</strong> (.pdf / .xlsx / .csv) desde el portal de Office Banking Santander, cárgala a continuación y presiona <strong>"Ejecutar Auto-Match"</strong> para vincular el abono con el comprobante de forma automática.
+              </>
+            ) : (
+              <>
+                Cuando los clientes realicen pagos (SumUp o transferencias) y se adjunten sus comprobantes en los Expedientes, aparecerán en la pestaña <strong>"Comprobantes & Pagos Registrados"</strong> listos para ser conciliados con la Cartola Santander.
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -185,7 +240,7 @@ export const BankPage: React.FC = () => {
             <Zap size={20} /> Auto-Match Abono Santander ↔ Pagos
           </h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: 1.6 }}>
-            Ejecuta el algoritmo de conciliación automática: compara referencias bancarias y montos en CLP entre los abonos de la cartola y los comprobantes de pago registrados.
+            Ejecuta el algoritmo de conciliación automática: compara referencias bancarias y montos en CLP entre los abonos de la cartola Santander y los comprobantes de pago registrados en expedientes.
           </p>
 
           <button
@@ -197,7 +252,7 @@ export const BankPage: React.FC = () => {
             {matching ? (
               <><RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> Ejecutando match...</>
             ) : (
-              <><Zap size={16} /> Ejecutar Auto-Match</>
+              <><Zap size={16} /> Ejecutar Auto-Match ({unreconciledReceiptsCount} abonos pendientes)</>
             )}
           </button>
 
@@ -279,189 +334,341 @@ export const BankPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tabla Abonos con filtros y paginación */}
-      <div className="table-container">
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Landmark size={18} color="var(--accent-primary)" /> Registro de Abonos Banco Santander Chile
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({filteredReceipts.length} de {receipts.length} registros)</span>
-            </h3>
-          </div>
+      {/* Pestañas de Vista */}
+      <div className="tabs-nav" style={{ marginBottom: '16px' }}>
+        <button
+          type="button"
+          className={`tab-btn ${viewTab === 'RECEIPTS' ? 'active' : ''}`}
+          onClick={() => { setViewTab('RECEIPTS'); setPage(1); }}
+        >
+          <Landmark size={15} /> Abonos Banco Santander ({receipts.length})
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${viewTab === 'PAYMENTS' ? 'active' : ''}`}
+          onClick={() => { setViewTab('PAYMENTS'); setPage(1); }}
+        >
+          <FileCheck size={15} /> Comprobantes & Pagos Registrados ({payments.length})
+        </button>
+      </div>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {/* Filtros de estado */}
-            <div style={{ display: 'flex', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', padding: '2px', border: '1px solid var(--border-color)' }}>
-              <button
-                type="button"
-                onClick={() => { setFilterStatus('ALL'); setPage(1); }}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  borderRadius: '4px',
-                  border: 'none',
-                  backgroundColor: filterStatus === 'ALL' ? 'var(--accent-primary)' : 'transparent',
-                  color: filterStatus === 'ALL' ? '#fff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Todos ({receipts.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFilterStatus('UNRECONCILED'); setPage(1); }}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  borderRadius: '4px',
-                  border: 'none',
-                  backgroundColor: filterStatus === 'UNRECONCILED' ? 'var(--warning)' : 'transparent',
-                  color: filterStatus === 'UNRECONCILED' ? '#000' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Sin Conciliar ({unreconciledCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFilterStatus('RECONCILED'); setPage(1); }}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  borderRadius: '4px',
-                  border: 'none',
-                  backgroundColor: filterStatus === 'RECONCILED' ? 'var(--success)' : 'transparent',
-                  color: filterStatus === 'RECONCILED' ? '#fff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Conciliados ({reconciledCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => { setFilterStatus('DISCREPANCY'); setPage(1); }}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: '11px',
-                  borderRadius: '4px',
-                  border: 'none',
-                  backgroundColor: filterStatus === 'DISCREPANCY' ? 'var(--danger)' : 'transparent',
-                  color: filterStatus === 'DISCREPANCY' ? '#fff' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-              >
-                Descalces ({discrepancyCount})
-              </button>
+      {/* VISTA 1: TABLA ABONOS CARTOLA SANTANDER */}
+      {viewTab === 'RECEIPTS' && (
+        <div className="table-container">
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Landmark size={18} color="var(--accent-primary)" /> Registro de Abonos Banco Santander Chile
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({filteredReceipts.length} de {receipts.length} registros)</span>
+              </h3>
             </div>
 
-            <button onClick={fetchReceipts} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Filtros de estado */}
+              <div style={{ display: 'flex', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', padding: '2px', border: '1px solid var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => { setFilterStatus('ALL'); setPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: filterStatus === 'ALL' ? 'var(--accent-primary)' : 'transparent',
+                    color: filterStatus === 'ALL' ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Todos ({receipts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFilterStatus('UNRECONCILED'); setPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: filterStatus === 'UNRECONCILED' ? 'var(--warning)' : 'transparent',
+                    color: filterStatus === 'UNRECONCILED' ? '#000' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Sin Conciliar ({unreconciledReceiptsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFilterStatus('RECONCILED'); setPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: filterStatus === 'RECONCILED' ? 'var(--success)' : 'transparent',
+                    color: filterStatus === 'RECONCILED' ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Conciliados ({reconciledReceiptsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setFilterStatus('DISCREPANCY'); setPage(1); }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: filterStatus === 'DISCREPANCY' ? 'var(--danger)' : 'transparent',
+                    color: filterStatus === 'DISCREPANCY' ? '#fff' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Descalces ({receipts.filter(r => r.status === 'DISCREPANCY').length})
+                </button>
+              </div>
+
+              <button onClick={fetchData} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                <RefreshCw size={13} style={{ marginRight: '4px' }} /> Actualizar
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando registros bancarios...</div>
+          ) : (
+            <>
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Fecha Movimiento</th>
+                    <th>Descripción / Concepto</th>
+                    <th>N° Documento / Ref</th>
+                    <th>Monto (CLP)</th>
+                    <th>Estado</th>
+                    <th>Documento Cartola</th>
+                    <th style={{ textAlign: 'center' }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedReceipts.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                        <Landmark size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+                        {receipts.length === 0 ? (
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>No hay abonos de cartola importados todavía.</div>
+                            <div style={{ fontSize: '12px' }}>Sube tu archivo de <strong>Cartola Histórica Santander (.pdf / .xlsx / .csv)</strong> en el panel superior para cargar los movimientos bancarios.</div>
+                          </div>
+                        ) : (
+                          'No hay abonos bancarios bajo el filtro seleccionado.'
+                        )}
+                      </td>
+                    </tr>
+                  ) : (
+                    pagedReceipts.map((r) => {
+                      const rec = r.reconciliations?.[0];
+                      const matchedPayment = rec?.paymentAllocation?.payment;
+                      const matchedExpedient =
+                        matchedPayment?.paymentRequest?.invoice?.expedient ||
+                        matchedPayment?.proofDocument?.links?.find((l: any) => l.expedient)?.expedient;
+
+                      return (
+                        <tr key={r.id}>
+                          <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{r.code}</td>
+                          <td style={{ fontSize: '13px' }}>{new Date(r.transactionDate).toLocaleDateString('es-CL')}</td>
+                          <td style={{ fontSize: '13px' }}>
+                            <div>{r.description}</div>
+                            {matchedExpedient && (
+                              <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px', fontWeight: 600 }}>
+                                ↳ Conciliado con Expediente {matchedExpedient.code} ({matchedExpedient.customer?.legalName || 'SATEM'})
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ fontSize: '13px', fontFamily: 'monospace' }}>{r.referenceNumber || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                          <td style={{ fontWeight: 'bold', color: Number(r.amountClp) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            ${Math.abs(Number(r.amountClp)).toLocaleString('es-CL')} CLP
+                          </td>
+                          <td>{statusBadge(r.status)}</td>
+                          <td>
+                            {r.rawSourceFile ? (
+                              <button
+                                type="button"
+                                onClick={() => setDocModal({ isOpen: true, docId: r.rawSourceFile.id, title: r.rawSourceFile.originalName })}
+                                className="btn btn-secondary"
+                                style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                title="Ver Cartola Santander Original"
+                              >
+                                <FileText size={12} color="var(--accent-primary)" /> {r.rawSourceFile.originalName.length > 18 ? `${r.rawSourceFile.originalName.slice(0, 15)}...` : r.rawSourceFile.originalName}
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReceipt(r.id, r.code)}
+                              className="btn btn-secondary"
+                              style={{ padding: '5px 8px', color: 'var(--danger)', fontSize: '12px' }}
+                              title="Eliminar o descartar este movimiento del listado"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    Página {page} de {totalPages} ({filteredReceipts.length} registros)
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '13px' }} disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Anterior</button>
+                    <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '13px' }} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Siguiente →</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* VISTA 2: TABLA COMPROBANTES & PAGOS REGISTRADOS */}
+      {viewTab === 'PAYMENTS' && (
+        <div className="table-container">
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FileCheck size={18} color="var(--accent-primary)" /> Comprobantes & Pagos Registrados en Expedientes
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>({payments.length} pago(s) registrados)</span>
+              </h3>
+            </div>
+            <button onClick={fetchData} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
               <RefreshCw size={13} style={{ marginRight: '4px' }} /> Actualizar
             </button>
           </div>
-        </div>
 
-        {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando registros bancarios...</div>
-        ) : (
-          <>
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Cargando pagos registrados...</div>
+          ) : payments.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <FileCheck size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+              No hay comprobantes de pago registrados en expedientes aún.
+            </div>
+          ) : (
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Fecha Movimiento</th>
-                  <th>Descripción / Concepto</th>
-                  <th>N° Documento / Ref</th>
-                  <th>Monto (CLP)</th>
-                  <th>Estado</th>
-                  <th>Documento Cartola</th>
-                  <th style={{ textAlign: 'center' }}>Acciones</th>
+                  <th>Código / Ref</th>
+                  <th>Fecha Pago</th>
+                  <th>Expediente / Cliente</th>
+                  <th>Método</th>
+                  <th>Monto Pagado</th>
+                  <th>Neto Bancario Estimado</th>
+                  <th>Estado en Santander</th>
+                  <th>Comprobante</th>
                 </tr>
               </thead>
               <tbody>
-                {pagedReceipts.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
-                      <Landmark size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
-                      No hay abonos bancarios bajo el filtro seleccionado.
-                    </td>
-                  </tr>
-                ) : (
-                  pagedReceipts.map((r) => {
-                    const rec = r.reconciliations?.[0];
-                    const matchedPayment = rec?.paymentAllocation?.payment;
-                    const matchedExpedient =
-                      matchedPayment?.paymentRequest?.invoice?.expedient ||
-                      matchedPayment?.proofDocument?.links?.find((l: any) => l.expedient)?.expedient;
+                {payments.map((p) => {
+                  const hasRec = p.allocations?.some((a: any) => a.reconciliations?.length > 0);
+                  const firstRec = p.allocations?.[0]?.reconciliations?.[0];
+                  const linkedExpedient =
+                    p.paymentRequest?.invoice?.expedient ||
+                    p.proofDocument?.links?.find((l: any) => l.expedient)?.expedient;
+                  const customer = linkedExpedient?.customer;
 
-                    return (
-                      <tr key={r.id}>
-                        <td style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{r.code}</td>
-                        <td style={{ fontSize: '13px' }}>{new Date(r.transactionDate).toLocaleDateString('es-CL')}</td>
-                        <td style={{ fontSize: '13px' }}>
-                          <div>{r.description}</div>
-                          {matchedExpedient && (
-                            <div style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '2px', fontWeight: 600 }}>
-                              ↳ Conciliado con Expediente {matchedExpedient.code} ({matchedExpedient.customer?.legalName || 'SATEM'})
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ fontSize: '13px', fontFamily: 'monospace' }}>{r.referenceNumber || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
-                        <td style={{ fontWeight: 'bold', color: Number(r.amountClp) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                          ${Math.abs(Number(r.amountClp)).toLocaleString('es-CL')} CLP
-                        </td>
-                        <td>{statusBadge(r.status)}</td>
-                        <td>
-                          {r.rawSourceFile ? (
-                            <button
-                              type="button"
-                              onClick={() => setDocModal({ isOpen: true, docId: r.rawSourceFile.id, title: r.rawSourceFile.originalName })}
-                              className="btn btn-secondary"
-                              style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              title="Ver Cartola Santander Original"
-                            >
-                              <FileText size={12} color="var(--accent-primary)" /> {r.rawSourceFile.originalName.length > 18 ? `${r.rawSourceFile.originalName.slice(0, 15)}...` : r.rawSourceFile.originalName}
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>{p.code}</div>
+                        {p.transactionRef && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            Ref: {p.transactionRef}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '13px' }}>
+                        {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('es-CL') : '—'}
+                      </td>
+                      <td>
+                        {linkedExpedient ? (
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{linkedExpedient.code}</div>
+                            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{customer?.legalName || 'SATEM'}</div>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>General</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className="badge badge-info">{p.paymentMethod || 'SumUp'}</span>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '13.5px' }}>
+                          ${Number(p.amount).toLocaleString('es-CL')} {p.currency}
+                        </div>
+                        {p.usdEquivalent && p.currency !== 'USD' && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            ≈ ${Number(p.usdEquivalent).toFixed(2)} USD
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {p.allocations?.[0]?.allocatedAmount ? (
+                          <div style={{ fontWeight: 'bold', color: 'var(--success)', fontSize: '13.5px' }}>
+                            ${Number(p.allocations[0].allocatedAmount).toLocaleString('es-CL')} CLP
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {hasRec ? (
+                          <span className="badge badge-success" title={`Conciliado con ${firstRec?.bankReceipt?.code || 'Abono'}`}>
+                            ✓ Conciliado en Banco
+                          </span>
+                        ) : (
+                          <span className="badge badge-warning" title="Pendiente de importar cartola Santander con este depósito">
+                            ⏳ Pendiente de Abono Santander
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {p.proofDocument ? (
                           <button
                             type="button"
-                            onClick={() => handleDeleteReceipt(r.id, r.code)}
+                            onClick={() => setDocModal({ isOpen: true, docId: p.proofDocument.id, title: p.proofDocument.originalName || 'Comprobante de Pago' })}
                             className="btn btn-secondary"
-                            style={{ padding: '5px 8px', color: 'var(--danger)', fontSize: '12px' }}
-                            title="Eliminar o descartar este movimiento del listado"
+                            style={{ fontSize: '11px', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            title="Ver Comprobante / Informe SumUp Adjunto"
                           >
-                            <Trash2 size={14} />
+                            <FileText size={12} color="var(--accent-primary)" /> Ver Comprobante
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
+                        ) : (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
-
-            {/* Paginación */}
-            {totalPages > 1 && (
-              <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Página {page} de {totalPages} ({filteredReceipts.length} registros)
-                </span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '13px' }} disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Anterior</button>
-                  <button className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '13px' }} disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Siguiente →</button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Modal Visor de Documento de Cartola Santander */}
       {docModal && (

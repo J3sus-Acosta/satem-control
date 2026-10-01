@@ -31,9 +31,35 @@ export async function listPaymentsHandler(request: FastifyRequest, reply: Fastif
   const payments = await prisma.payment.findMany({
     where: { deletedAt: null },
     include: {
-      paymentRequest: { include: { invoice: { include: { expedient: true } } } },
-      allocations: { include: { reconciliations: true } },
-      proofDocument: true,
+      paymentRequest: {
+        include: {
+          invoice: {
+            include: {
+              expedient: {
+                include: { customer: true },
+              },
+            },
+          },
+        },
+      },
+      allocations: {
+        include: {
+          reconciliations: {
+            include: { bankReceipt: true },
+          },
+        },
+      },
+      proofDocument: {
+        include: {
+          links: {
+            include: {
+              expedient: {
+                include: { customer: true },
+              },
+            },
+          },
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
