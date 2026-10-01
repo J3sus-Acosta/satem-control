@@ -620,9 +620,10 @@ img, svg, video {
 /* Master-Detail Expedients Layout */
 .expedients-layout {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  gap: 20px;
   align-items: start;
+  width: 100%;
 }
 
 .expedients-sidebar {
@@ -633,6 +634,71 @@ img, svg, video {
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 180px);
+  min-width: 0;
+}
+
+.expedients-detail-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.expedient-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.expedient-title-block {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.expedient-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.expedient-item-row, .integrity-item-row, .doc-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background-color: #0f172a;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  gap: 14px;
+  min-width: 0;
+}
+
+.integrity-item-row {
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+
+.expedient-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.expedient-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 /* Document Generator / Template Editor Split */
@@ -802,6 +868,36 @@ img, svg, video {
   .header-user-email {
     display: none;
   }
+
+  .expedients-detail-card {
+    padding: 16px;
+  }
+
+  .expedient-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .expedient-header-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .expedient-item-row, .integrity-item-row, .doc-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .expedient-item-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .expedient-item-actions .btn {
+    flex: 1 1 auto;
+    font-size: 11.5px;
+  }
 }
 
 /* Small Mobile (< 480px) */
@@ -831,6 +927,14 @@ img, svg, video {
   .page-header-actions .btn {
     width: 100%;
     flex: unset;
+  }
+
+  .expedients-detail-card {
+    padding: 12px;
+  }
+
+  .expedient-item-actions .btn {
+    width: 100%;
   }
 
   .modal-dialog {

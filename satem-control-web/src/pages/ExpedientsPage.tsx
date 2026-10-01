@@ -505,23 +505,25 @@ export const ExpedientsPage: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Gestión de Expedientes (EXP-YYYY-NNNNNN)</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+      <div className="page-header">
+        <div className="page-header-info">
+          <h1>Gestión de Expedientes (EXP-YYYY-NNNNNN)</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
             Unidad central de control operativo, facturación, integridad y snapshots de cierre SATEM.
           </p>
         </div>
         {!isViewer && (
-          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
-            <Plus size={18} /> Nuevo Expediente
-          </button>
+          <div className="page-header-actions">
+            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+              <Plus size={18} /> Nuevo Expediente
+            </button>
+          </div>
         )}
       </div>
 
       {/* Error Alert */}
       {fetchError && (
-        <div style={{ padding: '14px 18px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: '#f87171', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 18px', backgroundColor: 'rgba(239, 68, 68, 0.15)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: '#f87171', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <strong>Error al cargar expedientes:</strong> {fetchError}
           </div>
@@ -533,8 +535,8 @@ export const ExpedientsPage: React.FC = () => {
 
       <div className="expedients-layout">
         {/* Lista lateral */}
-        <div className="expedients-sidebar" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 180px)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <div className="expedients-sidebar">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '4px' }}>
             <h3 style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', margin: 0 }}>
               Expedientes ({expedients.length})
             </h3>
@@ -563,8 +565,8 @@ export const ExpedientsPage: React.FC = () => {
                   }}
                 >
                   <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--accent-primary)' }}>{exp.code}</div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px' }}>{exp.title}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{exp.customer?.legalName}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '2px', wordBreak: 'break-word' }}>{exp.title}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', wordBreak: 'break-word' }}>{exp.customer?.legalName}</div>
                   <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <span className="badge badge-info">{exp.status}</span>
                     <span className="badge badge-success">{exp.taxTreatment}</span>
@@ -601,23 +603,23 @@ export const ExpedientsPage: React.FC = () => {
 
         {/* Detalle 360° */}
         {selectedExpedient ? (
-          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
+          <div className="expedients-detail-card">
             {/* Header expediente */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', flexWrap: 'wrap', gap: '16px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <h2 style={{ fontSize: '22px' }}>{selectedExpedient.code}</h2>
+            <div className="expedient-header-top">
+              <div className="expedient-title-block">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: 'clamp(1.15rem, 2.5vw, 1.45rem)', margin: 0 }}>{selectedExpedient.code}</h2>
                   <span className="badge badge-info">{selectedExpedient.status}</span>
                   <span className="badge badge-success">{selectedExpedient.taxTreatment}</span>
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: 600, marginTop: '4px' }}>{selectedExpedient.title}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                <div style={{ fontSize: 'clamp(14px, 2vw, 16px)', fontWeight: 600, marginTop: '6px', wordBreak: 'break-word' }}>{selectedExpedient.title}</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', wordBreak: 'break-word' }}>
                   Cliente: <strong>{selectedExpedient.customer?.legalName}</strong> ({selectedExpedient.customer?.country?.name}) | Tax ID: {selectedExpedient.customer?.taxId}
                 </div>
               </div>
 
               {!isViewer && (
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="expedient-header-actions">
                   <button onClick={() => handleDownloadBundle(selectedExpedient.id, selectedExpedient.code)} className="btn btn-secondary">
                     <Download size={16} /> ZIP Bundle
                   </button>
@@ -643,9 +645,11 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
               )}
               {isViewer && (
-                <button onClick={() => handleDownloadBundle(selectedExpedient.id, selectedExpedient.code)} className="btn btn-secondary">
-                  <Download size={16} /> ZIP Bundle
-                </button>
+                <div className="expedient-header-actions">
+                  <button onClick={() => handleDownloadBundle(selectedExpedient.id, selectedExpedient.code)} className="btn btn-secondary">
+                    <Download size={16} /> ZIP Bundle
+                  </button>
+                </div>
               )}
             </div>
 
@@ -879,10 +883,10 @@ export const ExpedientsPage: React.FC = () => {
             {/* TAB: Integridad */}
             {activeTab === 'integrity' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '15px' }}>Checklist de Integridad Operativa y Auditoría</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 style={{ fontSize: '15px', margin: 0 }}>Checklist de Integridad Operativa y Auditoría</h3>
                   {!isViewer && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <button
                         onClick={() => setShowSumUpModal(true)}
                         className="btn btn-secondary"
@@ -916,32 +920,30 @@ export const ExpedientsPage: React.FC = () => {
                     return (
                       <div
                         key={item.id}
+                        className="integrity-item-row"
                         style={{
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
-                          borderLeft: '4px solid',
                           borderColor: isCompleted ? 'var(--success)' : 'var(--warning)',
                         }}
                       >
-                        <div style={{ flex: 1, marginRight: '16px' }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {item.name}
+                        <div className="expedient-item-info">
+                          <div style={{ fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <span>{item.name}</span>
                             {item.isRequired && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(Obligatorio)</span>}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Categoría: {item.category}</div>
                           {item.observation && (
-                            <div style={{ fontSize: '11.5px', color: 'var(--success)', marginTop: '4px', fontWeight: 600 }}>
+                            <div style={{ fontSize: '11.5px', color: 'var(--success)', marginTop: '4px', fontWeight: 600, wordBreak: 'break-word' }}>
                               ✓ {item.observation}
                             </div>
                           )}
                           {item.code === 'RECONCILIATION_COMPLETED' && (
-                            <div style={{ marginTop: '10px', maxWidth: '460px' }}>
+                            <div style={{ marginTop: '10px', width: '100%', maxWidth: '460px' }}>
                               {(() => {
                                 const match = item.observation?.match(/Progreso:\s*(\d+)%/) || item.observation?.match(/Pagado y Conciliado:\s*(\d+)%/);
                                 const reconPct = match ? parseInt(match[1], 10) : (isCompleted ? 100 : 0);
                                 return (
                                   <>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '5px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '5px', flexWrap: 'wrap', gap: '4px' }}>
                                       <span style={{ color: 'var(--text-secondary)' }}>Progreso de Cobro del Contrato (USD)</span>
                                       <span style={{ fontWeight: 'bold', color: reconPct >= 100 ? 'var(--success)' : (reconPct > 0 ? 'var(--warning)' : 'var(--text-muted)') }}>
                                         {reconPct}% {reconPct >= 100 ? '(Totalmente Pagado)' : (reconPct > 0 ? '(Abono Parcial Recibido)' : '(Pendiente de Abono)')}
@@ -972,7 +974,7 @@ export const ExpedientsPage: React.FC = () => {
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div className="expedient-item-actions">
                           {/* 1. Contrato SOW */}
                           {item.code === 'CONTRACT_PRESENT' && (
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -1297,8 +1299,8 @@ export const ExpedientsPage: React.FC = () => {
             {/* TAB: Excepciones — MEJ-02 */}
             {activeTab === 'exceptions' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h3 style={{ fontSize: '15px', margin: 0 }}>
                     Excepciones del Expediente ({selectedExpedient.exceptions?.length || 0})
                   </h3>
                   {!isViewer && (
@@ -1318,15 +1320,15 @@ export const ExpedientsPage: React.FC = () => {
                     {selectedExpedient.exceptions?.map((exc: any) => (
                       <div
                         key={exc.id}
+                        className="expedient-item-row"
                         style={{
-                          padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
-                          borderLeft: '4px solid',
+                          borderLeftWidth: '4px',
+                          borderLeftStyle: 'solid',
                           borderColor: exc.severity === 'CRITICAL' ? 'var(--danger)' : exc.severity === 'WARNING' ? 'var(--warning)' : 'var(--info)',
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
                         }}
                       >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <div className="expedient-item-info">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                             {severityBadge(exc.severity)}
                             <span style={{ fontWeight: 700, fontSize: '14px' }}>{exc.title}</span>
                           </div>
@@ -1337,7 +1339,7 @@ export const ExpedientsPage: React.FC = () => {
                             </div>
                           )}
                         </div>
-                        <div>
+                        <div className="expedient-item-actions">
                           {exc.status === 'OPEN' && <span className="badge badge-danger">ABIERTA</span>}
                           {exc.status === 'RESOLVED' && <span className="badge badge-success">RESUELTA</span>}
                         </div>
@@ -1400,14 +1402,13 @@ export const ExpedientsPage: React.FC = () => {
                     {selectedExpedient.documentInstances?.map((doc: any) => (
                       <div
                         key={doc.id}
+                        className="doc-item-row"
                         style={{
-                          padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
-                          border: doc.status === 'SIGNED' ? '1px solid rgba(16,185,129,0.4)' : '1px solid var(--border-color)',
-                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          borderColor: doc.status === 'SIGNED' ? 'rgba(16,185,129,0.4)' : 'var(--border-color)',
                           boxShadow: doc.status === 'SIGNED' ? '0 0 15px rgba(16,185,129,0.08)' : 'none',
                         }}
                       >
-                        <div>
+                        <div className="expedient-item-info">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--accent-primary)' }}>{doc.documentNumber || doc.code}</span>
                             <span className={`badge ${doc.status === 'SIGNED' ? 'badge-success' : 'badge-info'}`}>
@@ -1419,7 +1420,7 @@ export const ExpedientsPage: React.FC = () => {
                             Plantilla: <strong>{doc.template?.name || 'Documento Oficial SATEM'}</strong>
                           </div>
                           {doc.signedAt && (
-                            <div style={{ fontSize: '11.5px', color: 'var(--success)', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ fontSize: '11.5px', color: 'var(--success)', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                               <CheckCircle size={13} /> Firma recepcionada: {new Date(doc.signedAt).toLocaleString('es-CL')}
                               <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: '6px' }}>
                                 (SHA-256: <code>{doc.signedPdfHash?.substring(0, 16)}...</code>)
@@ -1432,7 +1433,7 @@ export const ExpedientsPage: React.FC = () => {
                             </div>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div className="expedient-item-actions">
                           {doc.status === 'SIGNED' && doc.signedPdfPath && (
                             <button
                               onClick={() => handleViewSignedPdf(doc.id, doc.documentNumber)}
@@ -1549,14 +1550,9 @@ export const ExpedientsPage: React.FC = () => {
                             return (
                               <div
                                 key={doc.id}
-                                style={{
-                                  padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
-                                  border: '1px solid var(--border-color)',
-                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                  flexWrap: 'wrap', gap: '12px',
-                                }}
+                                className="doc-item-row"
                               >
-                                <div>
+                                <div className="expedient-item-info">
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                     <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>{doc.originalName}</span>
                                     <span className={`badge ${isPayment ? 'badge-success' : isInvoice ? 'badge-info' : 'badge-secondary'}`}>
@@ -1567,7 +1563,7 @@ export const ExpedientsPage: React.FC = () => {
                                     SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {doc.createdAt ? new Date(doc.createdAt).toLocaleString('es-CL') : 'N/A'}
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div className="expedient-item-actions">
                                   <button
                                     onClick={() => handleViewAttachedDoc(doc.id, doc.originalName)}
                                     className="btn btn-secondary"
@@ -1656,7 +1652,7 @@ export const ExpedientsPage: React.FC = () => {
                       >
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent-primary)', marginTop: '5px', flexShrink: 0 }} />
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
                             <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--accent-primary)' }}>{log.action}</span>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                               {new Date(log.createdAt).toLocaleString('es-CL')}
