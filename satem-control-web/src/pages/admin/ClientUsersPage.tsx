@@ -70,24 +70,39 @@ export const ClientUsersPage: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const fetchCustomersList = async () => {
+    try {
+      const res = await api.get('/customers');
+      const list = res.data?.data || [];
+      setCustomers(list);
+      return list;
+    } catch (err) {
+      console.error('Error fetching customers:', err);
+      return [];
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const [usersRes, custRes] = await Promise.all([
-        api.get('/admin/client-users', {
+      // 1. Cargar clientes siempre
+      const custList = await fetchCustomersList();
+
+      // 2. Cargar usuarios cliente
+      try {
+        const usersRes = await api.get('/admin/client-users', {
           params: {
             search: search || undefined,
             customerId: selectedCustomerFilter || undefined,
           },
-        }),
-        api.get('/customers'),
-      ]);
-
-      setClientUsers(usersRes.data.data || []);
-      setCustomers(custRes.data.data || []);
+        });
+        setClientUsers(usersRes.data?.data || []);
+      } catch (userErr: any) {
+        console.warn('Endpoint /admin/client-users pendiente de backend:', userErr);
+      }
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Error al cargar los usuarios clientes.');
+      setErrorMsg(err.response?.data?.message || 'Error al cargar la información.');
     } finally {
       setLoading(false);
     }
@@ -97,11 +112,15 @@ export const ClientUsersPage: React.FC = () => {
     fetchData();
   }, [selectedCustomerFilter]);
 
-  const handleOpenCreateModal = () => {
+  const handleOpenCreateModal = async () => {
+    let currentCustomers = customers;
+    if (!currentCustomers || currentCustomers.length === 0) {
+      currentCustomers = await fetchCustomersList();
+    }
     setFormEmail('');
     setFormFullName('');
     setFormPhone('');
-    setFormCustomerId(customers.length === 1 ? customers[0].id : '');
+    setFormCustomerId(currentCustomers.length > 0 ? currentCustomers[0].id : '');
     setFormInitialPassword('');
     setFormSendInvite(true);
     setFormAllowedEntityIds([]);
