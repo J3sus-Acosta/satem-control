@@ -837,3 +837,33 @@ img, svg, video {
     padding: 14px;
   }
 }
+
+/* ==========================================================================
+   Portal Signatures Responsive Layout
+   ========================================================================== */
+.portal-sign-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.portal-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 880px) {
+  .portal-sign-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .portal-doc-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+  }
+}
+

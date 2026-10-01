@@ -118,7 +118,18 @@ export async function ensureCompanySignature(): Promise<void> {
       }
     }
 
-    console.log('[BOOTSTRAP] ✅ Firma oficial de SATEM verificada y aplicada en todas las plantillas.');
+    // 3. Regenerar automáticamente en disco todos los documentos existentes no firmados
+    try {
+      const { regenerateAllUnsignedDocumentPdfs } = await import('../../modules/document-instances/document-instances.controller.js');
+      const regenResult = await regenerateAllUnsignedDocumentPdfs('[BOOTSTRAP]');
+      if (regenResult.total > 0) {
+        console.log(`[BOOTSTRAP] 📑 Documentos existentes procesados: ${regenResult.regenerated} regenerados con firma oficial, ${regenResult.skipped} omitidos, ${regenResult.errors} errores.`);
+      }
+    } catch (regenErr) {
+      console.error('[BOOTSTRAP] ⚠️ Aviso al regenerar PDFs de instancias:', regenErr);
+    }
+
+    console.log('[BOOTSTRAP] ✅ Firma oficial de SATEM verificada y aplicada en todas las plantillas y documentos.');
   } catch (error) {
     console.error('[BOOTSTRAP] ⚠️ Advertencia al sincronizar firma corporativa de SATEM:', error);
   }

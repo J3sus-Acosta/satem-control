@@ -6,6 +6,7 @@ import {
   uploadSignedDocumentHandler,
   downloadGeneratedPdfHandler,
   downloadSignedPdfHandler,
+  regenerateAllDocumentsHandler,
 } from './document-instances.controller.js';
 import { authenticateGuard, roleGuard } from '../../common/middleware/auth-guard.js';
 
@@ -14,6 +15,7 @@ export async function documentInstancesRoutes(fastify: FastifyInstance) {
 
   fastify.get('/', listDocumentInstancesHandler);
   fastify.post('/generate', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS, UserRole.ACCOUNTING])] }, generateDocumentInstanceHandler);
+  fastify.post('/regenerate-all', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS])] }, regenerateAllDocumentsHandler);
   fastify.get('/:id/pdf', (req: any, reply: any) => downloadGeneratedPdfHandler(req, reply));
   fastify.get('/:id/download-pdf', (req: any, reply: any) => downloadGeneratedPdfHandler(req, reply));
   fastify.get('/:id/signed-pdf', (req: any, reply: any) => downloadSignedPdfHandler(req, reply));

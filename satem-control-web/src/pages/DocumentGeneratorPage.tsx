@@ -48,8 +48,24 @@ export const DocumentGeneratorPage: React.FC = () => {
   // Estado UI
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [generatedResult, setGeneratedResult] = useState<{ id: string; documentNumber: string; expedient?: any } | null>(null);
   const [previewHtml, setPreviewHtml] = useState('');
+
+  const handleRegenerateAll = async () => {
+    if (!window.confirm('¿Desea regenerar todos los documentos PDF existentes que aún no han sido firmados por clientes para estampar la firma oficial institucional de SATEM?')) {
+      return;
+    }
+    setRegenerating(true);
+    try {
+      const res = await api.post('/document-instances/regenerate-all');
+      alert(res.data.message || 'Documentos regenerados exitosamente.');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error al regenerar documentos.');
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   // Títulos automáticos por categoría de plantilla
   const getBilingualTitle = (category: string, tplName: string) => {
@@ -361,16 +377,30 @@ export const DocumentGeneratorPage: React.FC = () => {
           </p>
         </div>
 
-        {generatedResult && (
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button onClick={() => handleDownloadPdf(generatedResult.id, generatedResult.documentNumber)} className="btn btn-primary">
-              <Download size={16} /> Descargar {generatedResult.documentNumber} (PDF)
-            </button>
-            <button onClick={() => navigate('/expedients')} className="btn btn-secondary">
-              <FolderKanban size={16} /> Ver en Expedientes
-            </button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={handleRegenerateAll}
+            disabled={regenerating}
+            className="btn btn-secondary"
+            style={{ fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            title="Aplica y regenera la firma oficial de SATEM en todos los documentos PDF existentes no firmados"
+          >
+            <RefreshCw size={15} className={regenerating ? 'spin' : ''} />
+            {regenerating ? 'Regenerando PDFs...' : 'Regenerar Firma SATEM en Documentos'}
+          </button>
+
+          {generatedResult && (
+            <>
+              <button onClick={() => handleDownloadPdf(generatedResult.id, generatedResult.documentNumber)} className="btn btn-primary">
+                <Download size={16} /> Descargar {generatedResult.documentNumber} (PDF)
+              </button>
+              <button onClick={() => navigate('/expedients')} className="btn btn-secondary">
+                <FolderKanban size={16} /> Ver en Expedientes
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Grid Principal: Formulario a la izquierda y Previsualización a la derecha */}

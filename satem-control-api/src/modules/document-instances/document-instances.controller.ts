@@ -599,3 +599,169 @@ export async function downloadSignedPdfHandler(
   reply.header('Content-Disposition', `inline; filename="${instance.documentNumber}-FIRMADO.pdf"`);
   return reply.send(fs.createReadStream(physicalPath));
 }
+
+/**
+ * Regenera todos los documentos PDF existentes que aún no han sido firmados por el cliente
+ * para estampar la firma oficial institucional de SATEM.
+ */
+export async function regenerateAllUnsignedDocumentPdfs(logPrefix = '[REGENERATE]'): Promise<{ total: number; regenerated: number; skipped: number; errors: number }> {
+  const company: any = (await prisma.companyConfig.findUnique({ where: { id: 'DEFAULT' } })) || {};
+  const effectiveSatemSig = company.signatureUrl || SATEM_SIGNATURE_BASE64;
+
+  const instances = await prisma.documentInstance.findMany({
+    where: {
+      signedPdfPath: null, // Solo los que no han sido firmados por el cliente todavía
+    },
+    include: {
+      template: {
+        include: {
+          versions: { orderBy: { versionNumber: 'desc' } },
+        },
+      },
+      customer: { include: { country: true } },
+      contract: true,
+      expedient: true,
+    },
+    orderBy: { generatedAt: 'asc' },
+  });
+
+  if (instances.length === 0) {
+    return { total: 0, regenerated: 0, skipped: 0, errors: 0 };
+  }
+
+  let browser: any = null;
+  let regenerated = 0;
+  let errors = 0;
+  let skipped = 0;
+
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+
+    const page = await browser.newPage();
+
+    for (const doc of instances) {
+      try {
+        if (!doc.template || !doc.template.versions.length) {
+          skipped++;
+          continue;
+        }
+
+        const targetVersion =
+          doc.template.versions.find((v) => v.id === doc.templateVersionId) ||
+          doc.template.versions.find((v) => (v as any).isPublished) ||
+          doc.template.versions[0];
+
+        if (!targetVersion || !targetVersion.htmlTemplate) {
+          skipped++;
+          continue;
+        }
+
+        const existingSnapshot = (doc.dataSnapshot as any) || {};
+        const variables: Record<string, any> = {
+          ...existingSnapshot,
+          empresa: {
+            ...existingSnapshot.empresa,
+            nombre: company.legalName || existingSnapshot.empresa?.nombre || 'SATEM Soluciones Inteligentes SpA',
+            rut: company.taxId || existingSnapshot.empresa?.rut || '77.654.321-K',
+            signatureUrl: effectiveSatemSig,
+            logoFull: company.logoFullUrl || existingSnapshot.empresa?.logoFull || '',
+            logoShort: company.logoShortUrl || existingSnapshot.empresa?.logoShort || '',
+            firma: `<img src="${effectiveSatemSig}" class="sig-img" alt="Firma SATEM" style="max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px;" />`,
+          },
+        };
+
+        let rawCompiledHtml = compileTemplate(targetVersion.htmlTemplate, variables);
+
+        if (!rawCompiledHtml.includes('alt="Firma SATEM"') && !rawCompiledHtml.includes('class="sig-img"')) {
+          const sigImgTag = `<img src="${effectiveSatemSig}" class="sig-img" alt="Firma SATEM" />`;
+          rawCompiledHtml = rawCompiledHtml.replace(
+            /(<strong>(?:POR \/ FOR|POR|EMITIDO POR|AUTORIZADO POR|PRESENTADO POR): (?:\{\{empresa\.nombre\}\}|SATEM Soluciones Inteligentes SpA)<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
+            `$1${sigImgTag}$2`
+          );
+        }
+
+        const sanitizedHtml = rawCompiledHtml
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/src=["']?(file|ftp|gopher):/gi, 'src="about:blank"')
+          .replace(/href=["']?(file|ftp|gopher):/gi, 'href="#"');
+
+        await page.setContent(sanitizedHtml, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: {
+            top: '18mm',
+            bottom: '18mm',
+            left: '16mm',
+            right: '16mm',
+          },
+          preferCSSPageSize: true,
+        });
+
+        const generatedPdfHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
+
+        // Determinar ruta física
+        let finalPath = resolveStoragePath(doc.generatedPdfPath);
+        if (!finalPath) {
+          const year = doc.generatedAt ? new Date(doc.generatedAt).getFullYear() : new Date().getFullYear();
+          const expFolder = doc.expedient?.code ? doc.expedient.code : 'GENERAL';
+          const categoryFolderMap: Record<string, string> = {
+            CONTRACT: '01-Contrato',
+            QUOTATION: '02-Cotizaciones',
+            WORK_ORDER: '04-Ordenes-de-Trabajo',
+            ATTENTION_REPORT: '05-Atenciones-Tecnicas',
+            SERVICE_REPORT: '05-Atenciones-Tecnicas',
+            RECEPTION_CONFORMITY: '06-Recepciones-Conformes',
+            COMMERCIAL_PROPOSAL: '03-Expediente-General',
+          };
+          const folderName = categoryFolderMap[doc.category] || '12-Otros';
+          const targetDir = path.join(env.STORAGE_PATH, String(year), expFolder, folderName);
+          fs.mkdirSync(targetDir, { recursive: true });
+          finalPath = path.join(targetDir, `${doc.documentNumber}.pdf`);
+        } else {
+          fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+        }
+
+        fs.writeFileSync(finalPath, pdfBuffer);
+
+        await prisma.documentInstance.update({
+          where: { id: doc.id },
+          data: {
+            generatedPdfPath: finalPath,
+            generatedPdfHash,
+            generatedHtml: sanitizedHtml,
+            dataSnapshot: JSON.parse(JSON.stringify(variables)),
+          },
+        });
+
+        regenerated++;
+        console.log(`${logPrefix} ✓ Regenerado con firma SATEM: ${doc.documentNumber} (${finalPath})`);
+      } catch (docErr: any) {
+        errors++;
+        console.error(`${logPrefix} ❌ Error al regenerar ${doc.documentNumber}:`, docErr.message);
+      }
+    }
+  } catch (err: any) {
+    console.error(`${logPrefix} Error fatal en Puppeteer:`, err.message);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+
+  return { total: instances.length, regenerated, skipped, errors };
+}
+
+export async function regenerateAllDocumentsHandler(request: FastifyRequest, reply: FastifyReply) {
+  const result = await regenerateAllUnsignedDocumentPdfs('[API-REGENERATE]');
+  return reply.send({
+    success: true,
+    message: `Regeneración completada: ${result.regenerated} documento(s) actualizados con la firma oficial de SATEM.`,
+    data: result,
+  });
+}
+

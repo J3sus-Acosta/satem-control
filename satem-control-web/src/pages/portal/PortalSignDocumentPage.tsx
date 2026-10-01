@@ -152,52 +152,54 @@ export const PortalSignDocumentPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 340px) 1fr', gap: '20px', alignItems: 'start' }}>
+        <div className="portal-sign-layout">
           {/* Document list selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', color: 'var(--text-secondary)' }}>
               Documentos por Firmar ({documents.length})
             </h3>
 
-            {documents.map((doc) => {
-              const isSelected = selectedDoc?.id === doc.id;
-              return (
-                <div
-                  key={doc.id}
-                  className="card"
-                  onClick={() => setSelectedDoc(doc)}
-                  style={{
-                    cursor: 'pointer',
-                    padding: '14px',
-                    border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                    backgroundColor: isSelected ? 'var(--bg-card-hover)' : 'var(--bg-surface)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                      {doc.documentNumber}
-                    </span>
-                    <span className="badge badge-warning" style={{ fontSize: '10px' }}>Pendiente</span>
-                  </div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    {doc.template?.name}
-                  </div>
-                  {doc.expedient && (
-                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <FolderKanban size={12} /> {doc.expedient.code}
+            <div className="portal-doc-list">
+              {documents.map((doc) => {
+                const isSelected = selectedDoc?.id === doc.id;
+                return (
+                  <div
+                    key={doc.id}
+                    className="card"
+                    onClick={() => setSelectedDoc(doc)}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '14px',
+                      border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                      backgroundColor: isSelected ? 'var(--bg-card-hover)' : 'var(--bg-surface)',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                        {doc.documentNumber}
+                      </span>
+                      <span className="badge badge-warning" style={{ fontSize: '10px' }}>Pendiente</span>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      {doc.template?.name}
+                    </div>
+                    {doc.expedient && (
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <FolderKanban size={12} /> {doc.expedient.code}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Signing workspace */}
           {selectedDoc ? (
-            <div className="card" style={{ padding: '24px' }}>
+            <div className="card" style={{ padding: 'clamp(14px, 3vw, 24px)', width: '100%', boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-                <div>
+                <div style={{ flex: '1 1 200px' }}>
                   <h3 style={{ margin: '0 0 6px 0', fontSize: '18px', color: 'var(--text-primary)' }}>
                     {selectedDoc.template?.name}
                   </h3>
@@ -217,7 +219,7 @@ export const PortalSignDocumentPage: React.FC = () => {
               </div>
 
               {/* Signature Canvas Box */}
-              <div style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+              <div style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 'clamp(12px, 2.5vw, 20px)', width: '100%', boxSizing: 'border-box' }}>
                 <SignaturePad
                   onSave={handleSaveSignature}
                   isSaving={signing}
@@ -228,7 +230,7 @@ export const PortalSignDocumentPage: React.FC = () => {
             </div>
           ) : (
             <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              Seleccione un documento del listado izquierdo para firmarlo.
+              Seleccione un documento del listado para firmarlo.
             </div>
           )}
         </div>
