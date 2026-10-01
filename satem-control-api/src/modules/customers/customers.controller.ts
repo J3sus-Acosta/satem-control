@@ -17,6 +17,7 @@ const createCustomerSchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   defaultCurrency: z.string().default('USD'),
   notes: z.string().optional(),
+  branchName: z.string().optional(),
 });
 
 const createEntitySchema = z.object({
@@ -104,6 +105,18 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
       include: { country: true },
     });
 
+    // Crear sucursal inicial si fue especificada o por defecto
+    const initialBranchName = (body.branchName && body.branchName.trim()) || 'Casa Matriz';
+    await tx.customerEntity.create({
+      data: {
+        customerId: customer.id,
+        name: initialBranchName,
+        taxId: body.taxId || null,
+        address: body.address || null,
+        isPrimary: true,
+      },
+    });
+
     await createAuditLog(tx, {
       userId,
       action: 'CREATE_CUSTOMER',
@@ -139,6 +152,14 @@ export async function addEntityHandler(request: FastifyRequest<{ Params: { id: s
   });
 
   return reply.status(201).send({ success: true, data: entity });
+}
+
+export async function deleteEntityHandler(request: FastifyRequest<{ Params: { id: string; entityId: string } }>, reply: FastifyReply) {
+  const { id, entityId } = request.params;
+  await prisma.customerEntity.deleteMany({
+    where: { id: entityId, customerId: id },
+  });
+  return reply.send({ success: true, message: 'Sucursal eliminada' });
 }
 
 export async function addContactHandler(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {

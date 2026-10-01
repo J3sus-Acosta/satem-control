@@ -6,6 +6,7 @@ import {
   createCustomerHandler,
   updateCustomerHandler,
   addEntityHandler,
+  deleteEntityHandler,
   addContactHandler,
 } from './customers.controller.js';
 import { authenticateGuard, roleGuard } from '../../common/middleware/auth-guard.js';
@@ -18,5 +19,6 @@ export async function customersRoutes(fastify: FastifyInstance) {
   fastify.post('/', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS, UserRole.ACCOUNTING])] }, createCustomerHandler);
   fastify.put('/:id', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS, UserRole.ACCOUNTING])] }, (req: any, reply: any) => updateCustomerHandler(req, reply));
   fastify.post('/:id/entities', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS, UserRole.ACCOUNTING])] }, (req: any, reply: any) => addEntityHandler(req, reply));
+  fastify.delete('/:id/entities/:entityId', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS, UserRole.ACCOUNTING])] }, (req: any, reply: any) => deleteEntityHandler(req, reply));
   fastify.post('/:id/contacts', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.OPERATIONS, UserRole.ACCOUNTING])] }, (req: any, reply: any) => addContactHandler(req, reply));
 }

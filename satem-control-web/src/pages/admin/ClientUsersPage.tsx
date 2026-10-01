@@ -25,7 +25,10 @@ interface CustomerOption {
   id: string;
   legalName: string;
   taxId: string;
-  entities?: Array<{ id: string; name: string }>;
+  email?: string;
+  phone?: string;
+  entities?: Array<{ id: string; name: string; taxId?: string; address?: string; isPrimary?: boolean }>;
+  contacts?: Array<{ id: string; name: string; email: string; phone?: string; isPrimary?: boolean }>;
 }
 
 interface ClientUserItem {
@@ -112,15 +115,27 @@ export const ClientUsersPage: React.FC = () => {
     fetchData();
   }, [selectedCustomerFilter]);
 
+  const handleSelectCustomer = (customerId: string) => {
+    setFormCustomerId(customerId);
+    setFormAllowedEntityIds([]);
+    const targetCust = customers.find((c) => c.id === customerId);
+    if (targetCust) {
+      setFormEmail(targetCust.email || targetCust.contacts?.[0]?.email || '');
+      setFormPhone(targetCust.phone || targetCust.contacts?.[0]?.phone || '');
+      setFormFullName(targetCust.contacts?.[0]?.name || targetCust.legalName || '');
+    }
+  };
+
   const handleOpenCreateModal = async () => {
     let currentCustomers = customers;
     if (!currentCustomers || currentCustomers.length === 0) {
       currentCustomers = await fetchCustomersList();
     }
-    setFormEmail('');
-    setFormFullName('');
-    setFormPhone('');
-    setFormCustomerId(currentCustomers.length > 0 ? currentCustomers[0].id : '');
+    const initialCust = currentCustomers.length > 0 ? currentCustomers[0] : null;
+    setFormCustomerId(initialCust ? initialCust.id : '');
+    setFormEmail(initialCust ? (initialCust.email || initialCust.contacts?.[0]?.email || '') : '');
+    setFormPhone(initialCust ? (initialCust.phone || initialCust.contacts?.[0]?.phone || '') : '');
+    setFormFullName(initialCust ? (initialCust.contacts?.[0]?.name || initialCust.legalName || '') : '');
     setFormInitialPassword('');
     setFormSendInvite(true);
     setFormAllowedEntityIds([]);
@@ -460,27 +475,24 @@ export const ClientUsersPage: React.FC = () => {
                   <select
                     required
                     value={formCustomerId}
-                    onChange={(e) => {
-                      setFormCustomerId(e.target.value);
-                      setFormAllowedEntityIds([]);
-                    }}
+                    onChange={(e) => handleSelectCustomer(e.target.value)}
                     style={{ width: '100%' }}
                   >
                     <option value="">-- Seleccione un Cliente Registrado ({customers.length} disponibles) --</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.legalName} (RUT: {c.taxId})
+                        {c.legalName} (Tax ID: {c.taxId})
                       </option>
                     ))}
                   </select>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                    * Debe asociar el usuario a uno de los clientes registrados previamente en el sistema.
+                    * Al seleccionar la empresa, se precargarán automáticamente su correo, teléfono y nombre registrados.
                   </span>
                 </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Correo Electrónico *
+                  Correo Electrónico de Acceso al Portal *
                 </label>
                 <input
                   type="email"
@@ -490,11 +502,14 @@ export const ClientUsersPage: React.FC = () => {
                   placeholder="cliente@empresa.com"
                   style={{ width: '100%' }}
                 />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+                  Puedes modificarlo si el usuario usará un correo distinto; no alterará la ficha del cliente.
+                </span>
               </div>
 
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Nombre Completo *
+                  Nombre Completo del Usuario *
                 </label>
                 <input
                   type="text"
@@ -533,12 +548,12 @@ export const ClientUsersPage: React.FC = () => {
               </div>
 
               {/* Entity Access checkboxes */}
-              {selectedCustomerObj?.entities && selectedCustomerObj.entities.length > 0 && (
+              {selectedCustomerObj?.entities && selectedCustomerObj.entities.length > 0 ? (
                 <div>
                   <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    Restricción de Entidades / Sucursales
+                    Restricción de Sucursales / Filiales ({selectedCustomerObj.entities.length} registradas)
                   </label>
-                  <div style={{ backgroundColor: 'var(--bg-input)', padding: '10px', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '120px', overflowY: 'auto' }}>
+                  <div style={{ backgroundColor: 'var(--bg-input)', padding: '10px', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '130px', overflowY: 'auto', border: '1px solid var(--border-color)' }}>
                     {selectedCustomerObj.entities.map((ent) => (
                       <label key={ent.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', cursor: 'pointer' }}>
                         <input
@@ -552,13 +567,18 @@ export const ClientUsersPage: React.FC = () => {
                             }
                           }}
                         />
-                        <span>{ent.name}</span>
+                        <span style={{ fontWeight: 500 }}>{ent.name}</span>
+                        {ent.isPrimary && <span className="badge badge-success" style={{ fontSize: '9.5px', marginLeft: '4px' }}>Casa Matriz</span>}
                       </label>
                     ))}
                   </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    * Si no selecciona ninguna entidad, el usuario tendrá acceso a todos los expedientes de la empresa.
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    * Si no seleccionas ninguna sucursal específica, el usuario tendrá acceso a todos los expedientes y contratos de la empresa.
                   </span>
+                </div>
+              ) : (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '8px 12px', backgroundColor: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                  ℹ️ Esta empresa opera con su sede principal; el usuario accederá a todos los expedientes de la empresa.
                 </div>
               )}
 

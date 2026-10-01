@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   Building2, Plus, FileSignature, ArrowRight, ExternalLink, Edit2, MapPin,
-  Phone, Mail, Users, GitCommit, ChevronDown, ChevronUp
+  Phone, Mail, Users, GitCommit, ChevronDown, ChevronUp, Trash2
 } from 'lucide-react';
 
 export const CustomersPage: React.FC = () => {
@@ -32,6 +32,7 @@ export const CustomersPage: React.FC = () => {
   const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [branchName, setBranchName] = useState('Casa Matriz');
 
   // Form Entidad / Sucursal
   const [entityName, setEntityName] = useState('');
@@ -81,6 +82,7 @@ export const CustomersPage: React.FC = () => {
     setCity('');
     setPhone('');
     setEmail('');
+    setBranchName('Casa Matriz');
     setShowCustomerModal(true);
   };
 
@@ -93,6 +95,7 @@ export const CustomersPage: React.FC = () => {
     setCity(c.city || '');
     setPhone(c.phone || '');
     setEmail(c.email || '');
+    setBranchName('');
     setShowCustomerModal(true);
   };
 
@@ -118,6 +121,7 @@ export const CustomersPage: React.FC = () => {
           city,
           phone,
           email,
+          branchName: branchName || 'Casa Matriz',
         });
         if (res.data.warning) {
           alert(`Advertencia: ${res.data.warning}`);
@@ -133,10 +137,11 @@ export const CustomersPage: React.FC = () => {
 
   const handleAddEntity = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showEntityModal) return;
+    const custId = showEntityModal || editingCustomer?.id;
+    if (!custId || !entityName.trim()) return;
     try {
-      await api.post(`/customers/${showEntityModal}/entities`, {
-        name: entityName,
+      await api.post(`/customers/${custId}/entities`, {
+        name: entityName.trim(),
         taxId: entityTaxId || undefined,
         address: entityAddress || undefined,
         isPrimary: entityIsPrimary,
@@ -146,9 +151,27 @@ export const CustomersPage: React.FC = () => {
       setEntityTaxId('');
       setEntityAddress('');
       setEntityIsPrimary(false);
+      if (editingCustomer && editingCustomer.id === custId) {
+        const updatedCust = await api.get(`/customers/${custId}`);
+        setEditingCustomer(updatedCust.data.data);
+      }
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Error al agregar entidad/sucursal');
+    }
+  };
+
+  const handleDeleteEntity = async (customerId: string, entityId: string, name: string) => {
+    if (!confirm(`¿Estás seguro de eliminar la sucursal "${name}"?`)) return;
+    try {
+      await api.delete(`/customers/${customerId}/entities/${entityId}`);
+      if (editingCustomer && editingCustomer.id === customerId) {
+        const updatedCust = await api.get(`/customers/${customerId}`);
+        setEditingCustomer(updatedCust.data.data);
+      }
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error?.message || 'Error al eliminar sucursal');
     }
   };
 
@@ -569,6 +592,72 @@ export const CustomersPage: React.FC = () => {
                   <input type="text" className="form-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 305 123 4567" />
                 </div>
               </div>
+
+              {!editingCustomer && (
+                <div className="form-group" style={{ backgroundColor: 'rgba(0, 168, 150, 0.08)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--accent-primary)' }}>
+                  <label className="form-label" style={{ color: 'var(--accent-primary)' }}>Sucursal Inicial / Casa Matriz *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={branchName}
+                    onChange={(e) => setBranchName(e.target.value)}
+                    placeholder="Ej: Casa Matriz"
+                    required
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                    * Se registrará automáticamente como la sucursal/entidad principal del cliente.
+                  </span>
+                </div>
+              )}
+
+              {editingCustomer && (
+                <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ fontSize: '14px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Building2 size={16} color="var(--accent-primary)" /> Sucursales / Filiales Registradas ({editingCustomer.entities?.length || 0})
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowEntityModal(editingCustomer.id)}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '11px', padding: '4px 10px' }}
+                    >
+                      <Plus size={13} /> + Agregar Sucursal
+                    </button>
+                  </div>
+                  {(!editingCustomer.entities || editingCustomer.entities.length === 0) ? (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', textAlign: 'center' }}>
+                      Sin sucursales registradas. Haz clic en "+ Agregar Sucursal".
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+                      {editingCustomer.entities.map((ent: any) => (
+                        <div key={ent.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {ent.name}
+                              {ent.isPrimary && <span className="badge badge-success" style={{ fontSize: '9.5px' }}>Casa Matriz</span>}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {ent.address || 'Sin dirección específica'} {ent.taxId ? `• Tax ID: ${ent.taxId}` : ''}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEntity(editingCustomer.id, ent.id, ent.name)}
+                            className="btn-icon"
+                            style={{ color: '#f87171', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+                            title="Eliminar sucursal"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px', flexWrap: 'wrap' }}>
                 <button type="button" onClick={() => { setShowCustomerModal(false); setEditingCustomer(null); }} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary">{editingCustomer ? 'Guardar Cambios' : 'Crear Cliente'}</button>
