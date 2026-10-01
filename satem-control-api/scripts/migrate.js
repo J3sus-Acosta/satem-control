@@ -16,7 +16,26 @@ async function runSafeMigrations() {
       console.log(`[MIGRATION] 🧹 Se limpiaron ${cleaned} registro(s) de migraciones fallidas previas.`);
     }
 
-    // 2. Si la columna assignedUserId quedó creada de un intento anterior fallido,
+    // 2. Auto-reparación preventiva de columnas en payments
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`payments\` ADD COLUMN \`usdEquivalent\` DECIMAL(14, 2) NULL;
+      `);
+      console.log('[MIGRATION] ➕ Columna usdEquivalent agregada a payments.');
+    } catch {
+      // Ignorar si ya existe
+    }
+
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`payments\` ADD COLUMN \`exchangeRate\` DECIMAL(12, 4) NULL;
+      `);
+      console.log('[MIGRATION] ➕ Columna exchangeRate agregada a payments.');
+    } catch {
+      // Ignorar si ya existe
+    }
+
+    // 3. Si la columna assignedUserId quedó creada de un intento anterior fallido,
     // se remueve para permitir que la migración se aplique de forma limpia y consistente.
     try {
       await prisma.$executeRawUnsafe(`
