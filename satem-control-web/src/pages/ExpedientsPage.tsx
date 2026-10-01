@@ -654,7 +654,10 @@ export const ExpedientsPage: React.FC = () => {
               {(() => {
                 const totalExternalDocs = new Set([
                   ...(selectedExpedient.documentLinks || []).map((l: any) => l.document?.id || l.documentId),
+                  ...(selectedExpedient.integrityItems || []).map((i: any) => i.document?.id || i.documentId),
                   ...(selectedExpedient.invoices || []).map((i: any) => i.pdfDocumentId || i.pdfDocument?.id),
+                  ...(selectedExpedient.invoices || []).flatMap((i: any) => (i.paymentRequests || []).flatMap((pr: any) => (pr.payments || []).map((p: any) => p.proofDocumentId || p.proofDocument?.id))),
+                  ...(selectedExpedient.payments || []).map((p: any) => p.proofDocumentId || p.proofDocument?.id),
                 ].filter(Boolean)).size;
 
                 return [
@@ -975,7 +978,14 @@ export const ExpedientsPage: React.FC = () => {
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {(() => {
                                 const contractDoc = (selectedExpedient.documentInstances || []).find(
-                                  (d: any) => d.category === 'CONTRACT' || d.template?.category === 'CONTRACT'
+                                  (d: any) =>
+                                    d.category === 'CONTRACT' ||
+                                    d.category === 'SOW' ||
+                                    d.template?.category === 'CONTRACT' ||
+                                    d.template?.code?.toUpperCase().includes('SOW') ||
+                                    d.documentNumber?.startsWith('SOW') ||
+                                    d.documentNumber?.startsWith('CON') ||
+                                    (selectedExpedient.contractId && d.contractId === selectedExpedient.contractId)
                                 );
                                 const contractAttachedDocId = (selectedExpedient.documentLinks || []).find(
                                   (l: any) => l.document?.category === 'CONTRACT' || l.document?.category === 'SOW'
@@ -1004,10 +1014,10 @@ export const ExpedientsPage: React.FC = () => {
                                         {!isViewer && (
                                           <button
                                             onClick={() => setUploadingDocId(contractDoc.id)}
-                                            className="btn btn-secondary"
+                                            className={`btn ${contractDoc.status === 'SIGNED' ? 'btn-secondary' : 'btn-primary'}`}
                                             style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                           >
-                                            <Upload size={13} /> {contractDoc.status === 'SIGNED' ? 'Reemplazar Firmado' : 'Subir SOW Firmado'}
+                                            <Upload size={13} /> {contractDoc.status === 'SIGNED' ? 'Reemplazar Firmado' : '+ Subir SOW Firmado'}
                                           </button>
                                         )}
                                       </>
@@ -1041,7 +1051,11 @@ export const ExpedientsPage: React.FC = () => {
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {(() => {
                                 const woDoc = (selectedExpedient.documentInstances || []).find(
-                                  (d: any) => d.category === 'WORK_ORDER' || d.template?.category === 'WORK_ORDER'
+                                  (d: any) =>
+                                    d.category === 'WORK_ORDER' ||
+                                    d.template?.category === 'WORK_ORDER' ||
+                                    d.documentNumber?.startsWith('OT') ||
+                                    (selectedExpedient.workOrders && selectedExpedient.workOrders.some((w: any) => w.id === d.workOrderId))
                                 );
                                 return (
                                   <>
@@ -1066,10 +1080,10 @@ export const ExpedientsPage: React.FC = () => {
                                         {!isViewer && (
                                           <button
                                             onClick={() => setUploadingDocId(woDoc.id)}
-                                            className="btn btn-secondary"
+                                            className={`btn ${woDoc.status === 'SIGNED' ? 'btn-secondary' : 'btn-primary'}`}
                                             style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                           >
-                                            <Upload size={13} /> {woDoc.status === 'SIGNED' ? 'Reemplazar Firmada' : 'Subir OT Firmada'}
+                                            <Upload size={13} /> {woDoc.status === 'SIGNED' ? 'Reemplazar Firmada' : '+ Subir OT Firmada'}
                                           </button>
                                         )}
                                       </>
@@ -1095,7 +1109,11 @@ export const ExpedientsPage: React.FC = () => {
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                               {(() => {
                                 const rcDoc = (selectedExpedient.documentInstances || []).find(
-                                  (d: any) => d.category === 'RECEPTION_CONFORMITY' || d.template?.category === 'RECEPTION_CONFORMITY'
+                                  (d: any) =>
+                                    d.category === 'RECEPTION_CONFORMITY' ||
+                                    d.template?.category === 'RECEPTION_CONFORMITY' ||
+                                    d.documentNumber?.startsWith('RC') ||
+                                    d.documentNumber?.startsWith('REC')
                                 );
                                 return (
                                   <>
@@ -1120,10 +1138,10 @@ export const ExpedientsPage: React.FC = () => {
                                         {!isViewer && (
                                           <button
                                             onClick={() => setUploadingDocId(rcDoc.id)}
-                                            className="btn btn-secondary"
+                                            className={`btn ${rcDoc.status === 'SIGNED' ? 'btn-secondary' : 'btn-primary'}`}
                                             style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                           >
-                                            <Upload size={13} /> {rcDoc.status === 'SIGNED' ? 'Reemplazar Firmada' : 'Subir Acta Firmada'}
+                                            <Upload size={13} /> {rcDoc.status === 'SIGNED' ? 'Reemplazar Firmada' : '+ Subir Recepción Firmada'}
                                           </button>
                                         )}
                                       </>
@@ -1461,13 +1479,50 @@ export const ExpedientsPage: React.FC = () => {
                     }
                   });
 
-                  // b) Documentos desde Facturas SII
+                  // b) Documentos desde integridad (ej: comprobante de pago o factura asociada al checklist)
+                  (selectedExpedient.integrityItems || []).forEach((item: any) => {
+                    if (item.document?.id && !externalDocsMap.has(item.document.id)) {
+                      externalDocsMap.set(item.document.id, {
+                        ...item.document,
+                        category: item.document.category || (item.code === 'PAYMENT_PROOF_PRESENT' ? 'PAYMENT_PROOF' : 'EVIDENCE'),
+                      });
+                    }
+                  });
+
+                  // c) Documentos desde Facturas SII
                   (selectedExpedient.invoices || []).forEach((inv: any) => {
                     if (inv.pdfDocument?.id && !externalDocsMap.has(inv.pdfDocument.id)) {
                       externalDocsMap.set(inv.pdfDocument.id, {
                         ...inv.pdfDocument,
                         category: inv.pdfDocument.category || 'INVOICE',
                         originalName: inv.pdfDocument.originalName || `Factura_SII_Folio_${inv.siiFolio}.pdf`,
+                      });
+                    }
+                    if (inv.xmlDocument?.id && !externalDocsMap.has(inv.xmlDocument.id)) {
+                      externalDocsMap.set(inv.xmlDocument.id, {
+                        ...inv.xmlDocument,
+                        category: inv.xmlDocument.category || 'INVOICE',
+                      });
+                    }
+                    // Pagos vinculados a la factura
+                    (inv.paymentRequests || []).forEach((pr: any) => {
+                      (pr.payments || []).forEach((p: any) => {
+                        if (p.proofDocument?.id && !externalDocsMap.has(p.proofDocument.id)) {
+                          externalDocsMap.set(p.proofDocument.id, {
+                            ...p.proofDocument,
+                            category: p.proofDocument.category || 'PAYMENT_PROOF',
+                          });
+                        }
+                      });
+                    });
+                  });
+
+                  // d) Documentos directos de pagos si existieran
+                  (selectedExpedient.payments || []).forEach((p: any) => {
+                    if (p.proofDocument?.id && !externalDocsMap.has(p.proofDocument.id)) {
+                      externalDocsMap.set(p.proofDocument.id, {
+                        ...p.proofDocument,
+                        category: p.proofDocument.category || 'PAYMENT_PROOF',
                       });
                     }
                   });
@@ -1487,56 +1542,84 @@ export const ExpedientsPage: React.FC = () => {
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {externalDocs.map((doc: any) => (
-                            <div
-                              key={doc.id}
-                              style={{
-                                padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
-                                border: '1px solid var(--border-color)',
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                              }}
-                            >
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>{doc.originalName}</span>
-                                  <span className="badge badge-success">{doc.category}</span>
+                          {externalDocs.map((doc: any) => {
+                            const isPayment = doc.category === 'PAYMENT_PROOF' || doc.category === 'SUMUP_PROOF' || doc.category === 'BANK_RECEIPT';
+                            const isInvoice = doc.category === 'INVOICE';
+
+                            return (
+                              <div
+                                key={doc.id}
+                                style={{
+                                  padding: '14px 16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)',
+                                  border: '1px solid var(--border-color)',
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                  flexWrap: 'wrap', gap: '12px',
+                                }}
+                              >
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-primary)' }}>{doc.originalName}</span>
+                                    <span className={`badge ${isPayment ? 'badge-success' : isInvoice ? 'badge-info' : 'badge-secondary'}`}>
+                                      {doc.category}
+                                    </span>
+                                  </div>
+                                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {doc.createdAt ? new Date(doc.createdAt).toLocaleString('es-CL') : 'N/A'}
+                                  </div>
                                 </div>
-                                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                  SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {doc.createdAt ? new Date(doc.createdAt).toLocaleString('es-CL') : 'N/A'}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <button
-                                  onClick={() => handleViewAttachedDoc(doc.id, doc.originalName)}
-                                  className="btn btn-secondary"
-                                  style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                >
-                                  <FileText size={14} /> Ver Documento
-                                </button>
-                                {!isViewer && (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                   <button
-                                    onClick={() => handleDeleteAttachedDoc(doc.id, doc.originalName)}
-                                    className="btn btn-danger"
-                                    style={{
-                                      fontSize: '12px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                      color: '#f87171',
-                                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                                      padding: '6px 12px',
-                                      borderRadius: 'var(--radius-sm)',
-                                      cursor: 'pointer'
-                                    }}
-                                    title="Eliminar documento adjunto del expediente"
+                                    onClick={() => handleViewAttachedDoc(doc.id, doc.originalName)}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                                   >
-                                    <Trash2 size={14} /> Eliminar
+                                    <FileText size={14} /> Ver Documento
                                   </button>
-                                )}
+                                  {!isViewer && isPayment && (
+                                    <button
+                                      onClick={() => setShowPaymentModal(true)}
+                                      className="btn btn-secondary"
+                                      style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                      title="Reemplazar comprobante o informe de pago"
+                                    >
+                                      <Upload size={14} /> Reemplazar
+                                    </button>
+                                  )}
+                                  {!isViewer && isInvoice && (
+                                    <button
+                                      onClick={() => setShowInvoiceModal(true)}
+                                      className="btn btn-secondary"
+                                      style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                      title="Reemplazar Factura SII"
+                                    >
+                                      <Upload size={14} /> Reemplazar
+                                    </button>
+                                  )}
+                                  {!isViewer && (
+                                    <button
+                                      onClick={() => handleDeleteAttachedDoc(doc.id, doc.originalName)}
+                                      className="btn btn-danger"
+                                      style={{
+                                        fontSize: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                        color: '#f87171',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        padding: '6px 12px',
+                                        borderRadius: 'var(--radius-sm)',
+                                        cursor: 'pointer'
+                                      }}
+                                      title="Eliminar documento adjunto del expediente"
+                                    >
+                                      <Trash2 size={14} /> Eliminar
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

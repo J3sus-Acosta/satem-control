@@ -91,12 +91,40 @@ export async function listExpedientsHandler(request: FastifyRequest, reply: Fast
           request.log.warn({ err: e }, `Failed to load exceptions for expedient ${exp.id}`);
         }
 
+        let docInstances: any[] = [];
+        let docLinks: any[] = [];
+        try {
+          const orConditions: any[] = [{ expedientId: exp.id }];
+          if (exp.contractId) orConditions.push({ contractId: exp.contractId });
+          if (exp.quotationId) orConditions.push({ quotationId: exp.quotationId });
+          if (exp.customerId) orConditions.push({ customerId: exp.customerId });
+
+          docInstances = await prisma.documentInstance.findMany({
+            where: { OR: orConditions },
+            include: { template: true },
+            orderBy: { generatedAt: 'desc' },
+          });
+        } catch (e) {
+          request.log.warn({ err: e }, `Failed to load docInstances for expedient ${exp.id}`);
+        }
+
+        try {
+          docLinks = await prisma.documentLink.findMany({
+            where: { expedientId: exp.id },
+            include: { document: true },
+          });
+        } catch (e) {
+          request.log.warn({ err: e }, `Failed to load docLinks for expedient ${exp.id}`);
+        }
+
         return {
           ...exp,
           workOrders,
           invoices,
           integrityItems,
           exceptions,
+          documentInstances: docInstances,
+          documentLinks: docLinks,
         };
       })
     );
@@ -125,7 +153,22 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
         include: {
           pdfDocument: true,
           xmlDocument: true,
-          paymentRequests: { include: { payments: { include: { allocations: { include: { reconciliations: { include: { bankReceipt: true } } } } } } } },
+          paymentRequests: {
+            include: {
+              payments: {
+                include: {
+                  proofDocument: true,
+                  allocations: {
+                    include: {
+                      reconciliations: {
+                        include: { bankReceipt: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       integrityItems: { include: { document: true } },
@@ -433,7 +476,12 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
   let finalDocumentLinks = expedient.documentLinks || [];
   try {
     finalDocumentLinks = await prisma.documentLink.findMany({
-      where: { expedientId: expedient.id },
+      where: {
+        OR: [
+          { expedientId: expedient.id },
+          { entityType: 'EXPEDIENT', entityId: expedient.id },
+        ],
+      },
       include: {
         document: {
           include: {
