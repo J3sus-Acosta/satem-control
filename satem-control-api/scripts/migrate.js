@@ -16,23 +16,35 @@ async function runSafeMigrations() {
       console.log(`[MIGRATION] 🧹 Se limpiaron ${cleaned} registro(s) de migraciones fallidas previas.`);
     }
 
-    // 2. Auto-reparación preventiva de columnas en payments
+    // 2. Limpieza transitoria si la migración 20261001000000 falló a mitad de camino
     try {
       await prisma.$executeRawUnsafe(`
-        ALTER TABLE \`payments\` ADD COLUMN \`usdEquivalent\` DECIMAL(14, 2) NULL;
+        DELETE FROM _prisma_migrations 
+        WHERE migration_name LIKE '%20261001000000_add_payment_fields_and_portal%' AND rolled_back_at IS NOT NULL;
       `);
-      console.log('[MIGRATION] ➕ Columna usdEquivalent agregada a payments.');
     } catch {
-      // Ignorar si ya existe
+      // Ignorar si la tabla no existe
     }
 
     try {
-      await prisma.$executeRawUnsafe(`
-        ALTER TABLE \`payments\` ADD COLUMN \`exchangeRate\` DECIMAL(12, 4) NULL;
-      `);
-      console.log('[MIGRATION] ➕ Columna exchangeRate agregada a payments.');
+      await prisma.$executeRawUnsafe(`ALTER TABLE \`payments\` DROP COLUMN \`usdEquivalent\`;`);
     } catch {
-      // Ignorar si ya existe
+      // Ignorar si no existe
+    }
+
+    try {
+      await prisma.$executeRawUnsafe(`ALTER TABLE \`payments\` DROP COLUMN \`exchangeRate\`;`);
+    } catch {
+      // Ignorar si no existe
+    }
+
+    try {
+      await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS \`document_signatures\`;`);
+      await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS \`client_user_entity_access\`;`);
+      await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS \`client_user_sessions\`;`);
+      await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS \`client_users\`;`);
+    } catch {
+      // Ignorar si no existen
     }
 
     // 3. Si la columna assignedUserId quedó creada de un intento anterior fallido,
@@ -49,7 +61,6 @@ async function runSafeMigrations() {
       await prisma.$executeRawUnsafe(`
         ALTER TABLE \`system_exceptions\` DROP COLUMN \`assignedUserId\`;
       `);
-      console.log('[MIGRATION] 🔄 Columna transitoria assignedUserId reseteada para reaplicación limpia.');
     } catch {
       // Ignorar si la columna no existe aún
     }
@@ -59,7 +70,7 @@ async function runSafeMigrations() {
     await prisma.$disconnect();
   }
 
-  // 3. Ejecutar prisma migrate deploy
+  // 4. Ejecutar prisma migrate deploy
   console.log('[MIGRATION] Aplicando migraciones pendientes con Prisma...');
   try {
     execSync('npx prisma migrate deploy', { stdio: 'inherit' });
