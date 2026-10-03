@@ -981,16 +981,28 @@ export const ExpedientsPage: React.FC = () => {
                               {(() => {
                                 const contractDoc = (selectedExpedient.documentInstances || []).find(
                                   (d: any) =>
-                                    d.category === 'CONTRACT' ||
-                                    d.category === 'SOW' ||
-                                    d.template?.category === 'CONTRACT' ||
-                                    d.template?.code?.toUpperCase().includes('SOW') ||
-                                    d.documentNumber?.startsWith('SOW') ||
-                                    d.documentNumber?.startsWith('CON') ||
-                                    (selectedExpedient.contractId && d.contractId === selectedExpedient.contractId)
+                                    (d.category === 'CONTRACT' ||
+                                      d.category === 'SOW' ||
+                                      d.template?.category === 'CONTRACT' ||
+                                      d.template?.code?.toUpperCase().includes('SOW') ||
+                                      d.documentNumber?.startsWith('SOW') ||
+                                      d.documentNumber?.startsWith('CON')) &&
+                                    d.category !== 'RECEPTION_CONFORMITY' &&
+                                    d.category !== 'WORK_ORDER' &&
+                                    d.category !== 'QUOTATION' &&
+                                    d.category !== 'ATTENTION_REPORT' &&
+                                    d.category !== 'SERVICE_REPORT' &&
+                                    !d.documentNumber?.startsWith('RC') &&
+                                    !d.documentNumber?.startsWith('REC') &&
+                                    !d.documentNumber?.startsWith('OT') &&
+                                    !d.documentNumber?.startsWith('COT')
                                 );
                                 const contractAttachedDocId = (selectedExpedient.documentLinks || []).find(
-                                  (l: any) => l.document?.category === 'CONTRACT' || l.document?.category === 'SOW'
+                                  (l: any) =>
+                                    (l.document?.category === 'CONTRACT' || l.document?.category === 'SOW') &&
+                                    l.document?.category !== 'RECEPTION' &&
+                                    l.document?.category !== 'WORK_ORDER' &&
+                                    l.document?.category !== 'BANK_RECEIPT'
                                 )?.document?.id;
 
                                 return (

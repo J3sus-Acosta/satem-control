@@ -142,16 +142,16 @@ export async function clientSignDocumentHandler(
     if (instance.expedientId) {
       if (instance.category === 'CONTRACT') {
         await tx.expedientIntegrityItem.updateMany({
-          where: { expedientId: instance.expedientId, category: 'CONTRACT' },
+          where: { expedientId: instance.expedientId, code: 'CONTRACT_PRESENT' },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
-            observation: `Contrato firmado digitalmente por cliente (Hash: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Contrato SOW firmado digitalmente por cliente (Hash: ${signedPdfHash.slice(0, 16)}...)`,
           },
         });
       } else if (instance.category === 'WORK_ORDER') {
         await tx.expedientIntegrityItem.updateMany({
-          where: { expedientId: instance.expedientId, category: 'WORK_ORDER' },
+          where: { expedientId: instance.expedientId, code: 'WORK_ORDER_PRESENT' },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
@@ -160,7 +160,7 @@ export async function clientSignDocumentHandler(
         });
       } else if (instance.category === 'RECEPTION_CONFORMITY') {
         await tx.expedientIntegrityItem.updateMany({
-          where: { expedientId: instance.expedientId, category: 'RECEPTION_CONFORMITY' },
+          where: { expedientId: instance.expedientId, code: 'RECEPTION_SIGNED' },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),

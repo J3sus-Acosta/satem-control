@@ -308,21 +308,42 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
           }
         }
       } else if (item.code === 'CONTRACT_PRESENT') {
-        const sow = docInstances.find((d) => d.category === 'CONTRACT');
-        if (sow || expedient.contractId) {
-          const isSigned = sow?.status === 'SIGNED';
-          const docNum = sow?.documentNumber || expedient.contract?.code || 'SOW';
+        const sow = docInstances.find(
+          (d) =>
+            (d.category === 'CONTRACT' || d.template?.category === 'CONTRACT' || d.documentNumber?.startsWith('SOW') || d.documentNumber?.startsWith('CON')) &&
+            d.category !== 'RECEPTION_CONFORMITY' &&
+            d.category !== 'WORK_ORDER' &&
+            d.category !== 'QUOTATION' &&
+            !d.documentNumber?.startsWith('RC') &&
+            !d.documentNumber?.startsWith('REC') &&
+            !d.documentNumber?.startsWith('OT') &&
+            !d.documentNumber?.startsWith('COT')
+        );
+        const hasSignedDoc = (sow?.status === 'SIGNED' && !!sow?.signedPdfPath) || !!item.documentId;
+        if (hasSignedDoc) {
           if (item.status !== 'COMPLETED') {
             await prisma.expedientIntegrityItem.update({
               where: { id: item.id },
               data: {
                 status: 'COMPLETED',
-                observation: `Contrato SOW ${isSigned ? 'firmado por cliente cargado y verificado' : 'emitido'} (${docNum})`,
-                completedAt: new Date(),
+                observation: `Contrato SOW firmado por cliente cargado y verificado (${sow?.documentNumber || expedient.contract?.code || 'SOW'})`,
+                completedAt: sow?.signedAt || new Date(),
               },
             });
             needsIntegrityReload = true;
           }
+        } else if (item.status === 'COMPLETED' && !hasSignedDoc) {
+          await prisma.expedientIntegrityItem.update({
+            where: { id: item.id },
+            data: {
+              status: 'PENDING',
+              observation: sow
+                ? `Contrato SOW emitido (${sow.documentNumber}) — Pendiente de firma del cliente`
+                : (expedient.contract?.code ? `Contrato SOW registrado (${expedient.contract.code}) — Pendiente de firma del cliente` : 'Pendiente de emisión y firma de Contrato SOW'),
+              completedAt: null,
+            },
+          });
+          needsIntegrityReload = true;
         }
       } else if (item.code === 'RECEPTION_SIGNED') {
         const rc = docInstances.find((d) => d.category === 'RECEPTION_CONFORMITY' && d.status === 'SIGNED');

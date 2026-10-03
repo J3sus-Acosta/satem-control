@@ -343,10 +343,8 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
         await tx.expedientIntegrityItem.updateMany({
           where: { expedientId: expedient.id, code: 'CONTRACT_PRESENT' },
           data: {
-            status: 'COMPLETED',
-            observation: `Contrato emitido (${finalDocNumber})`,
-            completedAt: new Date(),
-            completedById: userId,
+            status: 'PENDING',
+            observation: `Contrato SOW emitido (${finalDocNumber}) — Pendiente de firma del cliente`,
           },
         });
       } else if (template.category === TemplateCategory.WORK_ORDER) {
