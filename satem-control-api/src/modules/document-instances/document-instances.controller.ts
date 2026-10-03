@@ -408,7 +408,7 @@ export async function uploadSignedDocumentHandler(
   const userId = (request.user as any)?.userId;
   const instance = await prisma.documentInstance.findUnique({
     where: { id: request.params.id },
-    include: { expedient: true, contract: true },
+    include: { expedient: true, contract: true, template: true },
   });
 
   if (!instance) {
@@ -480,7 +480,28 @@ export async function uploadSignedDocumentHandler(
       });
 
       // Actualizar checklist de integridad del expediente
-      if (instance.category === 'CONTRACT') {
+      const isContract =
+        (instance.category === 'CONTRACT' ||
+          instance.template?.category === 'CONTRACT' ||
+          instance.documentNumber?.startsWith('SOW') ||
+          instance.documentNumber?.startsWith('CON')) &&
+        instance.category !== 'RECEPTION_CONFORMITY' &&
+        instance.category !== 'WORK_ORDER' &&
+        !instance.documentNumber?.startsWith('RC') &&
+        !instance.documentNumber?.startsWith('OT');
+
+      const isWorkOrder =
+        instance.category === 'WORK_ORDER' ||
+        instance.template?.category === 'WORK_ORDER' ||
+        instance.documentNumber?.startsWith('OT');
+
+      const isReception =
+        instance.category === 'RECEPTION_CONFORMITY' ||
+        instance.template?.category === 'RECEPTION_CONFORMITY' ||
+        instance.documentNumber?.startsWith('RC') ||
+        instance.documentNumber?.startsWith('REC');
+
+      if (isContract) {
         await tx.expedientIntegrityItem.updateMany({
           where: {
             expedientId: targetExpedientId,
@@ -489,12 +510,12 @@ export async function uploadSignedDocumentHandler(
           data: {
             status: 'COMPLETED',
             documentId: docRecord.id,
-            observation: `Contrato SOW firmado por cliente cargado y verificado (Hash SHA-256: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Contrato SOW firmado por cliente cargado y verificado (${instance.documentNumber})`,
             completedAt: new Date(),
             completedById: userId,
           },
         });
-      } else if (instance.category === 'WORK_ORDER') {
+      } else if (isWorkOrder) {
         await tx.expedientIntegrityItem.updateMany({
           where: {
             expedientId: targetExpedientId,
@@ -503,12 +524,12 @@ export async function uploadSignedDocumentHandler(
           data: {
             status: 'COMPLETED',
             documentId: docRecord.id,
-            observation: `Orden de Trabajo autorizada y firmada por cliente (${instance.documentNumber}) cargada (Hash SHA-256: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Orden de Trabajo autorizada y firmada por cliente (${instance.documentNumber}) cargada`,
             completedAt: new Date(),
             completedById: userId,
           },
         });
-      } else if (instance.category === 'RECEPTION_CONFORMITY') {
+      } else if (isReception) {
         await tx.expedientIntegrityItem.updateMany({
           where: {
             expedientId: targetExpedientId,
@@ -517,7 +538,7 @@ export async function uploadSignedDocumentHandler(
           data: {
             status: 'COMPLETED',
             documentId: docRecord.id,
-            observation: `Recepción Conforme firmada por cliente cargada (Hash SHA-256: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Recepción Conforme firmada por cliente cargada y verificada (${instance.documentNumber})`,
             completedAt: new Date(),
             completedById: userId,
           },
@@ -531,7 +552,7 @@ export async function uploadSignedDocumentHandler(
           data: {
             status: 'COMPLETED',
             documentId: docRecord.id,
-            observation: `Reporte de Atención firmado por cliente (${instance.documentNumber}) cargado (Hash SHA-256: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Reporte de Atención firmado por cliente (${instance.documentNumber}) cargado`,
             completedAt: new Date(),
             completedById: userId,
           },

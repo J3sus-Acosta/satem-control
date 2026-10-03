@@ -1129,6 +1129,16 @@ export const ExpedientsPage: React.FC = () => {
                                     d.documentNumber?.startsWith('RC') ||
                                     d.documentNumber?.startsWith('REC')
                                 );
+                                const rcAttachedDocId =
+                                  docId ||
+                                  (selectedExpedient.documentLinks || []).find(
+                                    (l: any) =>
+                                      l.document?.category === 'RECEPTION' ||
+                                      l.document?.category === 'RECEPTION_CONFORMITY' ||
+                                      l.document?.originalName?.toUpperCase().includes('RC') ||
+                                      l.document?.originalName?.toUpperCase().includes('RECEPCION')
+                                  )?.document?.id;
+
                                 return (
                                   <>
                                     {rcDoc ? (
@@ -1159,6 +1169,14 @@ export const ExpedientsPage: React.FC = () => {
                                           </button>
                                         )}
                                       </>
+                                    ) : rcAttachedDocId ? (
+                                      <button
+                                        onClick={() => handleViewAttachedDoc(rcAttachedDocId, `RECEPCION_CONFORME_${selectedExpedient.code}.pdf`)}
+                                        className="btn btn-secondary"
+                                        style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                      >
+                                        <FileText size={13} /> Ver Recepción Conforme
+                                      </button>
                                     ) : (
                                       !isViewer && (
                                         <button

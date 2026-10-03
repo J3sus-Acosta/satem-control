@@ -140,31 +140,52 @@ export async function clientSignDocumentHandler(
 
     // 3. Auto-actualizar checklist de integridad de expediente si corresponde
     if (instance.expedientId) {
-      if (instance.category === 'CONTRACT') {
+      const isContract =
+        (instance.category === 'CONTRACT' ||
+          instance.template?.category === 'CONTRACT' ||
+          instance.documentNumber?.startsWith('SOW') ||
+          instance.documentNumber?.startsWith('CON')) &&
+        instance.category !== 'RECEPTION_CONFORMITY' &&
+        instance.category !== 'WORK_ORDER' &&
+        !instance.documentNumber?.startsWith('RC') &&
+        !instance.documentNumber?.startsWith('OT');
+
+      const isWorkOrder =
+        instance.category === 'WORK_ORDER' ||
+        instance.template?.category === 'WORK_ORDER' ||
+        instance.documentNumber?.startsWith('OT');
+
+      const isReception =
+        instance.category === 'RECEPTION_CONFORMITY' ||
+        instance.template?.category === 'RECEPTION_CONFORMITY' ||
+        instance.documentNumber?.startsWith('RC') ||
+        instance.documentNumber?.startsWith('REC');
+
+      if (isContract) {
         await tx.expedientIntegrityItem.updateMany({
           where: { expedientId: instance.expedientId, code: 'CONTRACT_PRESENT' },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
-            observation: `Contrato SOW firmado digitalmente por cliente (Hash: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Contrato SOW firmado digitalmente por cliente (${instance.documentNumber})`,
           },
         });
-      } else if (instance.category === 'WORK_ORDER') {
+      } else if (isWorkOrder) {
         await tx.expedientIntegrityItem.updateMany({
           where: { expedientId: instance.expedientId, code: 'WORK_ORDER_PRESENT' },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
-            observation: `OT ${instance.documentNumber} firmada digitalmente por cliente (Hash: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `OT ${instance.documentNumber} firmada digitalmente por cliente`,
           },
         });
-      } else if (instance.category === 'RECEPTION_CONFORMITY') {
+      } else if (isReception) {
         await tx.expedientIntegrityItem.updateMany({
           where: { expedientId: instance.expedientId, code: 'RECEPTION_SIGNED' },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
-            observation: `Recepción Conforme firmada digitalmente por cliente (Hash: ${signedPdfHash.slice(0, 16)}...)`,
+            observation: `Recepción Conforme firmada digitalmente por cliente (${instance.documentNumber})`,
           },
         });
       }
