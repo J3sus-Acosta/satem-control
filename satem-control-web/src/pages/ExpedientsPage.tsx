@@ -500,6 +500,96 @@ export const ExpedientsPage: React.FC = () => {
     return <span className="badge badge-info">INFO</span>;
   };
 
+  const getItemEffectiveInfo = (item: any, exp: any) => {
+    const isContractItem = item.code === 'CONTRACT_PRESENT' || item.code === 'CONTRACT' || item.name?.toLowerCase().includes('contrato') || item.name?.toLowerCase().includes('sow');
+    const isWoItem = item.code === 'WORK_ORDER_PRESENT' || item.code === 'WORK_ORDER' || item.name?.toLowerCase().includes('orden de trabajo');
+    const isRcItem = item.code === 'RECEPTION_SIGNED' || item.code === 'RECEPTION_CONFORMITY' || item.name?.toLowerCase().includes('recepción') || item.name?.toLowerCase().includes('recepcion');
+
+    if (isContractItem) {
+      const contractDoc = (exp?.documentInstances || []).find(
+        (d: any) =>
+          (d.category === 'CONTRACT' ||
+            d.template?.category === 'CONTRACT' ||
+            d.template?.code?.toUpperCase().includes('SOW') ||
+            d.documentNumber?.startsWith('SOW') ||
+            d.documentNumber?.startsWith('CON')) &&
+          d.category !== 'RECEPTION_CONFORMITY' &&
+          d.category !== 'WORK_ORDER' &&
+          !d.documentNumber?.startsWith('RC') &&
+          !d.documentNumber?.startsWith('OT')
+      );
+      const contractAttachedDocId = (exp?.documentLinks || []).find(
+        (l: any) =>
+          l.document?.category === 'CONTRACT' &&
+          l.document?.category !== 'RECEPTION' &&
+          l.document?.category !== 'WORK_ORDER' &&
+          l.document?.category !== 'BANK_RECEIPT'
+      )?.document?.id;
+
+      const isSigned = Boolean((contractDoc && contractDoc.status === 'SIGNED' && contractDoc.signedPdfPath) || contractAttachedDocId);
+      const docCode = contractDoc?.documentNumber || exp?.contract?.code || 'SOW';
+
+      return {
+        status: isSigned ? 'COMPLETED' : 'PENDING',
+        observation: isSigned
+          ? `Contrato SOW firmado por cliente cargado y verificado (${docCode})`
+          : (contractDoc ? `Contrato SOW emitido (${docCode}) — Pendiente de firma del cliente` : 'Pendiente de emisión y firma de Contrato SOW'),
+      };
+    }
+
+    if (isWoItem) {
+      const woDoc = (exp?.documentInstances || []).find(
+        (d: any) =>
+          (d.category === 'WORK_ORDER' || d.template?.category === 'WORK_ORDER' || d.documentNumber?.startsWith('OT')) &&
+          d.category !== 'RECEPTION_CONFORMITY' &&
+          !d.documentNumber?.startsWith('RC')
+      );
+      const isSigned = Boolean(woDoc && woDoc.status === 'SIGNED' && woDoc.signedPdfPath);
+      const docCode = woDoc?.documentNumber || (exp?.workOrders?.[0]?.code) || 'OT';
+
+      return {
+        status: isSigned ? 'COMPLETED' : 'PENDING',
+        observation: isSigned
+          ? `Orden de Trabajo autorizada y firmada por cliente (${docCode})`
+          : (woDoc || exp?.workOrders?.length > 0 ? `Orden de Trabajo autorizada emitida (${docCode}) — Pendiente de firma` : 'Pendiente de autorización y emisión de Orden de Trabajo'),
+      };
+    }
+
+    if (isRcItem) {
+      const rcDoc = (exp?.documentInstances || []).find(
+        (d: any) =>
+          (d.category === 'RECEPTION_CONFORMITY' ||
+            d.template?.category === 'RECEPTION_CONFORMITY' ||
+            d.documentNumber?.startsWith('RC') ||
+            d.documentNumber?.startsWith('REC')) &&
+          (d.status === 'SIGNED' || !!d.signedPdfPath)
+      );
+      const rcAttachedDocId = (exp?.documentLinks || []).find(
+        (l: any) =>
+          l.document?.category === 'RECEPTION' ||
+          l.document?.category === 'RECEPTION_CONFORMITY' ||
+          l.document?.originalName?.toUpperCase().includes('RC') ||
+          l.document?.originalName?.toUpperCase().includes('RECEPCION')
+      )?.document?.id;
+      const hasWoRc = exp?.workOrders?.some((w: any) => Boolean(w.receptionConformity));
+
+      const isSigned = Boolean(rcDoc || rcAttachedDocId || hasWoRc);
+      const docCode = rcDoc?.documentNumber || exp?.workOrders?.find((w: any) => w.receptionConformity)?.receptionConformity?.code || 'RC';
+
+      return {
+        status: isSigned ? 'COMPLETED' : 'PENDING',
+        observation: isSigned
+          ? `Recepción Conforme firmada por cliente cargada y verificada (${docCode})`
+          : 'Pendiente de emisión y firma de Recepción Conforme',
+      };
+    }
+
+    return {
+      status: item.status,
+      observation: item.observation,
+    };
+  };
+
   if (loading) return <div style={{ color: 'var(--text-secondary)' }}>Cargando expedientes...</div>;
 
   return (
@@ -665,7 +755,7 @@ export const ExpedientsPage: React.FC = () => {
                 ].filter(Boolean)).size;
 
                 return [
-                  { key: 'integrity',  label: `Integridad (${selectedExpedient.integrityItems?.filter((i: any) => i.status === 'COMPLETED').length || 0}/${selectedExpedient.integrityItems?.length || 0})` },
+                  { key: 'integrity',  label: `Integridad (${(selectedExpedient.integrityItems || []).filter((i: any) => getItemEffectiveInfo(i, selectedExpedient).status === 'COMPLETED').length}/${selectedExpedient.integrityItems?.length || 0})` },
                   { key: 'workOrders', label: `Operaciones & OTs (${selectedExpedient.workOrders?.length || 0})` },
                   { key: 'exceptions', label: `Excepciones (${selectedExpedient.exceptions?.length || 0})` },
                   { key: 'documents',  label: `Documentos (${(selectedExpedient.documentInstances?.length || 0) + totalExternalDocs})` },
@@ -914,7 +1004,9 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {selectedExpedient.integrityItems?.map((item: any) => {
-                    const isCompleted = item.status === 'COMPLETED';
+                    const effective = getItemEffectiveInfo(item, selectedExpedient);
+                    const isCompleted = effective.status === 'COMPLETED';
+                    const effectiveObservation = effective.observation || item.observation;
                     const docId = item.documentId || item.document?.id;
 
                     return (
@@ -931,9 +1023,9 @@ export const ExpedientsPage: React.FC = () => {
                             {item.isRequired && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(Obligatorio)</span>}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Categoría: {item.category}</div>
-                          {item.observation && (
-                            <div style={{ fontSize: '11.5px', color: 'var(--success)', marginTop: '4px', fontWeight: 600, wordBreak: 'break-word' }}>
-                              ✓ {item.observation}
+                          {effectiveObservation && (
+                            <div style={{ fontSize: '11.5px', color: isCompleted ? 'var(--success)' : 'var(--warning)', marginTop: '4px', fontWeight: 600, wordBreak: 'break-word' }}>
+                              {isCompleted ? '✓ ' : '⚠ '}{effectiveObservation}
                             </div>
                           )}
                           {item.code === 'RECONCILIATION_COMPLETED' && (
@@ -967,7 +1059,7 @@ export const ExpedientsPage: React.FC = () => {
                               })()}
                             </div>
                           )}
-                          {item.completedAt && (
+                          {isCompleted && item.completedAt && (
                             <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                               Completado el: {new Date(item.completedAt).toLocaleString('es-CL')}
                             </div>

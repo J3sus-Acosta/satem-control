@@ -290,7 +290,11 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     for (const item of currentItems) {
       if (item.code === 'ATTENTION_REGISTERED') continue;
 
-      if (item.code === 'WORK_ORDER_PRESENT') {
+      const isWoItem = item.code === 'WORK_ORDER_PRESENT' || item.code === 'WORK_ORDER' || item.name?.toLowerCase().includes('orden de trabajo');
+      const isContractItem = item.code === 'CONTRACT_PRESENT' || item.code === 'CONTRACT' || item.code === 'SOW_PRESENT' || item.name?.toLowerCase().includes('contrato') || item.name?.toLowerCase().includes('sow');
+      const isRcItem = item.code === 'RECEPTION_SIGNED' || item.code === 'RECEPTION_CONFORMITY' || item.code === 'RECEPTION_PRESENT' || item.name?.toLowerCase().includes('recepción') || item.name?.toLowerCase().includes('recepcion');
+
+      if (isWoItem) {
         const wo = docInstances.find(
           (d) =>
             (d.category === 'WORK_ORDER' ||
@@ -361,7 +365,7 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
             needsIntegrityReload = true;
           }
         }
-      } else if (item.code === 'CONTRACT_PRESENT') {
+      } else if (isContractItem) {
         const sow = docInstances.find(
           (d) =>
             (d.category === 'CONTRACT' ||
@@ -439,7 +443,7 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
             needsIntegrityReload = true;
           }
         }
-      } else if (item.code === 'RECEPTION_SIGNED') {
+      } else if (isRcItem) {
         const rc = docInstances.find(
           (d) =>
             (d.category === 'RECEPTION_CONFORMITY' ||
