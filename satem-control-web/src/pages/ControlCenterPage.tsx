@@ -154,9 +154,8 @@ export const ControlCenterPage: React.FC = () => {
             </button>
           </div>
           {expiringContracts.length === 0 ? (
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '10px 0' }}>
-              No hay datos de contratos próximos a vencer. El endpoint de la API debe incluir
-              <code style={{ margin: '0 4px' }}>expiringContracts[]</code> en el resumen del Centro de Control.
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)', padding: '12px 0', textAlign: 'center' }}>
+              No hay contratos próximos a vencer en los siguientes 30 días.
             </div>
           ) : (
             <table className="custom-table">

@@ -133,7 +133,7 @@ export async function buildServer() {
   return fastify;
 }
 
-import { ensureDatabaseSchema, ensureDefaultAdmin, ensureCompanySignature, ensureDefaultTemplates, ensureDefaultClientUsers } from './common/utils/bootstrap.js';
+import { ensureDatabaseSchema, syncClosedContracts, ensureDefaultAdmin, ensureCompanySignature, ensureDefaultTemplates, ensureDefaultClientUsers } from './common/utils/bootstrap.js';
 
 async function start() {
   const app = await buildServer();
@@ -141,6 +141,7 @@ async function start() {
     await app.listen({ port: env.PORT, host: env.HOST });
     app.log.info(`🚀 SATEM Control API corriendo en http://${env.HOST}:${env.PORT}`);
     await ensureDatabaseSchema();
+    await syncClosedContracts();
     await ensureDefaultAdmin();
     await ensureDefaultTemplates();
     await ensureDefaultClientUsers();

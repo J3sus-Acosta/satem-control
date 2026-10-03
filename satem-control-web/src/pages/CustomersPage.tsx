@@ -468,9 +468,18 @@ export const CustomersPage: React.FC = () => {
         <div className="table-container">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileSignature size={20} color="var(--success)" /> Contratos SOW Vigentes
+              <FileSignature size={20} color="var(--accent-primary)" /> Contratos SOW Registrados
             </h3>
-            <span className="badge badge-success">{contracts.length} activos</span>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <span className="badge badge-info">
+                {contracts.filter((c) => c.status === 'ACTIVE').length} activos
+              </span>
+              {contracts.filter((c) => c.status === 'EXHAUSTED' || c.status === 'CANCELLED' || c.status === 'EXPIRED').length > 0 && (
+                <span className="badge badge-success">
+                  {contracts.filter((c) => c.status === 'EXHAUSTED' || c.status === 'CANCELLED' || c.status === 'EXPIRED').length} completados
+                </span>
+              )}
+            </div>
           </div>
           <table className="custom-table">
             <thead>
@@ -489,43 +498,51 @@ export const CustomersPage: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                contracts.map((ct) => (
-                  <tr key={ct.id}>
-                    <td>
-                      <div style={{ fontWeight: 'bold' }}>{ct.code}</div>
-                      <span className="badge badge-info" style={{ fontSize: '10px' }}>
-                        v{ct.currentVersion || 1} ({ct.versions?.length || 1} adendas)
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, fontSize: '13px' }}>{ct.customer?.legalName}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{ct.title}</div>
-                    </td>
-                    <td>
-                      <span className="badge badge-warning">
-                        {ct.consumedHours} / {ct.contractedHours || '∞'} hrs
-                      </span>
-                      {ct.totalAmount && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                          ${Number(ct.totalAmount).toLocaleString('en-US')} {ct.currency}
+                contracts.map((ct) => {
+                  const isCompleted = ct.status === 'EXHAUSTED' || (ct.contractedHours && Number(ct.consumedHours) >= Number(ct.contractedHours));
+                  return (
+                    <tr key={ct.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 'bold' }}>{ct.code}</span>
+                          <span className={`badge ${isCompleted ? 'badge-success' : 'badge-info'}`} style={{ fontSize: '10px' }}>
+                            {isCompleted ? 'EJECUTADO' : 'ACTIVO'}
+                          </span>
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      {!isViewer && (
-                        <button
-                          type="button"
-                          onClick={() => openVersionModal(ct)}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          title="Crear Nueva Versión / Adenda"
-                        >
-                          <GitCommit size={12} /> + Adenda
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                        <span className="badge badge-secondary" style={{ fontSize: '10px', marginTop: '4px' }}>
+                          v{ct.currentVersion || 1} ({ct.versions?.length || 1} adendas)
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: '13px' }}>{ct.customer?.legalName}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{ct.title}</div>
+                      </td>
+                      <td>
+                        <span className={`badge ${isCompleted ? 'badge-success' : 'badge-warning'}`}>
+                          {ct.consumedHours} / {ct.contractedHours || '∞'} hrs {isCompleted ? '✓' : ''}
+                        </span>
+                        {ct.totalAmount && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            ${Number(ct.totalAmount).toLocaleString('en-US')} {ct.currency}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {!isViewer && (
+                          <button
+                            type="button"
+                            onClick={() => openVersionModal(ct)}
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Crear Nueva Versión / Adenda"
+                          >
+                            <GitCommit size={12} /> + Adenda
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

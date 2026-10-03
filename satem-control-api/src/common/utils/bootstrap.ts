@@ -46,6 +46,42 @@ export async function ensureDatabaseSchema(): Promise<void> {
 }
 
 /**
+ * Sincroniza el estado y horas de contratos cuyos expedientes asociados ya fueron cerrados al 100%.
+ */
+export async function syncClosedContracts(): Promise<void> {
+  try {
+    const contracts = await prisma.contract.findMany({
+      where: { deletedAt: null },
+      include: {
+        expedients: { where: { deletedAt: null } },
+      },
+    });
+
+    for (const ct of contracts) {
+      if (!ct.expedients || ct.expedients.length === 0) continue;
+
+      const allClosed = ct.expedients.every((exp) => exp.status === 'CLOSED' || exp.status === 'CLOSED_WITH_EXCEPTION');
+      if (allClosed) {
+        const contractedHrs = ct.contractedHours ? Number(ct.contractedHours) : 0;
+        const currentConsumed = Number(ct.consumedHours || 0);
+        const finalConsumed = contractedHrs > 0 ? Math.max(currentConsumed, contractedHrs) : currentConsumed;
+
+        await prisma.contract.update({
+          where: { id: ct.id },
+          data: {
+            status: 'EXHAUSTED',
+            consumedHours: finalConsumed,
+          },
+        });
+        console.log(`[BOOTSTRAP] 📜 Contrato ${ct.code} sincronizado a EXHAUSTED (${finalConsumed}/${contractedHrs} hrs) por expediente(s) cerrado(s).`);
+      }
+    }
+  } catch (error) {
+    console.warn('[BOOTSTRAP] ⚠️ Advertencia al sincronizar contratos cerrados:', error);
+  }
+}
+
+/**
  * Garantiza que exista al menos un usuario Administrador activo al arrancar el servidor.
  * Esto evita fallos de login tras migraciones, resets de BD o despliegues limpios.
  */

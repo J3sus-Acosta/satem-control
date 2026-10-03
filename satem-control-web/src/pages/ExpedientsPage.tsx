@@ -17,6 +17,7 @@ export const ExpedientsPage: React.FC = () => {
 
   const [expedients, setExpedients] = useState<any[]>([]);
   const [selectedExpedient, setSelectedExpedient] = useState<any>(null);
+  const [isClosedExpedientExpanded, setIsClosedExpedientExpanded] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'summary' | 'integrity' | 'exceptions' | 'documents' | 'history' | 'workOrders'>('integrity');
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -129,13 +130,17 @@ export const ExpedientsPage: React.FC = () => {
       .then((res) => {
         if (res.data?.data) {
           setSelectedExpedient(res.data.data);
+          setIsClosedExpedientExpanded(false);
         }
       })
       .catch((err) => {
         console.error('Error fetching expedient detail:', err);
         setExpedients((prev) => {
           const item = prev.find((e) => e.id === id);
-          if (item) setSelectedExpedient(item);
+          if (item) {
+            setSelectedExpedient(item);
+            setIsClosedExpedientExpanded(false);
+          }
           return prev;
         });
       });
@@ -743,6 +748,72 @@ export const ExpedientsPage: React.FC = () => {
               )}
             </div>
 
+            {/* Si el expediente está cerrado, mostrar banner de Cierre 100% y control de contraer/expandir */}
+            {(() => {
+              const isClosed = selectedExpedient.status === 'CLOSED' || selectedExpedient.status === 'CLOSED_WITH_EXCEPTION';
+              if (!isClosed) return null;
+
+              return (
+                <div style={{
+                  marginTop: '16px',
+                  marginBottom: '16px',
+                  padding: '16px 20px',
+                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid var(--success)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <CheckCircle size={22} color="var(--success)" />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--success)' }}>
+                          Expediente Cerrado al 100% (Auditoría Inmutable Congelada)
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          {selectedExpedient.closedAt ? `Fecha de cierre: ${new Date(selectedExpedient.closedAt).toLocaleString('es-CL')}` : 'Cierre completado'}
+                          {selectedExpedient.closeReason ? ` • Motivo: "${selectedExpedient.closeReason}"` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsClosedExpedientExpanded((prev) => !prev)}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '12px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      {isClosedExpedientExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      {isClosedExpedientExpanded ? 'Contraer Vista Detallada de Documentos' : 'Expandir Vista Detallada de Documentos'}
+                    </button>
+                  </div>
+
+                  {!isClosedExpedientExpanded && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', paddingTop: '8px', borderTop: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        📄 Total Documentos: <strong style={{ color: 'var(--text-primary)' }}>{(selectedExpedient.documentInstances?.length || 0) + (selectedExpedient.documentLinks?.length || 0)}</strong>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        🛠️ Órdenes de Trabajo: <strong style={{ color: 'var(--text-primary)' }}>{selectedExpedient.workOrders?.length || 0}</strong>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        📑 Facturas SII: <strong style={{ color: 'var(--text-primary)' }}>{selectedExpedient.invoices?.length || 0}</strong>
+                      </div>
+                      {selectedExpedient.snapshots?.[0]?.checksumSha256 && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
+                          🔐 Snapshot SHA-256: <code>{selectedExpedient.snapshots[0].checksumSha256}</code>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Tabs y contenido de expediente: visible siempre si está abierto o si fue expandido manualmente si está cerrado */}
+            {(!(selectedExpedient.status === 'CLOSED' || selectedExpedient.status === 'CLOSED_WITH_EXCEPTION') || isClosedExpedientExpanded) && (
+              <>
             {/* Tabs */}
             <div className="tabs-nav">
               {(() => {
@@ -1805,6 +1876,8 @@ export const ExpedientsPage: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
+            </>
             )}
           </div>
         ) : (

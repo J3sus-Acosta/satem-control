@@ -185,14 +185,22 @@ export async function getControlCenterSummaryHandler(request: FastifyRequest, re
     where: { status: 'CLOSED_WITH_EXCEPTION' },
   });
 
-  const expiringContractsCount = await prisma.contract.count({
+  const expiringContracts = await prisma.contract.findMany({
     where: {
       status: 'ACTIVE',
       endDate: {
+        gte: new Date(),
         lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
+      deletedAt: null,
     },
+    include: {
+      customer: true,
+    },
+    orderBy: { endDate: 'asc' },
   });
+
+  const expiringContractsCount = expiringContracts.length;
 
   return reply.send({
     success: true,
@@ -204,6 +212,7 @@ export async function getControlCenterSummaryHandler(request: FastifyRequest, re
       incompleteExpedientsCount,
       closedWithExceptionCount,
       expiringContractsCount,
+      expiringContracts,
       openExceptions,
     },
   });

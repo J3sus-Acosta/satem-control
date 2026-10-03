@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import archiver from 'archiver';
 import fs from 'fs';
 import path from 'path';
-import { Prisma, ExpedientOrigin, ExpedientStatus, TaxTreatment } from '@prisma/client';
+import { Prisma, ExpedientOrigin, ExpedientStatus, ContractStatus, TaxTreatment } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { NotFoundError, AppError } from '../../common/errors/app-error.js';
 import { generateSequence } from '../../common/utils/sequence.js';
@@ -827,6 +827,34 @@ export async function closeExpedientHandler(
       },
     });
 
+    // Sincronizar contrato asociado: si el SOW/Expediente se cerró al 100%, actualizar horas consumidas y estado
+    if (expedient.contractId) {
+      const contractRecord = await tx.contract.findUnique({ where: { id: expedient.contractId } });
+      if (contractRecord) {
+        const contractedHrs = contractRecord.contractedHours ? Number(contractRecord.contractedHours) : 0;
+        const currentConsumed = Number(contractRecord.consumedHours || 0);
+        const finalConsumed = contractedHrs > 0 ? Math.max(currentConsumed, contractedHrs) : currentConsumed;
+
+        // Verificar si todos los expedientes del contrato están cerrados
+        const otherOpenExpedients = await tx.expedient.count({
+          where: {
+            contractId: expedient.contractId,
+            id: { not: id },
+            status: { in: ['DRAFT', 'OPEN', 'IN_PROGRESS'] },
+            deletedAt: null,
+          },
+        });
+
+        await tx.contract.update({
+          where: { id: expedient.contractId },
+          data: {
+            consumedHours: new Prisma.Decimal(finalConsumed),
+            status: otherOpenExpedients === 0 ? ContractStatus.EXHAUSTED : contractRecord.status,
+          },
+        });
+      }
+    }
+
     await createAuditLog(tx, {
       userId,
       action: 'CLOSE_EXPEDIENT',
@@ -838,11 +866,11 @@ export async function closeExpedientHandler(
       userAgent: request.headers['user-agent'],
     });
 
-      return closed;
-    });
+    return closed;
+  });
 
-    return reply.send({ success: true, data: updatedExpedient });
-  }
+  return reply.send({ success: true, data: updatedExpedient });
+}
 
 const reopenExpedientSchema = z.object({
   reason: z.string().min(3, 'Debe especificar el motivo de reapertura'),
@@ -872,6 +900,13 @@ export async function reopenExpedientHandler(
         closeHasException: false,
       },
     });
+
+    if (expedient.contractId) {
+      await tx.contract.update({
+        where: { id: expedient.contractId },
+        data: { status: ContractStatus.ACTIVE },
+      });
+    }
 
     await createAuditLog(tx, {
       userId,
