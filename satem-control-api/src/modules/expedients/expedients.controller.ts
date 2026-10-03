@@ -291,17 +291,71 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
       if (item.code === 'ATTENTION_REGISTERED') continue;
 
       if (item.code === 'WORK_ORDER_PRESENT') {
-        const wo = docInstances.find((d) => d.category === 'WORK_ORDER');
-        if (wo || (expedient.workOrders && expedient.workOrders.length > 0)) {
-          const isSigned = wo?.status === 'SIGNED';
-          const docNum = wo?.documentNumber || (expedient.workOrders[0] && expedient.workOrders[0].code) || 'OT';
-          if (item.status !== 'COMPLETED') {
+        const wo = docInstances.find(
+          (d) =>
+            (d.category === 'WORK_ORDER' ||
+              d.template?.category === 'WORK_ORDER' ||
+              d.documentNumber?.startsWith('OT')) &&
+            d.category !== 'RECEPTION_CONFORMITY' &&
+            !d.documentNumber?.startsWith('RC') &&
+            !d.documentNumber?.startsWith('REC')
+        );
+        const hasWoEntity = expedient.workOrders && expedient.workOrders.length > 0;
+        const docNum = wo?.documentNumber || (hasWoEntity ? expedient.workOrders[0].code : 'OT');
+
+        // La OT solo se considera completada si la instancia tiene status SIGNED y signedPdfPath,
+        // o si existe un documento externo exclusivo de OT firmada cargado
+        const isWoInstanceSigned = !!wo && (wo.status === 'SIGNED' && !!wo.signedPdfPath);
+
+        let validWoDocId: string | null = null;
+        if (item.documentId) {
+          const doc = await prisma.document.findUnique({ where: { id: item.documentId } });
+          if (doc) {
+            const isInvalidDoc =
+              doc.category === 'EVIDENCE' ||
+              doc.category === 'BANK_RECEIPT' ||
+              doc.category === 'PAYMENT_PROOF' ||
+              doc.category === 'INVOICE' ||
+              doc.originalName?.toUpperCase().includes('RC') ||
+              doc.originalName?.toUpperCase().includes('RECEPCION') ||
+              doc.originalName?.toUpperCase().includes('CARTOLA');
+
+            if (!isInvalidDoc && (doc.category === 'WORK_ORDER' || doc.originalName?.toUpperCase().includes('OT') || doc.originalName?.toUpperCase().includes('ORDEN'))) {
+              validWoDocId = doc.id;
+            }
+          }
+        }
+
+        const isWoSigned = isWoInstanceSigned || !!validWoDocId;
+
+        if (isWoSigned) {
+          const completedObs = `Orden de Trabajo autorizada y firmada por cliente (${docNum})`;
+          if (item.status !== 'COMPLETED' || item.observation !== completedObs) {
             await prisma.expedientIntegrityItem.update({
               where: { id: item.id },
               data: {
                 status: 'COMPLETED',
-                observation: `Orden de Trabajo autorizada ${isSigned ? 'y firmada por cliente' : 'emitida'} (${docNum})`,
-                completedAt: new Date(),
+                documentId: validWoDocId || item.documentId || null,
+                observation: completedObs,
+                completedAt: wo?.signedAt || item.completedAt || new Date(),
+              },
+            });
+            needsIntegrityReload = true;
+          }
+        } else {
+          // Si NO está firmada, forzar estado PENDING y limpiar cualquier documentId cruzado
+          const pendingObs = (wo || hasWoEntity)
+            ? `Orden de Trabajo autorizada emitida (${docNum}) — Pendiente de firma`
+            : 'Pendiente de autorización y emisión de Orden de Trabajo';
+
+          if (item.status !== 'PENDING' || item.documentId !== null || item.observation !== pendingObs) {
+            await prisma.expedientIntegrityItem.update({
+              where: { id: item.id },
+              data: {
+                status: 'PENDING',
+                documentId: null,
+                observation: pendingObs,
+                completedAt: null,
               },
             });
             needsIntegrityReload = true;
@@ -568,16 +622,14 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     console.error('Warning: Error in integrity item auto-synchronization (non-fatal):', syncErr);
   }
 
-  let finalIntegrityItems = (expedient.integrityItems || []).filter((i) => i.code !== 'ATTENTION_REGISTERED');
-  if (needsIntegrityReload) {
-    try {
-      finalIntegrityItems = await prisma.expedientIntegrityItem.findMany({
-        where: { expedientId: expedient.id },
-        include: { document: true },
-      });
-    } catch {
-      // fallback to in-memory items
-    }
+  let finalIntegrityItems: any[] = [];
+  try {
+    finalIntegrityItems = await prisma.expedientIntegrityItem.findMany({
+      where: { expedientId: expedient.id, code: { not: 'ATTENTION_REGISTERED' } },
+      include: { document: true },
+    });
+  } catch {
+    finalIntegrityItems = (expedient.integrityItems || []).filter((i) => i.code !== 'ATTENTION_REGISTERED');
   }
 
   let finalDocumentLinks = expedient.documentLinks || [];

@@ -351,10 +351,9 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
         await tx.expedientIntegrityItem.updateMany({
           where: { expedientId: expedient.id, code: 'WORK_ORDER_PRESENT' },
           data: {
-            status: 'COMPLETED',
-            observation: `Orden de Trabajo autorizada emitida (${finalDocNumber})`,
-            completedAt: new Date(),
-            completedById: userId,
+            status: 'PENDING',
+            observation: `Orden de Trabajo autorizada emitida (${finalDocNumber}) — Pendiente de firma`,
+            completedAt: null,
           },
         });
       } else if (template.category === TemplateCategory.ATTENTION_REPORT || template.category === TemplateCategory.SERVICE_REPORT) {
