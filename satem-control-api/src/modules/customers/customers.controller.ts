@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
 import { Prisma, ContactType } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { NotFoundError } from '../../common/errors/app-error.js';
@@ -116,6 +117,27 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
         isPrimary: true,
       },
     });
+
+    // Si tiene email, crear usuario para portal de clientes automáticamente
+    if (body.email && body.email.trim()) {
+      const emailLower = body.email.toLowerCase().trim();
+      const existingClientUser = await tx.clientUser.findFirst({
+        where: { email: emailLower, deletedAt: null },
+      });
+      if (!existingClientUser) {
+        const passwordHash = await bcrypt.hash('Cliente@123', 10);
+        await tx.clientUser.create({
+          data: {
+            customerId: customer.id,
+            email: emailLower,
+            fullName: body.legalName,
+            phone: body.phone || null,
+            passwordHash,
+            isActive: true,
+          },
+        });
+      }
+    }
 
     await createAuditLog(tx, {
       userId,

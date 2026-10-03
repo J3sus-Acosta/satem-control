@@ -134,3 +134,122 @@ export async function ensureCompanySignature(): Promise<void> {
     console.error('[BOOTSTRAP] ⚠️ Advertencia al sincronizar firma corporativa de SATEM:', error);
   }
 }
+
+/**
+ * Garantiza que existan todas las plantillas oficiales predeterminadas de SATEM
+ * (Contrato SOW, Orden de Trabajo, Recepción Conforme, Propuesta Comercial, Cotización, etc.)
+ */
+export async function ensureDefaultTemplates(): Promise<void> {
+  try {
+    const { OFFICIAL_DEFAULT_TEMPLATES } = await import('./bootstrap-templates.js');
+    const admin = await prisma.user.findFirst({ where: { role: UserRole.ADMIN, isActive: true } });
+    const adminId = admin?.id || 'SYSTEM_BOOTSTRAP';
+
+    for (const tpl of OFFICIAL_DEFAULT_TEMPLATES) {
+      const existing = await prisma.documentTemplate.findUnique({
+        where: { code: tpl.code },
+        include: { versions: true },
+      });
+
+      if (!existing) {
+        const created = await prisma.documentTemplate.create({
+          data: {
+            code: tpl.code,
+            name: tpl.name,
+            description: `Plantilla institucional SATEM para ${tpl.name}`,
+            category: tpl.category,
+            language: tpl.language,
+            isActive: true,
+            currentVersion: 1,
+          },
+        });
+
+        await prisma.documentTemplateVersion.create({
+          data: {
+            templateId: created.id,
+            versionNumber: 1,
+            title: `${tpl.name} v1.0`,
+            htmlTemplate: tpl.html,
+            cssStyles: null,
+            changeReason: 'Versión inicial oficial SATEM',
+            isPublished: true,
+            publishedAt: new Date(),
+            publishedById: adminId,
+          },
+        });
+
+        console.log(`[BOOTSTRAP] 📄 Plantilla oficial creada: ${tpl.name} (${tpl.code})`);
+      } else if (existing.versions.length === 0) {
+        await prisma.documentTemplateVersion.create({
+          data: {
+            templateId: existing.id,
+            versionNumber: 1,
+            title: `${tpl.name} v1.0`,
+            htmlTemplate: tpl.html,
+            cssStyles: null,
+            changeReason: 'Versión inicial oficial SATEM',
+            isPublished: true,
+            publishedAt: new Date(),
+            publishedById: adminId,
+          },
+        });
+        console.log(`[BOOTSTRAP] 📄 Versión inicial agregada para plantilla: ${tpl.name} (${tpl.code})`);
+      }
+    }
+  } catch (error) {
+    console.error('[BOOTSTRAP] ⚠️ Advertencia al verificar plantillas oficiales:', error);
+  }
+}
+
+/**
+ * Garantiza que todos los clientes registrados en SATEM cuenten con un usuario de portal activo
+ * visible en la administración de Usuarios Cliente.
+ */
+export async function ensureDefaultClientUsers(): Promise<void> {
+  try {
+    const customers = await prisma.customer.findMany({
+      where: { deletedAt: null },
+      include: { contacts: true },
+    });
+
+    const defaultPasswordHash = await bcrypt.hash('Cliente@123', 10);
+
+    for (const customer of customers) {
+      const email = (customer.email || customer.contacts?.[0]?.email || '').toLowerCase().trim();
+      if (!email) continue;
+
+      const existingUser = await prisma.clientUser.findFirst({
+        where: {
+          OR: [
+            { email },
+            { customerId: customer.id },
+          ],
+          deletedAt: null,
+        },
+      });
+
+      if (!existingUser) {
+        const fullName = customer.contacts?.[0]?.name || customer.legalName;
+        await prisma.clientUser.create({
+          data: {
+            email,
+            passwordHash: defaultPasswordHash,
+            fullName,
+            phone: customer.phone || customer.contacts?.[0]?.phone || null,
+            customerId: customer.id,
+            isActive: true,
+          },
+        });
+        console.log(`[BOOTSTRAP] 👤 Usuario cliente del portal creado: ${fullName} <${email}> para cliente ${customer.legalName}`);
+      } else if (!existingUser.isActive) {
+        await prisma.clientUser.update({
+          where: { id: existingUser.id },
+          data: { isActive: true },
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[BOOTSTRAP] ⚠️ Advertencia al verificar usuarios cliente iniciales:', error);
+  }
+}
+

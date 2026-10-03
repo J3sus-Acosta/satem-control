@@ -254,18 +254,10 @@ export const CustomersPage: React.FC = () => {
             <Users size={18} /> Usuarios Portal
           </button>
           {!isViewer && (
-            <button onClick={openCreateModal} className="btn btn-secondary">
+            <button onClick={openCreateModal} className="btn btn-primary">
               <Plus size={18} /> Nuevo Cliente
             </button>
           )}
-          <button
-            onClick={() => navigate('/contracts/wizard')}
-            className="btn btn-primary"
-            disabled={isViewer}
-          >
-            <FileSignature size={18} /> Generar Contrato SOW
-            <ExternalLink size={14} style={{ opacity: 0.7 }} />
-          </button>
         </div>
       </div>
 
@@ -294,7 +286,7 @@ export const CustomersPage: React.FC = () => {
           </div>
         </div>
         <button onClick={() => navigate('/contracts/wizard')} className="btn btn-primary" style={{ whiteSpace: 'nowrap', fontSize: '13px' }}>
-          Abrir Wizard <ArrowRight size={16} />
+          Generar Contrato SOW <ArrowRight size={16} />
         </button>
       </div>
 

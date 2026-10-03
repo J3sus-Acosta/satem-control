@@ -102,19 +102,22 @@ export const DocumentGeneratorPage: React.FC = () => {
     }
   };
 
-  // Carga inicial
+  // Carga inicial resiliente
   useEffect(() => {
-    Promise.all([
-      api.get('/document-templates'),
-      api.get('/customers'),
-      api.get('/contracts'),
-      api.get('/expedients'),
-      api.get('/company/config').catch(() => ({ data: { data: {} } })),
-    ])
-      .then(([tplRes, custRes, contRes, expRes, compRes]) => {
-        const tpls = tplRes.data.data || [];
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [tplRes, custRes, contRes, expRes, compRes] = await Promise.allSettled([
+          api.get('/document-templates'),
+          api.get('/customers'),
+          api.get('/contracts'),
+          api.get('/expedients'),
+          api.get('/company/config'),
+        ]);
+
+        const tpls = tplRes.status === 'fulfilled' ? (tplRes.value.data?.data || []) : [];
         setTemplates(tpls);
-        
+
         // Priorizar queryTemplateId o la primera plantilla (o RECEPTION_CONFORMITY si existe)
         let initialTpl = tpls.find((t: any) => t.id === queryTemplateId);
         if (!initialTpl) {
@@ -126,13 +129,13 @@ export const DocumentGeneratorPage: React.FC = () => {
           setDocNumberDisplay(`${getCategoryPrefix(initialTpl.category)}-2026-AUTOMÁTICO`);
         }
 
-        const custList = custRes.data.data || [];
+        const custList = custRes.status === 'fulfilled' ? (custRes.value.data?.data || []) : [];
         setCustomers(custList);
-        const contList = contRes.data.data || [];
+        const contList = contRes.status === 'fulfilled' ? (contRes.value.data?.data || []) : [];
         setContracts(contList);
-        const expList = expRes.data.data || [];
+        const expList = expRes.status === 'fulfilled' ? (expRes.value.data?.data || []) : [];
         setExpedients(expList);
-        setCompanyConfig(compRes.data.data || {});
+        setCompanyConfig(compRes.status === 'fulfilled' ? (compRes.value.data?.data || {}) : {});
 
         // Si se pasa queryCustomerId, sincronizar contrato y expediente
         if (queryCustomerId) {
@@ -142,9 +145,14 @@ export const DocumentGeneratorPage: React.FC = () => {
             setSelectedContractId(custConts[0].id);
           }
         }
-      })
-      .catch((err) => console.error('Error cargando generador:', err))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error('Error cargando generador:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   // Filtrar contratos y expedientes por cliente seleccionado
