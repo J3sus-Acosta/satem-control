@@ -757,25 +757,30 @@ export async function closeExpedientHandler(
 
   const expedient = await prisma.expedient.findUnique({
     where: { id },
-    include: {
-      customer: true,
-      contract: true,
-      workOrders: { include: { attentions: true, receptionConformity: true } },
-      invoices: true,
-      integrityItems: true,
-      exceptions: { where: { status: 'OPEN' } },
-      documentInstances: true,
-    },
   });
 
   if (!expedient || expedient.deletedAt) {
     throw new NotFoundError('Expediente no encontrado');
   }
 
+  // Carga modular y segura de relaciones para garantizar integridad y evitar colapsos
+  const [customer, contract, workOrders, invoices, integrityItems, openExceptions, documentInstances] = await Promise.all([
+    prisma.customer.findUnique({ where: { id: expedient.customerId } }).catch(() => null),
+    expedient.contractId ? prisma.contract.findUnique({ where: { id: expedient.contractId } }).catch(() => null) : Promise.resolve(null),
+    prisma.workOrder.findMany({
+      where: { expedientId: id },
+      include: { attentions: true, receptionConformity: true },
+    }).catch(() => []),
+    prisma.invoice.findMany({ where: { expedientId: id } }).catch(() => []),
+    prisma.expedientIntegrityItem.findMany({ where: { expedientId: id } }).catch(() => []),
+    prisma.systemException.findMany({ where: { expedientId: id, status: 'OPEN' } }).catch(() => []),
+    prisma.documentInstance.findMany({ where: { expedientId: id } }).catch(() => []),
+  ]);
+
   const isExceptionClose = body.status === 'CLOSED_WITH_EXCEPTION';
 
   if (!isExceptionClose) {
-    const unfulfilledRequired = expedient.integrityItems.filter((i: any) => i.isRequired && i.status === 'PENDING');
+    const unfulfilledRequired = (integrityItems || []).filter((i: any) => i.isRequired && i.status === 'PENDING');
     if (unfulfilledRequired.length > 0) {
       throw new AppError(
         'No se puede cerrar el expediente normalmente porque tiene ítems documentales/financieros pendientes. Use "Cierre con Excepción" especificando la justificación.',
@@ -799,13 +804,13 @@ export async function closeExpedientHandler(
 
     const snapshotContent = JSON.stringify({
       expedient: closed,
-      customer: expedient.customer,
-      contract: expedient.contract,
-      workOrders: expedient.workOrders,
-      invoices: expedient.invoices,
-      documentInstances: expedient.documentInstances,
-      integrityChecklist: expedient.integrityItems,
-      openExceptions: expedient.exceptions,
+      customer,
+      contract,
+      workOrders,
+      invoices,
+      documentInstances,
+      integrityChecklist: integrityItems,
+      openExceptions,
       closedAt: new Date().toISOString(),
       closedByUserId: userId,
       reason: body.reason,

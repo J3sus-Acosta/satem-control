@@ -5,6 +5,47 @@ import { SATEM_SIGNATURE_BASE64 } from '../../assets/signatures.js';
 import { LOGO_FULL_BASE64, LOGO_SHORT_BASE64 } from '../../assets/logos.js';
 
 /**
+ * Garantiza la coherencia del esquema de base de datos en producción (auto-healing DDL).
+ * Agrega columnas y constraints faltantes de forma no destructiva e idempotente.
+ */
+export async function ensureDatabaseSchema(): Promise<void> {
+  try {
+    await prisma.$executeRawUnsafe(`SET FOREIGN_KEY_CHECKS = 0;`);
+
+    // system_exceptions.assignedUserId
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`system_exceptions\` ADD COLUMN \`assignedUserId\` VARCHAR(191) NULL;
+      `);
+      console.log('[BOOTSTRAP] 🛡️ Columna system_exceptions.assignedUserId verificada/agregada.');
+    } catch {}
+
+    // payments.usdEquivalent y exchangeRate
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`payments\` ADD COLUMN \`usdEquivalent\` DECIMAL(14, 2) NULL;
+      `);
+    } catch {}
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`payments\` ADD COLUMN \`exchangeRate\` DECIMAL(12, 4) NULL;
+      `);
+    } catch {}
+
+    // foreign keys
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`system_exceptions\` ADD CONSTRAINT \`system_exceptions_assignedUserId_fkey\` FOREIGN KEY (\`assignedUserId\`) REFERENCES \`users\`(\`id\`) ON DELETE SET NULL ON UPDATE CASCADE;
+      `);
+    } catch {}
+
+    await prisma.$executeRawUnsafe(`SET FOREIGN_KEY_CHECKS = 1;`);
+  } catch (error) {
+    console.warn('[BOOTSTRAP] ⚠️ Advertencia en verificación de esquema de BD:', error);
+  }
+}
+
+/**
  * Garantiza que exista al menos un usuario Administrador activo al arrancar el servidor.
  * Esto evita fallos de login tras migraciones, resets de BD o despliegues limpios.
  */

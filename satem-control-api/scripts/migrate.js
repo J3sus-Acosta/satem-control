@@ -24,6 +24,14 @@ async function runSafeMigrations() {
     console.log('[MIGRATION] Verificando tablas del Portal de Clientes y firmas...');
     await prisma.$executeRawUnsafe(`SET FOREIGN_KEY_CHECKS = 0;`);
 
+    // Columna assignedUserId en system_exceptions
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE \`system_exceptions\` ADD COLUMN \`assignedUserId\` VARCHAR(191) NULL;
+      `);
+      console.log('[MIGRATION] Columna assignedUserId agregada a system_exceptions.');
+    } catch {}
+
     // Columnas en payments
     try {
       await prisma.$executeRawUnsafe(`
