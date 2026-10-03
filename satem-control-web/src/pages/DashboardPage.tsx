@@ -68,9 +68,9 @@ export const DashboardPage: React.FC = () => {
   const cycle = [
     { step: '①', label: 'Clientes & Contratos', desc: 'Alta de cliente + generación de SOW con PDF', route: '/customers', icon: <Building2 size={18} />, color: 'var(--success)' },
     { step: '②', label: 'Expedientes', desc: 'Ejecución del trabajo, OTs, documentos e integridad', route: '/expedients', icon: <FolderKanban size={18} />, color: 'var(--info)' },
-    { step: '③', label: 'Cierre de Expediente', desc: 'Cierre 100% o con excepción + snapshot inmutable', route: '/expedients', icon: <CheckCircle2 size={18} />, color: 'var(--accent-primary)' },
-    { step: '④', label: 'Facturación SII', desc: 'Registro de folio SII Tipo 110 + cálculo SumUp', route: '/billing', icon: <FileSpreadsheet size={18} />, color: 'var(--warning)' },
-    { step: '⑤', label: 'Conciliación Bancaria', desc: 'Match del abono Santander con la factura emitida', route: '/bank', icon: <Landmark size={18} />, color: 'var(--success)' },
+    { step: '③', label: 'Facturación SII', desc: 'Registro de folio SII Tipo 110 + cálculo SumUp', route: '/billing', icon: <FileSpreadsheet size={18} />, color: 'var(--warning)' },
+    { step: '④', label: 'Conciliación Bancaria', desc: 'Match del abono Santander con la factura emitida', route: '/bank', icon: <Landmark size={18} />, color: 'var(--success)' },
+    { step: '⑤', label: 'Cierre de Expediente', desc: 'Cierre 100% o con excepción + snapshot inmutable', route: '/expedients', icon: <CheckCircle2 size={18} />, color: 'var(--accent-primary)' },
   ];
 
   return (
