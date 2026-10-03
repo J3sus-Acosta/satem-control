@@ -28,9 +28,10 @@ const confirmImportSchema = z.object({
 
 const reconcileSchema = z.object({
   bankReceiptId: z.string().uuid(),
-  paymentAllocationId: z.string().uuid(),
-  expectedAmountClp: z.number().positive(),
-  receivedAmountClp: z.number().positive(),
+  paymentAllocationId: z.string().uuid().optional(),
+  paymentId: z.string().uuid().optional(),
+  expectedAmountClp: z.number().positive().optional(),
+  receivedAmountClp: z.number().positive().optional(),
   notes: z.string().optional(),
   expedientId: z.string().uuid().optional(),
 });
@@ -131,8 +132,30 @@ async function updateExpedientIntegrityReconciliation(
   expedientId: string,
   receiptCode: string,
   reconciledAmountClp: number,
-  userId?: string
+  userId?: string,
+  rawSourceFileId?: string | null
 ) {
+  // 1. Vincular formalmente la cartola como documento del expediente si no está vinculada aún
+  if (rawSourceFileId) {
+    const existingLink = await tx.documentLink.findFirst({
+      where: {
+        documentId: rawSourceFileId,
+        expedientId: expedientId,
+      },
+    });
+
+    if (!existingLink) {
+      await tx.documentLink.create({
+        data: {
+          documentId: rawSourceFileId,
+          entityType: 'EXPEDIENT',
+          entityId: expedientId,
+          expedientId: expedientId,
+        },
+      });
+    }
+  }
+
   const expedient = await tx.expedient.findUnique({
     where: { id: expedientId },
     include: {
@@ -237,6 +260,7 @@ async function updateExpedientIntegrityReconciliation(
     where: { expedientId, code: 'RECONCILIATION_COMPLETED' },
     data: {
       status: 'COMPLETED',
+      documentId: rawSourceFileId || undefined,
       observation: `Conciliación bancaria Santander confirmada (${receiptCode})${progressText}`,
       completedAt: new Date(),
       completedById: userId,
@@ -625,22 +649,70 @@ export async function reconcileHandler(request: FastifyRequest, reply: FastifyRe
   const body = reconcileSchema.parse(request.body);
   const userId = (request.user as any)?.userId;
 
-  const discrepancyAmountClp = Math.abs(body.expectedAmountClp - body.receivedAmountClp);
+  const receipt = await prisma.bankReceipt.findUnique({
+    where: { id: body.bankReceiptId },
+  });
+  if (!receipt) {
+    throw new NotFoundError('Movimiento bancario no encontrado');
+  }
+
+  let allocId = body.paymentAllocationId;
+  if (!allocId && body.paymentId) {
+    const paymentRec = await prisma.payment.findUnique({
+      where: { id: body.paymentId },
+      include: { allocations: true },
+    });
+    if (paymentRec?.allocations?.[0]) {
+      allocId = paymentRec.allocations[0].id;
+    }
+  }
+
+  if (!allocId) {
+    throw new AppError('Debe especificar paymentAllocationId o paymentId', 400);
+  }
+
+  const alloc = await prisma.paymentAllocation.findUnique({
+    where: { id: allocId },
+    include: {
+      payment: {
+        include: {
+          paymentRequest: { include: { invoice: true } },
+          proofDocument: { include: { links: true } },
+        },
+      },
+    },
+  });
+  if (!alloc) {
+    throw new NotFoundError('Asignación de pago no encontrada');
+  }
+
+  const receivedAmountClp = body.receivedAmountClp || Number(receipt.amountClp);
+  const expectedAmountClp = body.expectedAmountClp || Number(alloc.payment.amount) || Number(alloc.allocatedAmount);
+  const diff = Math.abs(expectedAmountClp - receivedAmountClp);
+
+  // Si la diferencia es menor al 15% (rango de comisión de pasarelas como SumUp/PayPal/Stripe) o menos de 5 CLP, es una conciliación válida con comisión
+  const isSumUpOrFee = diff <= expectedAmountClp * 0.15 || diff <= 5;
+  const discrepancyAmountClp = isSumUpOrFee ? 0 : diff;
 
   const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const reconciliation = await tx.bankReconciliation.create({
       data: {
         bankReceiptId: body.bankReceiptId,
-        paymentAllocationId: body.paymentAllocationId,
-        expectedAmountClp: new Prisma.Decimal(body.expectedAmountClp),
-        receivedAmountClp: new Prisma.Decimal(body.receivedAmountClp),
+        paymentAllocationId: allocId,
+        expectedAmountClp: new Prisma.Decimal(expectedAmountClp),
+        receivedAmountClp: new Prisma.Decimal(receivedAmountClp),
         discrepancyAmountClp: new Prisma.Decimal(discrepancyAmountClp),
-        notes: body.notes || null,
+        notes: body.notes || (diff > 0 ? `Conciliación SATEM (Diferencia/Comisión: $${diff.toLocaleString('es-CL')} CLP)` : 'Conciliación Manual SATEM'),
         reconciledById: userId,
       },
     });
 
-    const receipt = await tx.bankReceipt.update({
+    await tx.paymentAllocation.update({
+      where: { id: allocId },
+      data: { allocatedAmount: new Prisma.Decimal(receivedAmountClp) },
+    });
+
+    const updatedReceipt = await tx.bankReceipt.update({
       where: { id: body.bankReceiptId },
       data: {
         status: discrepancyAmountClp > 0 ? ReconciliationStatus.DISCREPANCY : ReconciliationStatus.RECONCILED,
@@ -650,25 +722,15 @@ export async function reconcileHandler(request: FastifyRequest, reply: FastifyRe
     // Resolver expediente
     let targetExpedientId = body.expedientId;
     if (!targetExpedientId) {
-      const alloc = await tx.paymentAllocation.findUnique({
-        where: { id: body.paymentAllocationId },
-        include: {
-          payment: {
-            include: {
-              paymentRequest: { include: { invoice: true } },
-              proofDocument: { include: { links: true } },
-            },
-          },
-        },
-      });
       targetExpedientId =
         alloc?.payment?.paymentRequest?.invoice?.expedientId ||
         alloc?.payment?.proofDocument?.links?.find((l) => l.expedientId)?.expedientId ||
+        alloc?.payment?.proofDocument?.links?.find((l) => l.entityType === 'EXPEDIENT')?.entityId ||
         undefined;
     }
 
     if (targetExpedientId) {
-      await updateExpedientIntegrityReconciliation(tx, targetExpedientId, receipt.code, body.receivedAmountClp, userId);
+      await updateExpedientIntegrityReconciliation(tx, targetExpedientId, updatedReceipt.code, receivedAmountClp, userId, receipt.rawSourceFileId);
     }
 
     await createAuditLog(tx, {
@@ -685,6 +747,369 @@ export async function reconcileHandler(request: FastifyRequest, reply: FastifyRe
   });
 
   return reply.send({ success: true, data: result });
+}
+
+interface MatchCandidate {
+  allocationId: string;
+  paymentId: string;
+  paymentCode: string;
+  paymentMethod: string;
+  transactionRef?: string | null;
+  paymentDate: Date;
+  grossAmount: number;
+  currency: string;
+  usdEquivalent?: number | null;
+  customerName?: string;
+  expedientCode?: string;
+  expedientId?: string;
+  invoiceFolio?: number;
+  score: number;
+  isExactRef: boolean;
+  dateDiffDays: number;
+  feeDifferenceClp: number;
+  reasons: string[];
+}
+
+interface AnalyzedReceiptMatch {
+  receipt: any;
+  status: 'EXACT_MATCH' | 'HIGH_CONFIDENCE' | 'AMBIGUOUS' | 'NO_MATCH';
+  suggestedCandidate?: MatchCandidate;
+  candidates: MatchCandidate[];
+  reconciliationNotes: string;
+}
+
+function analyzeReceiptMatches(receipts: any[], allocations: any[]): AnalyzedReceiptMatch[] {
+  return receipts.map((receipt) => {
+    const receiptAmount = Number(receipt.amountClp);
+    const receiptDate = new Date(receipt.transactionDate).getTime();
+    const receiptDesc = (receipt.description || '').toLowerCase();
+    const receiptRef = (receipt.referenceNumber || '').trim().toLowerCase().replace(/^0+/, '');
+
+    const candidates: MatchCandidate[] = [];
+
+    for (const alloc of allocations) {
+      const p = alloc.payment;
+      const allocAmount = Number(alloc.allocatedAmount);
+      const grossAmount = Number(p.amount);
+      const pDate = new Date(p.paymentDate).getTime();
+      const dateDiffDays = Math.round(Math.abs(receiptDate - pDate) / (1000 * 60 * 60 * 24));
+
+      const exp = p.paymentRequest?.invoice?.expedient || p.proofDocument?.links?.find((l: any) => l.expedient)?.expedient;
+      const customer = exp?.customer;
+      const invoiceFolio = p.paymentRequest?.invoice?.siiFolio;
+      const expCode = exp?.code;
+
+      let score = 0;
+      let isExactRef = false;
+      const reasons: string[] = [];
+
+      // 1. Coincidencia de Referencia / Link / PID única (+100 puntos)
+      const pRef = (p.transactionRef || '').trim().toLowerCase().replace(/^0+/, '');
+      const sumupTxId = (p.paymentRequest?.sumupTransactionId || '').trim().toLowerCase();
+      const sumupLink = (p.paymentRequest?.sumupLink || '').trim().toLowerCase();
+
+      if (pRef && receiptRef && (receiptRef === pRef || receiptRef.includes(pRef) || pRef.includes(receiptRef))) {
+        score += 100;
+        isExactRef = true;
+        reasons.push(`Referencia bancaria coincide (${p.transactionRef})`);
+      } else if (pRef && receiptDesc.includes(pRef)) {
+        score += 100;
+        isExactRef = true;
+        reasons.push(`Glosa bancaria contiene referencia (${p.transactionRef})`);
+      } else if (sumupTxId && receiptDesc.includes(sumupTxId)) {
+        score += 100;
+        isExactRef = true;
+        reasons.push(`Glosa bancaria contiene ID SumUp (${sumupTxId})`);
+      } else if (sumupLink && receiptDesc.includes(sumupLink)) {
+        score += 100;
+        isExactRef = true;
+        reasons.push(`Glosa bancaria contiene Link de Pago (${sumupLink})`);
+      } else if (expCode && receiptDesc.includes(expCode.toLowerCase())) {
+        score += 80;
+        isExactRef = true;
+        reasons.push(`Glosa bancaria menciona Expediente ${expCode}`);
+      } else if (invoiceFolio && receiptDesc.includes(String(invoiceFolio))) {
+        score += 70;
+        reasons.push(`Glosa bancaria menciona Folio Factura #${invoiceFolio}`);
+      }
+
+      // 2. Coincidencia de Método SumUp y Neto con Comisión (+50 puntos)
+      const isSumUpBank = receiptDesc.includes('sumup');
+      const isSumUpPayment =
+        (p.paymentMethod || '').toLowerCase().includes('sumup') ||
+        (p.transactionRef || '').toLowerCase().includes('pid') ||
+        (p.proofDocument?.originalName || '').toLowerCase().includes('sumup');
+
+      let isAmountCompatible = false;
+      let feeDifferenceClp = 0;
+
+      if (isSumUpBank && isSumUpPayment) {
+        // En SumUp, el depósito neto está entre 80% y 101% del valor bruto
+        if (receiptAmount <= grossAmount * 1.01 && receiptAmount >= grossAmount * 0.80) {
+          score += 50;
+          isAmountCompatible = true;
+          feeDifferenceClp = Math.max(0, grossAmount - receiptAmount);
+          reasons.push(`Monto neto SumUp compatible (Bruto: $${grossAmount.toLocaleString('es-CL')} / Comisión: $${feeDifferenceClp.toLocaleString('es-CL')} CLP)`);
+        } else if (Math.abs(allocAmount - receiptAmount) <= 10) {
+          score += 50;
+          isAmountCompatible = true;
+          reasons.push(`Monto liquidado coincide con asignación ($${allocAmount.toLocaleString('es-CL')} CLP)`);
+        }
+      } else {
+        // Transferencia regular / Otro método
+        if (Math.abs(allocAmount - receiptAmount) <= 5 || Math.abs(grossAmount - receiptAmount) <= 5) {
+          score += 50;
+          isAmountCompatible = true;
+          reasons.push(`Monto exacto transferido ($${receiptAmount.toLocaleString('es-CL')} CLP)`);
+        } else if (receiptAmount <= grossAmount * 1.05 && receiptAmount >= grossAmount * 0.80) {
+          // Posible comisión de pasarela
+          score += 25;
+          isAmountCompatible = true;
+          feeDifferenceClp = Math.max(0, grossAmount - receiptAmount);
+          reasons.push(`Monto proporcional con posible comisión ($${feeDifferenceClp.toLocaleString('es-CL')} CLP)`);
+        }
+      }
+
+      // 3. Proximidad de Fecha (+30 puntos max)
+      if (isAmountCompatible || isExactRef) {
+        if (dateDiffDays <= 1) {
+          score += 30;
+          reasons.push(`Fecha idéntica o inmediata (${dateDiffDays} día de diferencia)`);
+        } else if (dateDiffDays <= 4) {
+          score += 25;
+          reasons.push(`Fecha cercana (${dateDiffDays} días de diferencia)`);
+        } else if (dateDiffDays <= 10) {
+          score += 15;
+          reasons.push(`Ventana de liquidación (${dateDiffDays} días de diferencia)`);
+        } else if (dateDiffDays <= 30) {
+          score += 5;
+          reasons.push(`Fecha en el mismo mes (${dateDiffDays} días de diferencia)`);
+        } else {
+          score -= 15;
+          reasons.push(`Fecha lejana (${dateDiffDays} días de diferencia)`);
+        }
+
+        candidates.push({
+          allocationId: alloc.id,
+          paymentId: p.id,
+          paymentCode: p.code,
+          paymentMethod: p.paymentMethod || 'SumUp',
+          transactionRef: p.transactionRef,
+          paymentDate: p.paymentDate,
+          grossAmount,
+          currency: p.currency,
+          usdEquivalent: p.usdEquivalent ? Number(p.usdEquivalent) : null,
+          customerName: customer?.legalName || customer?.rut || 'Cliente SATEM',
+          expedientCode: expCode,
+          expedientId: exp?.id,
+          invoiceFolio,
+          score,
+          isExactRef,
+          dateDiffDays,
+          feeDifferenceClp,
+          reasons,
+        });
+      }
+    }
+
+    // Ordenar candidatos por puntaje descendente
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Clasificación de certeza
+    let status: 'EXACT_MATCH' | 'HIGH_CONFIDENCE' | 'AMBIGUOUS' | 'NO_MATCH' = 'NO_MATCH';
+    let suggestedCandidate: MatchCandidate | undefined = undefined;
+    let reconciliationNotes = 'Auto-Match SATEM';
+
+    const topCandidate = candidates[0];
+
+    if (topCandidate) {
+      if (topCandidate.isExactRef) {
+        status = 'EXACT_MATCH';
+        suggestedCandidate = topCandidate;
+        reconciliationNotes = `Auto-Match Referencia Exacta (${topCandidate.paymentCode} - ${topCandidate.customerName || 'SATEM'})`;
+      } else if (candidates.length === 1 && topCandidate.score >= 60 && topCandidate.dateDiffDays <= 15) {
+        status = 'HIGH_CONFIDENCE';
+        suggestedCandidate = topCandidate;
+        const fee = topCandidate.feeDifferenceClp;
+        reconciliationNotes = fee > 0
+          ? `Auto-Match SumUp: Neto $${receiptAmount.toLocaleString('es-CL')} CLP (Comisión: $${fee.toLocaleString('es-CL')} CLP - ${topCandidate.customerName})`
+          : `Auto-Match por Monto y Fecha (${topCandidate.paymentCode} - ${topCandidate.customerName})`;
+      } else if (candidates.length > 1) {
+        // Ambigüedad detectada: múltiples pagos candidatos con montos/fechas similares sin link único
+        // Ver si el primer candidato supera al segundo por amplio margen (>30 pts)
+        const secondCandidate = candidates[1];
+        if (topCandidate.score - secondCandidate.score >= 35 && topCandidate.dateDiffDays <= 2) {
+          status = 'HIGH_CONFIDENCE';
+          suggestedCandidate = topCandidate;
+          reconciliationNotes = `Auto-Match Probable (${topCandidate.paymentCode} - ${topCandidate.customerName})`;
+        } else {
+          status = 'AMBIGUOUS';
+          // No auto-asignamos ciegamente para evitar colisión de contratos/links
+          reconciliationNotes = `Requiere Confirmación: ${candidates.length} pagos candidatos detectados con montos similares`;
+        }
+      }
+    }
+
+    return {
+      receipt,
+      status,
+      suggestedCandidate,
+      candidates,
+      reconciliationNotes,
+    };
+  });
+}
+
+export async function previewAutoMatchBankHandler(request: FastifyRequest, reply: FastifyReply) {
+  const unreconciledReceipts = await prisma.bankReceipt.findMany({
+    where: { status: ReconciliationStatus.UNRECONCILED },
+    orderBy: { transactionDate: 'asc' },
+  });
+
+  const paymentAllocations = await prisma.paymentAllocation.findMany({
+    where: { reconciliations: { none: {} } },
+    include: {
+      payment: {
+        include: {
+          proofDocument: { include: { links: true } },
+          paymentRequest: {
+            include: {
+              invoice: {
+                include: { expedient: { include: { customer: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const analyzed = analyzeReceiptMatches(unreconciledReceipts, paymentAllocations);
+
+  const exactCount = analyzed.filter(a => a.status === 'EXACT_MATCH').length;
+  const highConfidenceCount = analyzed.filter(a => a.status === 'HIGH_CONFIDENCE').length;
+  const ambiguousCount = analyzed.filter(a => a.status === 'AMBIGUOUS').length;
+  const noMatchCount = analyzed.filter(a => a.status === 'NO_MATCH').length;
+
+  return reply.send({
+    success: true,
+    data: {
+      items: analyzed,
+      summary: {
+        totalUnreconciledReceipts: unreconciledReceipts.length,
+        totalUnreconciledPayments: paymentAllocations.length,
+        exactMatchCount: exactCount,
+        highConfidenceCount,
+        ambiguousCount,
+        noMatchCount,
+        readyToReconcileCount: exactCount + highConfidenceCount,
+      },
+    },
+  });
+}
+
+export async function confirmBatchAutoMatchHandler(request: FastifyRequest, reply: FastifyReply) {
+  const batchSchema = z.object({
+    matches: z.array(
+      z.object({
+        bankReceiptId: z.string().uuid(),
+        paymentAllocationId: z.string().uuid().optional(),
+        paymentId: z.string().uuid().optional(),
+        notes: z.string().optional(),
+      })
+    ).min(1, 'Debe incluir al menos 1 coincidencia para conciliar'),
+  });
+
+  const body = batchSchema.parse(request.body);
+  const userId = (request.user as any)?.userId;
+
+  let reconciledCount = 0;
+
+  await prisma.$transaction(async (tx) => {
+    for (const m of body.matches) {
+      const receipt = await tx.bankReceipt.findUnique({
+        where: { id: m.bankReceiptId },
+      });
+      if (!receipt || receipt.status === ReconciliationStatus.RECONCILED) {
+        continue;
+      }
+
+      let allocId = m.paymentAllocationId;
+      if (!allocId && m.paymentId) {
+        const p = await tx.payment.findUnique({
+          where: { id: m.paymentId },
+          include: { allocations: true },
+        });
+        if (p?.allocations?.[0]) {
+          allocId = p.allocations[0].id;
+        }
+      }
+
+      if (!allocId) continue;
+
+      const alloc = await tx.paymentAllocation.findUnique({
+        where: { id: allocId },
+        include: {
+          payment: {
+            include: {
+              paymentRequest: { include: { invoice: true } },
+              proofDocument: { include: { links: true } },
+            },
+          },
+        },
+      });
+
+      if (!alloc) continue;
+
+      const receiptAmount = Number(receipt.amountClp);
+      const grossAmount = Number(alloc.payment.amount);
+      const feeDiff = Math.max(0, grossAmount - receiptAmount);
+      const notes = m.notes || (feeDiff > 0
+        ? `Conciliado: Neto $${receiptAmount.toLocaleString('es-CL')} CLP (Comisión: $${feeDiff.toLocaleString('es-CL')} CLP)`
+        : 'Conciliación Confirmada');
+
+      await tx.bankReconciliation.create({
+        data: {
+          bankReceiptId: receipt.id,
+          paymentAllocationId: alloc.id,
+          expectedAmountClp: new Prisma.Decimal(grossAmount > 0 ? grossAmount : receiptAmount),
+          receivedAmountClp: new Prisma.Decimal(receiptAmount),
+          discrepancyAmountClp: new Prisma.Decimal(0),
+          notes,
+          reconciledById: userId || 'SYSTEM',
+        },
+      });
+
+      await tx.paymentAllocation.update({
+        where: { id: alloc.id },
+        data: { allocatedAmount: new Prisma.Decimal(receiptAmount) },
+      });
+
+      await tx.bankReceipt.update({
+        where: { id: receipt.id },
+        data: { status: ReconciliationStatus.RECONCILED },
+      });
+
+      const expedId =
+        alloc.payment.paymentRequest?.invoice?.expedientId ||
+        alloc.payment.proofDocument?.links?.find((l) => l.expedientId)?.expedientId ||
+        alloc.payment.proofDocument?.links?.find((l) => l.entityType === 'EXPEDIENT')?.entityId;
+
+      if (expedId) {
+        await updateExpedientIntegrityReconciliation(tx, expedId, receipt.code, receiptAmount, userId, receipt.rawSourceFileId);
+      }
+
+      reconciledCount++;
+    }
+  });
+
+  return reply.send({
+    success: true,
+    data: {
+      reconciledCount,
+      message: `Se conciliaron exitosamente ${reconciledCount} abonos bancarios.`,
+    },
+  });
 }
 
 export async function autoMatchBankHandler(request: FastifyRequest, reply: FastifyReply) {
@@ -704,7 +1129,7 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
           paymentRequest: {
             include: {
               invoice: {
-                include: { expedient: true },
+                include: { expedient: { include: { customer: true } } },
               },
             },
           },
@@ -713,64 +1138,39 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
     },
   });
 
-  // Priorizar alocaciones que tengan expediente o documento vinculado
-  paymentAllocations.sort((a, b) => {
-    const aHasExp = (a.payment.paymentRequest?.invoice?.expedientId || a.payment.proofDocument?.links?.length) ? 1 : 0;
-    const bHasExp = (b.payment.paymentRequest?.invoice?.expedientId || b.payment.proofDocument?.links?.length) ? 1 : 0;
-    return bHasExp - aHasExp;
-  });
+  // Ejecutar análisis inteligente
+  const analyzed = analyzeReceiptMatches(unreconciledReceipts, paymentAllocations);
+
+  // Solo conciliar automáticamente coincidencias seguras (EXACT_MATCH o HIGH_CONFIDENCE)
+  // NUNCA conciliar de forma ciega las marcadas como AMBIGUOUS
+  const safeMatches = analyzed.filter(
+    (a) => (a.status === 'EXACT_MATCH' || a.status === 'HIGH_CONFIDENCE') && a.suggestedCandidate
+  );
 
   let matchCount = 0;
 
-  for (const receipt of unreconciledReceipts) {
-    const receiptAmount = Number(receipt.amountClp);
-    if (receiptAmount <= 0) continue;
+  if (safeMatches.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      for (const m of safeMatches) {
+        const candidate = m.suggestedCandidate!;
+        const receipt = m.receipt;
+        const receiptAmount = Number(receipt.amountClp);
 
-    const match = paymentAllocations.find((alloc) => {
-      const p = alloc.payment;
-
-      if (receipt.referenceNumber && p.transactionRef) {
-        const refR = receipt.referenceNumber.trim().toLowerCase();
-        const refP = p.transactionRef.trim().toLowerCase();
-        if (refR.includes(refP) || refP.includes(refR)) {
-          return true;
-        }
-      }
-
-      const isSumUpBank = receipt.description.toLowerCase().includes('sumup');
-      const isSumUpPayment = (p.paymentMethod || '').toLowerCase().includes('sumup') || (p.transactionRef || '').toLowerCase().includes('pid');
-
-      const allocAmount = Number(alloc.allocatedAmount);
-      const grossAmount = Number(p.amount);
-
-      if (Math.abs(allocAmount - receiptAmount) < 1) {
-        return true;
-      }
-
-      if (isSumUpBank && isSumUpPayment && (Math.abs(allocAmount - receiptAmount) < 1 || Math.abs(grossAmount - receiptAmount) < 1)) {
-        return true;
-      }
-
-      return false;
-    });
-
-    if (match) {
-      const expedId =
-        match.payment.paymentRequest?.invoice?.expedientId ||
-        match.payment.proofDocument?.links?.find((l) => l.expedientId)?.expedientId ||
-        match.payment.proofDocument?.links?.find((l) => l.entityType === 'EXPEDIENT')?.entityId;
-
-      await prisma.$transaction(async (tx) => {
         await tx.bankReconciliation.create({
           data: {
             bankReceiptId: receipt.id,
-            paymentAllocationId: match.id,
-            expectedAmountClp: new Prisma.Decimal(receiptAmount),
+            paymentAllocationId: candidate.allocationId,
+            expectedAmountClp: new Prisma.Decimal(candidate.grossAmount > 0 ? candidate.grossAmount : receiptAmount),
             receivedAmountClp: new Prisma.Decimal(receiptAmount),
             discrepancyAmountClp: new Prisma.Decimal(0),
-            notes: 'Auto-Match Automático SATEM',
+            notes: m.reconciliationNotes,
             reconciledById: userId || 'SYSTEM',
           },
+        });
+
+        await tx.paymentAllocation.update({
+          where: { id: candidate.allocationId },
+          data: { allocatedAmount: new Prisma.Decimal(receiptAmount) },
         });
 
         await tx.bankReceipt.update({
@@ -778,22 +1178,36 @@ export async function autoMatchBankHandler(request: FastifyRequest, reply: Fasti
           data: { status: ReconciliationStatus.RECONCILED },
         });
 
-        if (expedId) {
-          await updateExpedientIntegrityReconciliation(tx, expedId, receipt.code, receiptAmount, userId);
+        if (candidate.expedientId) {
+          await updateExpedientIntegrityReconciliation(tx, candidate.expedientId, receipt.code, receiptAmount, userId, receipt.rawSourceFileId);
         }
-      });
 
-      matchCount++;
-      const idx = paymentAllocations.indexOf(match);
-      if (idx > -1) paymentAllocations.splice(idx, 1);
+        matchCount++;
+      }
+    });
+  }
+
+  const ambiguousCount = analyzed.filter(a => a.status === 'AMBIGUOUS').length;
+
+  let message = '';
+  if (matchCount > 0) {
+    message = `Se conciliaron de forma segura ${matchCount} movimientos.`;
+    if (ambiguousCount > 0) {
+      message += ` Hay ${ambiguousCount} abonos con múltiples pagos de montos similares que requieren selección manual para evitar colisiones.`;
     }
+  } else if (ambiguousCount > 0) {
+    message = `Se detectaron ${ambiguousCount} abonos con múltiples candidatos de montos similares. Por favor selecciona el link/contrato correspondiente en el botón "Conciliar".`;
+  } else {
+    message = 'No se encontraron coincidencias automáticas seguras pendientes.';
   }
 
   return reply.send({
     success: true,
     data: {
       reconciledCount: matchCount,
-      message: matchCount > 0 ? `Se conciliaron exitosamente ${matchCount} movimientos.` : 'No se encontraron coincidencias automáticas pendientes.',
+      ambiguousCount,
+      message,
     },
   });
 }
+

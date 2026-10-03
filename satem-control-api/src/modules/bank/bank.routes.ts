@@ -6,6 +6,8 @@ import {
   confirmBankImportHandler,
   reconcileHandler,
   autoMatchBankHandler,
+  previewAutoMatchBankHandler,
+  confirmBatchAutoMatchHandler,
   deleteBankReceiptHandler,
 } from './bank.controller.js';
 import { authenticateGuard, roleGuard } from '../../common/middleware/auth-guard.js';
@@ -18,5 +20,7 @@ export async function bankRoutes(fastify: FastifyInstance) {
   fastify.post('/import-confirm', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING])] }, confirmBankImportHandler);
   fastify.post('/reconcile', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING])] }, reconcileHandler);
   fastify.post('/auto-match', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING])] }, autoMatchBankHandler);
+  fastify.post('/auto-match-preview', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING])] }, previewAutoMatchBankHandler);
+  fastify.post('/auto-match-confirm', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING])] }, confirmBatchAutoMatchHandler);
   fastify.delete('/receipts/:id', { preHandler: [roleGuard([UserRole.ADMIN, UserRole.ACCOUNTING])] }, (req: any, reply: any) => deleteBankReceiptHandler(req, reply));
 }

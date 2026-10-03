@@ -3,7 +3,8 @@ import { api, getAccessToken } from '../services/api';
 import {
   Landmark, Upload, CheckCircle2, AlertTriangle,
   FileCheck, Zap, RefreshCw, Info, FileSpreadsheet,
-  Trash2, Eye, Download, X, FileText, Filter
+  Trash2, Eye, Download, X, FileText, Filter, Link2,
+  ShieldCheck, AlertCircle, Calendar, Sparkles, CheckSquare, Square, ChevronRight
 } from 'lucide-react';
 
 export const BankPage: React.FC = () => {
@@ -20,6 +21,25 @@ export const BankPage: React.FC = () => {
 
   // Modal de visualización de documento de cartola / comprobante
   const [docModal, setDocModal] = useState<{ isOpen: boolean; docId: string; title: string } | null>(null);
+
+  // Modal de conciliación manual individual
+  const [manualModal, setManualModal] = useState<{
+    isOpen: boolean;
+    receipt: any;
+    selectedPaymentId: string;
+    notes: string;
+    submitting: boolean;
+  } | null>(null);
+
+  // Modal de Auto-Match inteligente con confirmación y prevención de colisiones
+  const [autoMatchModal, setAutoMatchModal] = useState<{
+    isOpen: boolean;
+    items: any[];
+    summary: any;
+    selectedAllocations: Record<string, string>;
+    enabledReceipts: Record<string, boolean>;
+    submitting: boolean;
+  } | null>(null);
 
   // Paginación client-side
   const PAGE_SIZE = 15;
@@ -99,19 +119,112 @@ export const BankPage: React.FC = () => {
     }
   };
 
-  /** Auto-Match abono ↔ pago / factura */
+  /** Conciliación Manual directa */
+  const handleManualReconcileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualModal || !manualModal.receipt || !manualModal.selectedPaymentId) {
+      alert('Por favor selecciona un comprobante o pago para conciliar.');
+      return;
+    }
+    setManualModal(prev => prev ? { ...prev, submitting: true } : null);
+    try {
+      await api.post('/bank/reconcile', {
+        bankReceiptId: manualModal.receipt.id,
+        paymentId: manualModal.selectedPaymentId,
+        receivedAmountClp: Number(manualModal.receipt.amountClp),
+        notes: manualModal.notes || undefined,
+      });
+      alert('Abono bancario conciliado exitosamente.');
+      setManualModal(null);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error?.message || err.response?.data?.message || 'Error al conciliar movimiento';
+      alert(msg);
+      setManualModal(prev => prev ? { ...prev, submitting: false } : null);
+    }
+  };
+
+  /** Analizar y previsualizar Auto-Match con confirmación anti-colisiones */
   const handleAutoMatch = async () => {
     setMatching(true);
     setMatchResult(null);
     try {
-      const res = await api.post('/bank/auto-match', {});
-      setMatchResult(res.data.data);
-      fetchData();
+      const res = await api.post('/bank/auto-match-preview');
+      const { items, summary } = res.data.data;
+
+      if (!items || items.length === 0) {
+        alert('No hay abonos pendientes para analizar.');
+        return;
+      }
+
+      const initialSelections: Record<string, string> = {};
+      const initialEnabled: Record<string, boolean> = {};
+
+      items.forEach((item: any) => {
+        const rId = item.receipt.id;
+        if (item.suggestedCandidate) {
+          initialSelections[rId] = item.suggestedCandidate.allocationId;
+          // Coincidencias seguras vienen activadas por defecto
+          initialEnabled[rId] = item.status === 'EXACT_MATCH' || item.status === 'HIGH_CONFIDENCE';
+        } else if (item.candidates && item.candidates.length > 0) {
+          initialSelections[rId] = item.candidates[0].allocationId;
+          // Casos ambiguos requieren que el usuario los active tras seleccionar
+          initialEnabled[rId] = false;
+        } else {
+          initialEnabled[rId] = false;
+        }
+      });
+
+      setAutoMatchModal({
+        isOpen: true,
+        items,
+        summary,
+        selectedAllocations: initialSelections,
+        enabledReceipts: initialEnabled,
+        submitting: false,
+      });
     } catch (err: any) {
       const msg = err.response?.data?.error?.message || err.response?.data?.message;
-      alert(msg || 'Error al ejecutar auto-match');
+      alert(msg || 'Error al analizar auto-match');
     } finally {
       setMatching(false);
+    }
+  };
+
+  /** Confirmar conciliaciones seleccionadas en lote */
+  const handleConfirmBatchAutoMatch = async () => {
+    if (!autoMatchModal) return;
+
+    const matchesToConfirm: Array<{ bankReceiptId: string; paymentAllocationId: string; notes?: string }> = [];
+
+    autoMatchModal.items.forEach((item) => {
+      const rId = item.receipt.id;
+      if (autoMatchModal.enabledReceipts[rId] && autoMatchModal.selectedAllocations[rId]) {
+        const selectedAllocId = autoMatchModal.selectedAllocations[rId];
+        const candidate = item.candidates.find((c: any) => c.allocationId === selectedAllocId) || item.suggestedCandidate;
+        matchesToConfirm.push({
+          bankReceiptId: rId,
+          paymentAllocationId: selectedAllocId,
+          notes: candidate ? `Auto-Match Confirmado (${candidate.paymentCode} - ${candidate.customerName || 'SATEM'})` : undefined,
+        });
+      }
+    });
+
+    if (matchesToConfirm.length === 0) {
+      alert('Selecciona al menos 1 abono bancario con su comprobante para conciliar.');
+      return;
+    }
+
+    setAutoMatchModal(prev => prev ? { ...prev, submitting: true } : null);
+    try {
+      const res = await api.post('/bank/auto-match-confirm', { matches: matchesToConfirm });
+      alert(res.data.data?.message || `Se conciliaron ${matchesToConfirm.length} movimientos exitosamente.`);
+      setAutoMatchModal(null);
+      fetchData();
+    } catch (err: any) {
+      const msg = err.response?.data?.error?.message || err.response?.data?.message || 'Error al confirmar conciliaciones';
+      alert(msg);
+      setAutoMatchModal(prev => prev ? { ...prev, submitting: false } : null);
     }
   };
 
@@ -510,7 +623,27 @@ export const BankPage: React.FC = () => {
                               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
                             )}
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            {r.status !== 'RECONCILED' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const pendingPay = payments.find(p => !p.allocations?.some((a: any) => a.reconciliations?.length > 0)) || payments[0];
+                                  setManualModal({
+                                    isOpen: true,
+                                    receipt: r,
+                                    selectedPaymentId: pendingPay?.id || '',
+                                    notes: '',
+                                    submitting: false,
+                                  });
+                                }}
+                                className="btn btn-primary"
+                                style={{ padding: '4px 8px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '6px' }}
+                                title="Conciliar manualmente este abono con un comprobante de pago"
+                              >
+                                <Link2 size={12} /> Conciliar
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleDeleteReceipt(r.id, r.code)}
@@ -724,6 +857,408 @@ export const BankPage: React.FC = () => {
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 title={docModal.title}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Conciliación Manual */}
+      {manualModal && (
+        <div className="modal-overlay" style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="modal-dialog" style={{ maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Link2 size={20} color="var(--accent-primary)" /> Conciliar Abono Santander con Comprobante
+              </h3>
+              <button
+                type="button"
+                onClick={() => setManualModal(null)}
+                className="btn-icon"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Resumen del Abono en Banco Santander */}
+            <div style={{ backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '14px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
+                Abono Detectado en Banco Santander
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)', fontSize: '14px' }}>
+                    {manualModal.receipt.code} • {manualModal.receipt.description}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Fecha: {new Date(manualModal.receipt.transactionDate).toLocaleDateString('es-CL')} | Ref: {manualModal.receipt.referenceNumber || 'N/A'}
+                  </div>
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--success)' }}>
+                  ${Math.abs(Number(manualModal.receipt.amountClp)).toLocaleString('es-CL')} CLP
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleManualReconcileSubmit}>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Seleccionar Pago / Comprobante a Vincular</label>
+                {payments.length === 0 ? (
+                  <div style={{ padding: '12px', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-sm)', fontSize: '13px', color: 'var(--text-primary)' }}>
+                    ⚠ No hay comprobantes de pago registrados en el sistema. Primero adjunta el comprobante en el Expediente o Facturación.
+                  </div>
+                ) : (
+                  <select
+                    className="form-input"
+                    value={manualModal.selectedPaymentId}
+                    onChange={(e) => setManualModal({ ...manualModal, selectedPaymentId: e.target.value })}
+                    required
+                  >
+                    <option value="">-- Seleccionar Comprobante de Pago --</option>
+                    {payments.map((p) => {
+                      const exp = p.paymentRequest?.invoice?.expedient || p.proofDocument?.links?.find((l: any) => l.expedient)?.expedient;
+                      const hasRec = p.allocations?.some((a: any) => a.reconciliations?.length > 0);
+                      const isSameMethod = (p.paymentMethod || '').toLowerCase().includes('sumup') && manualModal.receipt.description.toLowerCase().includes('sumup');
+                      return (
+                        <option key={p.id} value={p.id}>
+                          {isSameMethod ? '⭐ [RECOMENDADO] ' : ''}
+                          {p.code} - {p.paymentMethod || 'Pago'} ({exp ? `Exp. ${exp.code} - ${exp.customer?.legalName || 'SATEM'}` : 'General'}) - ${Number(p.amount).toLocaleString('es-CL')} {p.currency} {hasRec ? '(Ya conciliado)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </div>
+
+              {/* Cálculo y desglose de comisión */}
+              {(() => {
+                const selectedPayment = payments.find(p => p.id === manualModal.selectedPaymentId);
+                if (!selectedPayment) return null;
+
+                const grossAmount = Number(selectedPayment.amount);
+                const netBankAmount = Math.abs(Number(manualModal.receipt.amountClp));
+                const commissionDiff = grossAmount - netBankAmount;
+                const isSumUp = (selectedPayment.paymentMethod || '').toLowerCase().includes('sumup') || manualModal.receipt.description.toLowerCase().includes('sumup');
+
+                return (
+                  <div style={{ padding: '14px', backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid var(--info)', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '13px' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--info)', marginBottom: '6px' }}>
+                      📊 Desglose de Conciliación y Liquidación:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
+                      <div>Monto Bruto Pagado por Cliente:</div>
+                      <div style={{ fontWeight: 600, textAlign: 'right' }}>${grossAmount.toLocaleString('es-CL')} {selectedPayment.currency}</div>
+
+                      <div>Monto Neto Depositado en Santander:</div>
+                      <div style={{ fontWeight: 600, color: 'var(--success)', textAlign: 'right' }}>${netBankAmount.toLocaleString('es-CL')} CLP</div>
+
+                      {commissionDiff > 0 && (
+                        <>
+                          <div style={{ color: 'var(--warning)' }}>Comisión Deducida {isSumUp ? '(SumUp ~3.8%)' : 'Pasarela'}:</div>
+                          <div style={{ fontWeight: 600, color: 'var(--warning)', textAlign: 'right' }}>-${commissionDiff.toLocaleString('es-CL')} CLP</div>
+                        </>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px' }}>
+                      ✓ Al conciliar, el sistema actualizará el expediente del cliente confirmando el pago y el abono bancario.
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="form-group" style={{ marginBottom: '20px' }}>
+                <label className="form-label">Notas u Observaciones (Opcional)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Ej: Conciliación comprobante SumUp con depósito Santander"
+                  value={manualModal.notes}
+                  onChange={(e) => setManualModal({ ...manualModal, notes: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setManualModal(null)}
+                  className="btn btn-secondary"
+                  disabled={manualModal.submitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={manualModal.submitting || !manualModal.selectedPaymentId}
+                >
+                  {manualModal.submitting ? 'Confirmando...' : 'Confirmar Conciliación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Auto-Match Asistido con Prevención de Colisiones */}
+      {autoMatchModal && (
+        <div className="modal-overlay" style={{ backdropFilter: 'blur(5px)' }}>
+          <div
+            className="modal-dialog"
+            style={{
+              maxWidth: '860px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 0,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-primary)' }}>
+                  <Sparkles size={20} color="var(--accent-primary)" /> Revisión de Auto-Match Inteligente Santander
+                </h3>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                  Prevención automática de colisiones entre contratos y links de montos similares.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoMatchModal(null)}
+                className="btn-icon"
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+              {/* Resumen Pills */}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                <div style={{ padding: '8px 14px', backgroundColor: 'rgba(16,185,129,0.12)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheck size={16} color="var(--success)" />
+                  <strong>{autoMatchModal.summary?.readyToReconcileCount || 0}</strong> Coincidencias Seguras
+                </div>
+                {autoMatchModal.summary?.ambiguousCount > 0 && (
+                  <div style={{ padding: '8px 14px', backgroundColor: 'rgba(245,158,11,0.12)', border: '1px solid var(--warning)', borderRadius: 'var(--radius-sm)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertTriangle size={16} color="var(--warning)" />
+                    <strong>{autoMatchModal.summary.ambiguousCount}</strong> Requieren Confirmación (Múltiples Links/Pagos)
+                  </div>
+                )}
+                {autoMatchModal.summary?.noMatchCount > 0 && (
+                  <div style={{ padding: '8px 14px', backgroundColor: 'rgba(100,116,139,0.12)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)' }}>
+                    <Info size={16} />
+                    <strong>{autoMatchModal.summary.noMatchCount}</strong> Sin Comprobante
+                  </div>
+                )}
+              </div>
+
+              {/* Lista de Abonos Analizados */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {autoMatchModal.items.map((item: any, idx: number) => {
+                  const rId = item.receipt.id;
+                  const isEnabled = !!autoMatchModal.enabledReceipts[rId];
+                  const selectedAllocId = autoMatchModal.selectedAllocations[rId];
+                  const currentCandidate = item.candidates.find((c: any) => c.allocationId === selectedAllocId) || item.suggestedCandidate;
+
+                  const isExact = item.status === 'EXACT_MATCH';
+                  const isHighConf = item.status === 'HIGH_CONFIDENCE';
+                  const isAmbiguous = item.status === 'AMBIGUOUS';
+                  const isNoMatch = item.status === 'NO_MATCH';
+
+                  return (
+                    <div
+                      key={rId || idx}
+                      style={{
+                        backgroundColor: isEnabled ? 'rgba(0,168,150,0.04)' : 'var(--bg-card)',
+                        border: `1px solid ${isEnabled ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        padding: '16px',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {/* Top Row: Abono info + Status Badge */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isNoMatch) return;
+                              setAutoMatchModal(prev => {
+                                if (!prev) return null;
+                                return {
+                                  ...prev,
+                                  enabledReceipts: {
+                                    ...prev.enabledReceipts,
+                                    [rId]: !prev.enabledReceipts[rId],
+                                  },
+                                };
+                              });
+                            }}
+                            disabled={isNoMatch}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: isNoMatch ? 'not-allowed' : 'pointer',
+                              color: isEnabled ? 'var(--accent-primary)' : 'var(--text-muted)',
+                              padding: '2px',
+                              marginTop: '2px',
+                            }}
+                          >
+                            {isEnabled ? <CheckSquare size={20} /> : <Square size={20} />}
+                          </button>
+
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 'bold', color: 'var(--accent-primary)', fontSize: '14px' }}>
+                                {item.receipt.code}
+                              </span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                {new Date(item.receipt.transactionDate).toLocaleDateString('es-CL')}
+                              </span>
+                              {item.receipt.referenceNumber && (
+                                <span style={{ fontSize: '11px', fontFamily: 'monospace', backgroundColor: 'var(--bg-primary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                  Ref: {item.receipt.referenceNumber}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginTop: '4px' }}>
+                              {item.receipt.description}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--success)' }}>
+                            ${Math.abs(Number(item.receipt.amountClp)).toLocaleString('es-CL')} CLP
+                          </div>
+                          <div style={{ marginTop: '4px' }}>
+                            {isExact && <span className="badge badge-success">✓ 100% Certeza (Link/Ref)</span>}
+                            {isHighConf && <span className="badge badge-success">✓ Coincidencia Alta (Único)</span>}
+                            {isAmbiguous && <span className="badge badge-warning">⚠️ {item.candidates.length} Links/Pagos Similares</span>}
+                            {isNoMatch && <span className="badge badge-secondary">⚪ Sin Comprobante</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle: Candidate Selector / Details */}
+                      {item.candidates && item.candidates.length > 0 && (
+                        <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+                          {/* Dropdown if ambiguous or multiple */}
+                          {item.candidates.length > 1 && (
+                            <div style={{ marginBottom: '10px' }}>
+                              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--warning)', display: 'block', marginBottom: '4px' }}>
+                                ⚠️ Selecciona el Pago / Contrato correspondiente para este abono:
+                              </label>
+                              <select
+                                className="form-input"
+                                value={selectedAllocId}
+                                onChange={(e) => {
+                                  const newAllocId = e.target.value;
+                                  setAutoMatchModal(prev => {
+                                    if (!prev) return null;
+                                    return {
+                                      ...prev,
+                                      selectedAllocations: {
+                                        ...prev.selectedAllocations,
+                                        [rId]: newAllocId,
+                                      },
+                                      enabledReceipts: {
+                                        ...prev.enabledReceipts,
+                                        [rId]: true,
+                                      },
+                                    };
+                                  });
+                                }}
+                                style={{ fontSize: '12.5px', borderColor: isAmbiguous ? 'var(--warning)' : 'var(--border-color)' }}
+                              >
+                                {item.candidates.map((c: any) => (
+                                  <option key={c.allocationId} value={c.allocationId}>
+                                    {c.paymentCode} - {c.customerName} ({c.expedientCode ? `Exp. ${c.expedientCode}` : 'General'}) - ${c.grossAmount.toLocaleString('es-CL')} {c.currency} [Fecha: {new Date(c.paymentDate).toLocaleDateString('es-CL')}]
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Candidate Detail Card */}
+                          {currentCandidate && (
+                            <div style={{ backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-sm)', padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: '12.5px' }}>
+                              <div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  ↳ Vinculado a: {currentCandidate.customerName} ({currentCandidate.expedientCode ? `Expediente ${currentCandidate.expedientCode}` : currentCandidate.paymentCode})
+                                </div>
+                                <div style={{ color: 'var(--text-muted)', fontSize: '11.5px', marginTop: '2px' }}>
+                                  Método: {currentCandidate.paymentMethod} • Fecha Pago: {new Date(currentCandidate.paymentDate).toLocaleDateString('es-CL')} ({currentCandidate.dateDiffDays} días dif.)
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  Bruto: ${currentCandidate.grossAmount.toLocaleString('es-CL')} {currentCandidate.currency}
+                                </div>
+                                {currentCandidate.feeDifferenceClp > 0 && (
+                                  <div style={{ fontSize: '11px', color: 'var(--warning)' }}>
+                                    Comisión deducida: -${currentCandidate.feeDifferenceClp.toLocaleString('es-CL')} CLP
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-surface)',
+              }}
+            >
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                {Object.values(autoMatchModal.enabledReceipts).filter(Boolean).length} de {autoMatchModal.items.length} abonos seleccionados para conciliar
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAutoMatchModal(null)}
+                  className="btn btn-secondary"
+                  disabled={autoMatchModal.submitting}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBatchAutoMatch}
+                  className="btn btn-primary"
+                  disabled={autoMatchModal.submitting || Object.values(autoMatchModal.enabledReceipts).filter(Boolean).length === 0}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <CheckCircle2 size={16} />
+                  {autoMatchModal.submitting
+                    ? 'Conciliando...'
+                    : `Confirmar y Conciliar (${Object.values(autoMatchModal.enabledReceipts).filter(Boolean).length})`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

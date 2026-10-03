@@ -6,7 +6,7 @@ import {
   FolderKanban, Plus, CheckCircle, AlertTriangle, Download,
   FileText, Lock, ShieldAlert, Clock, History, FilePlus, Upload,
   DollarSign, Receipt, CreditCard, ExternalLink, ChevronDown, ChevronUp, RotateCcw,
-  Trash2, Calculator, X, Wrench, ClipboardCheck, Users
+  Trash2, Calculator, X, Wrench, ClipboardCheck, Users, FileSpreadsheet
 } from 'lucide-react';
 import { SumUpCalculator } from '../components/SumUpCalculator';
 
@@ -1274,13 +1274,27 @@ export const ExpedientsPage: React.FC = () => {
 
                           {/* 7. Conciliación Bancaria */}
                           {item.code === 'RECONCILIATION_COMPLETED' && (
-                            <button
-                              onClick={() => navigate('/bank')}
-                              className="btn btn-secondary"
-                              style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
-                            >
-                              <ExternalLink size={13} /> Ir a Conciliación Bancaria
-                            </button>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {(() => {
+                                const bankDocId = docId || item.documentId || item.document?.id || selectedExpedient.documentLinks?.find((l: any) => l.document?.category === 'BANK_RECEIPT')?.document?.id;
+                                return bankDocId ? (
+                                  <button
+                                    onClick={() => handleViewAttachedDoc(bankDocId, `CARTOLA_SANTANDER_${selectedExpedient.code}.pdf`)}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                  >
+                                    <FileSpreadsheet size={13} color="var(--accent-primary)" /> Ver Cartola Bancaria
+                                  </button>
+                                ) : null;
+                              })()}
+                              <button
+                                onClick={() => navigate('/bank')}
+                                className="btn btn-secondary"
+                                style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                              >
+                                <ExternalLink size={13} /> Ir a Conciliación Bancaria
+                              </button>
+                            </div>
                           )}
 
                           {isCompleted ? (
