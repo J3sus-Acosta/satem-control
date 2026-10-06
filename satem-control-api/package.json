@@ -8,6 +8,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "npx prisma generate && tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
@@ -52,7 +54,8 @@
     "@types/pdf-parse": "^1.1.5",
     "prisma": "^5.20.0",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.9"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

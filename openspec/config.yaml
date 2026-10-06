@@ -1,0 +1,159 @@
+schema: spec-driven
+
+context: |
+
+  Project: SATEM Soluciones Inteligentes SpA
+
+  Purpose:
+    Plataforma tecnológica empresarial desarrollada y administrada por SATEM
+    para soportar procesos internos, clientes, servicios tecnológicos,
+    automatización, operaciones y futuras funcionalidades de SATEM ONE.
+
+  Development philosophy:
+    - OpenSpec-driven development
+    - Multi-agent development
+    - Security by design
+    - Minimal changes
+    - Reusable architecture
+    - Strong typing
+    - Automated testing
+    - Maintainability
+
+  Backend:
+    - Node.js (v20+)
+    - TypeScript
+    - Fastify / Express REST API
+    - Prisma ORM
+    - Zod validation
+
+  Database:
+    - MySQL / PostgreSQL (MySQL 8.0 InnoDB en SATEM Control)
+    - Prisma ORM
+    - Controlled migrations
+    - Soft delete pattern (deletedAt)
+    - Referential integrity
+
+  Frontend:
+    - React (v18+, Vite) / Angular
+    - TypeScript
+    - SATEM Design System (Dark Mode Premium, CSS Variables)
+    - Responsive design (Mobile, Tablet, Desktop)
+    - Lucide React icons
+
+  Infrastructure:
+    - Docker & Docker Compose
+    - EasyPanel
+    - VPS
+    - Environment variables
+    - Reverse proxy
+
+  Authentication:
+    - JWT & Secure HTTP-only cookies
+    - Bcrypt (10 rounds)
+    - Normalized lowercase emails
+    - Role-based authorization (ADMIN, OPERATIONS, ACCOUNTING, TECHNICIAN, VIEWER)
+
+  General coding rules:
+    - TypeScript preferred over JavaScript for application code
+    - Avoid any unless technically justified
+    - Avoid duplicated business logic
+    - Keep controllers/route handlers thin
+    - Business logic belongs in services
+    - Database access should be isolated
+    - Validate external input with schemas (Zod)
+    - Never hardcode secrets
+    - Never expose sensitive information in logs
+    - Prefer small cohesive functions
+    - Prefer descriptive names
+    - Remove unused code
+    - Do not introduce dependencies without justification
+
+  Frontend rules:
+    - Responsive design required
+    - Reuse components
+    - Avoid duplicated UI logic
+    - Handle loading, empty and error states
+    - Maintain accessibility
+    - Respect the existing visual system and SATEM tokens
+
+  Database rules:
+    - Do not perform destructive production changes without authorization
+    - Prefer migrations
+    - Review relations and indexes before schema changes
+    - Check whether new fields are actually consumed
+    - Avoid unused database fields
+
+  API rules:
+    - Validate request input
+    - Use consistent HTTP status codes
+    - Return predictable error structures
+    - Protect authenticated endpoints
+    - Enforce authorization server-side
+    - Avoid exposing internal implementation details
+
+  Testing:
+    - Detect and use the project's existing test framework
+    - Prefer behavior-oriented tests
+    - Test happy paths
+    - Test validation failures
+    - Test authorization failures
+    - Test edge cases
+    - Add regression tests for discovered bugs
+
+  Security:
+    - Authentication
+    - Authorization
+    - Input validation
+    - Injection prevention
+    - CORS
+    - CSRF when applicable
+    - Secure cookies
+    - Secret management
+    - Rate limiting where appropriate
+    - Audit sensitive operations
+
+  SATEM architecture principle:
+    Preserve the existing architecture whenever possible.
+    Do not introduce a new framework or database merely because another
+    technology is preferred by the agent.
+
+rules:
+
+  proposal:
+    - Clearly define the business objective.
+    - Define scope and non-goals.
+    - Identify affected modules.
+    - Identify affected APIs.
+    - Identify affected database models.
+    - Identify security implications.
+    - Identify frontend impact.
+    - Identify infrastructure impact.
+    - Identify external integrations.
+
+  tasks:
+    - Break work into small independently verifiable tasks.
+    - Every task must identify affected files or modules.
+    - Include testing tasks for new business logic.
+    - Include security validation when authentication or authorization changes.
+    - Include migration validation when database structure changes.
+    - Include frontend validation when UI behavior changes.
+
+operations:
+
+  apply:
+    guidance:
+      - Read existing code before changing it.
+      - Do not modify unrelated files.
+      - Follow the existing architecture.
+      - Reuse existing services and utilities.
+      - Do not introduce dependencies without justification.
+      - Run appropriate tests after implementation.
+      - Update documentation when architecture changes.
+
+  archive:
+    guidance:
+      - Confirm that implementation matches OpenSpec.
+      - Confirm tests pass.
+      - Confirm security review completed when applicable.
+      - Confirm architecture documentation is updated.
+      - Confirm no pending tasks remain.
