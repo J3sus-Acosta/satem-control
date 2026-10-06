@@ -29,6 +29,172 @@ const closeExpedientSchema = z.object({
   reason: z.string().min(5, 'Motivo de cierre requerido'),
 });
 
+export function unifyWorkOrders(rawWorkOrders: any[], docInstances: any[], expedientObj?: any) {
+  const resultWorkOrders = [...(rawWorkOrders || [])];
+  
+  // Buscar instancias documentales de categoría WORK_ORDER
+  const woDocs = (docInstances || []).filter(
+    (d: any) =>
+      (d.category === 'WORK_ORDER' ||
+        d.template?.category === 'WORK_ORDER' ||
+        d.documentNumber?.startsWith('OT')) &&
+      d.category !== 'RECEPTION_CONFORMITY' &&
+      !d.documentNumber?.startsWith('RC') &&
+      !d.documentNumber?.startsWith('REC')
+  );
+
+  // Buscar instancias documentales de categoría RECEPTION_CONFORMITY
+  const rcDocs = (docInstances || []).filter(
+    (d: any) =>
+      d.category === 'RECEPTION_CONFORMITY' ||
+      d.template?.category === 'RECEPTION_CONFORMITY' ||
+      d.documentNumber?.startsWith('RC') ||
+      d.documentNumber?.startsWith('REC')
+  );
+
+  const primaryRcDoc = rcDocs.find((d: any) => d.status === 'SIGNED' || Boolean(d.signedPdfPath)) || rcDocs[0];
+
+  // 1. Enriquecer las órdenes de trabajo existentes con datos de los documentos
+  for (let i = 0; i < resultWorkOrders.length; i++) {
+    const wo = resultWorkOrders[i];
+    const matchingWoDoc = woDocs.find((d: any) => d.workOrderId === wo.id || d.documentNumber === wo.code || d.id === wo.id) || woDocs[0];
+    
+    if (matchingWoDoc) {
+      wo.documentInstanceId = matchingWoDoc.id;
+      wo.documentNumber = matchingWoDoc.documentNumber;
+      wo.pdfPath = matchingWoDoc.generatedPdfPath;
+      wo.signedPdfPath = matchingWoDoc.signedPdfPath;
+      wo.isSigned = matchingWoDoc.status === 'SIGNED' || Boolean(matchingWoDoc.signedPdfPath);
+      wo.signedAt = matchingWoDoc.signedAt;
+      if (matchingWoDoc.status === 'SIGNED') {
+        wo.status = 'CONFORMED';
+      }
+    }
+
+    if (wo.receptionConformity) {
+      if (primaryRcDoc) {
+        wo.receptionConformity.documentInstanceId = primaryRcDoc.id;
+        wo.receptionConformity.documentNumber = primaryRcDoc.documentNumber;
+        wo.receptionConformity.signedPdfPath = primaryRcDoc.signedPdfPath;
+        wo.receptionConformity.isSigned = primaryRcDoc.status === 'SIGNED' || Boolean(primaryRcDoc.signedPdfPath);
+        wo.receptionConformity.receptionDate = primaryRcDoc.signedAt || primaryRcDoc.generatedAt || wo.receptionConformity.receptionDate;
+      }
+    } else if (primaryRcDoc) {
+      const dataSnapshot = typeof primaryRcDoc.dataSnapshot === 'string' ? JSON.parse(primaryRcDoc.dataSnapshot) : (primaryRcDoc.dataSnapshot || {});
+      wo.receptionConformity = {
+        id: primaryRcDoc.id,
+        code: primaryRcDoc.documentNumber,
+        workOrderId: wo.id,
+        receptionDate: primaryRcDoc.signedAt || primaryRcDoc.generatedAt || new Date(),
+        acceptedByName: dataSnapshot.cliente?.contacto || dataSnapshot.cliente?.nombreLegal || 'Cliente Autorizado',
+        acceptedByRole: dataSnapshot.cliente?.cargo || 'Recepción Conforme',
+        acceptedByEmail: dataSnapshot.cliente?.email || '',
+        comments: dataSnapshot.contrato?.descripcion || 'Recepción Conforme de servicios prestados a entera satisfacción.',
+        documentInstanceId: primaryRcDoc.id,
+        documentNumber: primaryRcDoc.documentNumber,
+        signedPdfPath: primaryRcDoc.signedPdfPath,
+        isSigned: primaryRcDoc.status === 'SIGNED' || Boolean(primaryRcDoc.signedPdfPath),
+        status: primaryRcDoc.status,
+      };
+      if (wo.receptionConformity.isSigned) {
+        wo.status = 'CONFORMED';
+      }
+    }
+  }
+
+  // 2. Si hay documentos de OT que no tienen fila en workOrder, sintetizarlas
+  for (const woDoc of woDocs) {
+    const alreadyIncluded = resultWorkOrders.some(
+      (w: any) => w.id === woDoc.id || w.id === woDoc.workOrderId || w.code === woDoc.documentNumber
+    );
+
+    if (!alreadyIncluded) {
+      const dataSnapshot = typeof woDoc.dataSnapshot === 'string' ? JSON.parse(woDoc.dataSnapshot) : (woDoc.dataSnapshot || {});
+      const isSigned = woDoc.status === 'SIGNED' || Boolean(woDoc.signedPdfPath);
+      
+      let attachedRc: any = null;
+      if (primaryRcDoc) {
+        const rcSnapshot = typeof primaryRcDoc.dataSnapshot === 'string' ? JSON.parse(primaryRcDoc.dataSnapshot) : (primaryRcDoc.dataSnapshot || {});
+        attachedRc = {
+          id: primaryRcDoc.id,
+          code: primaryRcDoc.documentNumber,
+          workOrderId: woDoc.id,
+          receptionDate: primaryRcDoc.signedAt || primaryRcDoc.generatedAt || new Date(),
+          acceptedByName: rcSnapshot.cliente?.contacto || rcSnapshot.cliente?.nombreLegal || 'Cliente Autorizado',
+          acceptedByRole: rcSnapshot.cliente?.cargo || 'Recepción Conforme',
+          acceptedByEmail: rcSnapshot.cliente?.email || '',
+          comments: rcSnapshot.contrato?.descripcion || 'Recepción Conforme de servicios prestados a entera satisfacción.',
+          documentInstanceId: primaryRcDoc.id,
+          documentNumber: primaryRcDoc.documentNumber,
+          signedPdfPath: primaryRcDoc.signedPdfPath,
+          isSigned: primaryRcDoc.status === 'SIGNED' || Boolean(primaryRcDoc.signedPdfPath),
+          status: primaryRcDoc.status,
+        };
+      }
+
+      resultWorkOrders.push({
+        id: woDoc.id,
+        code: woDoc.documentNumber || 'OT-2026-000001',
+        expedientId: woDoc.expedientId || expedientObj?.id,
+        title: dataSnapshot.documento?.titulo || woDoc.template?.name || dataSnapshot.contrato?.titulo || 'Orden de Trabajo Autorizada',
+        description: dataSnapshot.contrato?.descripcion || dataSnapshot.documento?.descripcion || 'Orden de trabajo y ejecución técnica autorizada.',
+        status: (isSigned || attachedRc?.isSigned) ? 'CONFORMED' : (woDoc.status === 'GENERATED' ? 'AUTHORIZED' : woDoc.status),
+        createdAt: woDoc.generatedAt,
+        updatedAt: woDoc.updatedAt || woDoc.generatedAt,
+        documentInstanceId: woDoc.id,
+        documentNumber: woDoc.documentNumber,
+        pdfPath: woDoc.generatedPdfPath,
+        signedPdfPath: woDoc.signedPdfPath,
+        isSigned,
+        signedAt: woDoc.signedAt,
+        attentions: [],
+        receptionConformity: attachedRc,
+      });
+    }
+  }
+
+  // 3. Si no hay OTs pero hay un Acta de Recepción Conforme emitida o firmada, sintetizar la OT para visualizarla
+  if (resultWorkOrders.length === 0 && primaryRcDoc) {
+    const rcSnapshot = typeof primaryRcDoc.dataSnapshot === 'string' ? JSON.parse(primaryRcDoc.dataSnapshot) : (primaryRcDoc.dataSnapshot || {});
+    const isSigned = primaryRcDoc.status === 'SIGNED' || Boolean(primaryRcDoc.signedPdfPath);
+    
+    resultWorkOrders.push({
+      id: primaryRcDoc.id,
+      code: primaryRcDoc.documentNumber ? primaryRcDoc.documentNumber.replace(/^RC-/, 'OT-') : 'OT-2026-000001',
+      expedientId: primaryRcDoc.expedientId || expedientObj?.id,
+      title: rcSnapshot.documento?.titulo || rcSnapshot.contrato?.titulo || 'Orden de Trabajo y Servicios Prestados',
+      description: rcSnapshot.contrato?.descripcion || 'Servicios y trabajos ejecutados con recepción conforme.',
+      status: isSigned ? 'CONFORMED' : 'AUTHORIZED',
+      createdAt: primaryRcDoc.generatedAt,
+      updatedAt: primaryRcDoc.updatedAt || primaryRcDoc.generatedAt,
+      documentInstanceId: primaryRcDoc.id,
+      documentNumber: primaryRcDoc.documentNumber,
+      pdfPath: primaryRcDoc.generatedPdfPath,
+      signedPdfPath: primaryRcDoc.signedPdfPath,
+      isSigned,
+      signedAt: primaryRcDoc.signedAt,
+      attentions: [],
+      receptionConformity: {
+        id: primaryRcDoc.id,
+        code: primaryRcDoc.documentNumber,
+        workOrderId: primaryRcDoc.id,
+        receptionDate: primaryRcDoc.signedAt || primaryRcDoc.generatedAt || new Date(),
+        acceptedByName: rcSnapshot.cliente?.contacto || rcSnapshot.cliente?.nombreLegal || 'Cliente Autorizado',
+        acceptedByRole: rcSnapshot.cliente?.cargo || 'Recepción Conforme',
+        acceptedByEmail: rcSnapshot.cliente?.email || '',
+        comments: rcSnapshot.contrato?.descripcion || 'Recepción Conforme de servicios prestados a entera satisfacción.',
+        documentInstanceId: primaryRcDoc.id,
+        documentNumber: primaryRcDoc.documentNumber,
+        signedPdfPath: primaryRcDoc.signedPdfPath,
+        isSigned,
+        status: primaryRcDoc.status,
+      },
+    });
+  }
+
+  return resultWorkOrders;
+}
+
 export async function listExpedientsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
     const rawExpedients = await prisma.expedient.findMany({
@@ -117,9 +283,11 @@ export async function listExpedientsHandler(request: FastifyRequest, reply: Fast
           request.log.warn({ err: e }, `Failed to load docLinks for expedient ${exp.id}`);
         }
 
+        const unifiedWorkOrders = unifyWorkOrders(workOrders, docInstances, exp);
+
         return {
           ...exp,
-          workOrders,
+          workOrders: unifiedWorkOrders,
           invoices,
           integrityItems,
           exceptions,
@@ -667,10 +835,13 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
     // fallback
   }
 
+  const unifiedWorkOrders = unifyWorkOrders(expedient.workOrders, docInstances, expedient);
+
   return reply.send({
     success: true,
     data: {
       ...expedient,
+      workOrders: unifiedWorkOrders,
       documentLinks: finalDocumentLinks,
       integrityItems: finalIntegrityItems,
       documentInstances: docInstances,

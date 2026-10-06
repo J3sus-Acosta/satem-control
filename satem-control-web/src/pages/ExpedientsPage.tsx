@@ -941,7 +941,17 @@ export const ExpedientsPage: React.FC = () => {
                               {wo.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{wo.description}</div>}
                             </div>
 
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {(wo.documentInstanceId || selectedExpedient.documentInstances?.some((d: any) => d.id === wo.id || d.documentNumber === wo.code)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewPdf(wo.documentInstanceId || wo.id, wo.documentNumber || wo.code)}
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: '11.5px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <FileText size={13} /> Ver OT (PDF)
+                                </button>
+                              )}
                               {!isViewer && (
                                 <>
                                   <button
@@ -974,12 +984,27 @@ export const ExpedientsPage: React.FC = () => {
                           <div style={{ padding: '14px 18px' }}>
                             {/* Recepción Conforme Badge */}
                             {hasReception && (
-                              <div style={{ padding: '10px 14px', backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ fontSize: '12px' }}>
-                                  <strong style={{ color: 'var(--success)' }}>✓ Recepción Conforme Firmada:</strong> Aceptado por <strong>{wo.receptionConformity.acceptedByName}</strong> {wo.receptionConformity.acceptedByRole ? `(${wo.receptionConformity.acceptedByRole})` : ''} el {new Date(wo.receptionConformity.receptionDate).toLocaleDateString('es-CL')}.
-                                  {wo.receptionConformity.comments && <div style={{ fontStyle: 'italic', marginTop: '2px' }}>"{wo.receptionConformity.comments}"</div>}
+                              <div style={{ padding: '12px 16px', backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                                <div style={{ fontSize: '12.5px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <CheckCircle size={15} color="var(--success)" />
+                                    <strong style={{ color: 'var(--success)' }}>Recepción Conforme Firmada ({wo.receptionConformity.code})</strong>
+                                  </div>
+                                  <div style={{ color: 'var(--text-secondary)', marginTop: '3px' }}>
+                                    Aceptado por <strong>{wo.receptionConformity.acceptedByName}</strong> {wo.receptionConformity.acceptedByRole ? `(${wo.receptionConformity.acceptedByRole})` : ''} el {new Date(wo.receptionConformity.receptionDate).toLocaleDateString('es-CL')}.
+                                  </div>
+                                  {wo.receptionConformity.comments && <div style={{ fontStyle: 'italic', marginTop: '2px', color: 'var(--text-muted)' }}>"{wo.receptionConformity.comments}"</div>}
                                 </div>
-                                <span className="badge badge-success">{wo.receptionConformity.code}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewPdf(wo.receptionConformity.documentInstanceId || wo.receptionConformity.id, wo.receptionConformity.code)}
+                                    className="btn btn-primary"
+                                    style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                  >
+                                    <FileText size={13} /> Ver Acta Firmada (PDF)
+                                  </button>
+                                </div>
                               </div>
                             )}
 

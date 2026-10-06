@@ -5,6 +5,7 @@ import path from 'path';
 import { prisma } from '../../config/prisma.js';
 import { NotFoundError, ForbiddenError } from '../../common/errors/app-error.js';
 import { resolveStoragePath } from '../../common/utils/storage-path.js';
+import { unifyWorkOrders } from '../expedients/expedients.controller.js';
 
 async function getClientEntityRestrictions(clientUserId: string) {
   const access = await prisma.clientUserEntityAccess.findMany({
@@ -56,6 +57,25 @@ export async function listPortalExpedientsHandler(
     include: {
       customerEntity: { select: { id: true, name: true } },
       contract: { select: { id: true, code: true, title: true, type: true } },
+      workOrders: {
+        where: { deletedAt: null },
+        include: { receptionConformity: true },
+      },
+      documentInstances: {
+        select: {
+          id: true,
+          documentNumber: true,
+          category: true,
+          workOrderId: true,
+          expedientId: true,
+          status: true,
+          signedAt: true,
+          signedPdfPath: true,
+          generatedPdfPath: true,
+          generatedAt: true,
+          template: { select: { id: true, code: true, name: true, category: true } },
+        },
+      },
       _count: {
         select: {
           workOrders: true,
@@ -70,23 +90,26 @@ export async function listPortalExpedientsHandler(
 
   return reply.send({
     success: true,
-    data: expedients.map((exp) => ({
-      id: exp.id,
-      code: exp.code,
-      title: exp.title,
-      description: exp.description,
-      status: exp.status,
-      origin: exp.origin,
-      createdAt: exp.createdAt,
-      closedAt: exp.closedAt,
-      customerEntity: exp.customerEntity,
-      contract: exp.contract,
-      stats: {
-        workOrdersCount: exp._count.workOrders,
-        attentionsCount: exp._count.attentions,
-        documentsCount: exp._count.documentInstances + exp._count.documentLinks,
-      },
-    })),
+    data: expedients.map((exp) => {
+      const unifiedWos = unifyWorkOrders(exp.workOrders || [], exp.documentInstances || [], exp);
+      return {
+        id: exp.id,
+        code: exp.code,
+        title: exp.title,
+        description: exp.description,
+        status: exp.status,
+        origin: exp.origin,
+        createdAt: exp.createdAt,
+        closedAt: exp.closedAt,
+        customerEntity: exp.customerEntity,
+        contract: exp.contract,
+        stats: {
+          workOrdersCount: unifiedWos.length,
+          attentionsCount: exp._count.attentions,
+          documentsCount: exp._count.documentInstances + exp._count.documentLinks,
+        },
+      };
+    }),
   });
 }
 
@@ -174,10 +197,15 @@ export async function getPortalExpedientDetailHandler(
     },
   });
 
+  const unifiedWorkOrders = unifyWorkOrders(expedient.workOrders, documentInstances, expedient);
+
   return reply.send({
     success: true,
     data: {
-      expedient,
+      expedient: {
+        ...expedient,
+        workOrders: unifiedWorkOrders,
+      },
       documentInstances,
       attachedDocuments: documentLinks.map((l) => l.document),
     },

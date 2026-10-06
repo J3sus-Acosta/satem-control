@@ -13,7 +13,9 @@ SATEM Control es el sistema centralizado de gestión operativa, contratos de man
 satem-control/
 ├── satem-control-api/      # Backend REST API (Node.js, TypeScript, Fastify, Prisma ORM, MySQL)
 ├── satem-control-web/      # Frontend Web SPA (React 18, Vite, TypeScript, SATEM Design System)
-├── docs/                   # Guías operativas, despliegue, desastres y testing
+├── docs/                   # Guías operativas, manuales de usuario, despliegue y testing
+│   ├── MANUAL_PORTAL_CLIENTE.md # Manual de usuario oficial para el Portal Web de Clientes
+│   ├── MANUAL_ADMINISTRADOR.md  # Manual de usuario oficial para Administradores de SATEM
 │   ├── TESTING.md          # Guía completa de pruebas automatizadas (Vitest)
 │   ├── EASYPANEL-DEPLOYMENT.md
 │   └── GUIA_LOGIN_Y_DESPLIEGUE.md
@@ -25,7 +27,21 @@ satem-control/
 
 ---
 
-## 2. Puesta en Marcha Rápida
+## 2. Manuales de Usuario Oficiales
+
+- 📖 **Portal de Clientes:**
+  - [Versión Markdown](docs/MANUAL_PORTAL_CLIENTE.md)
+  - [Descargar Manual PDF con Capturas](docs/MANUAL_PORTAL_CLIENTE.pdf)
+  - *Cubre: activación vía token, seguimiento de expedientes, órdenes de trabajo, descarga de informes ZIP y firma electrónica interactiva.*
+
+- 🛠️ **Administrador SATEM Control:**
+  - [Versión Markdown](docs/MANUAL_ADMINISTRADOR.md)
+  - [Descargar Manual PDF con Capturas](docs/MANUAL_ADMINISTRADOR.pdf)
+  - *Cubre: control de accesos RBAC, centro de control en tiempo real, gestión de clientes y contratos, emisión de OTs, facturación SII, pasarela SumUp, conciliación bancaria Santander y plantillas PDF.*
+
+---
+
+## 3. Puesta en Marcha Rápida
 
 ### Backend (`satem-control-api`)
 ```bash
@@ -43,7 +59,7 @@ npm run dev        # Inicia con Vite en http://localhost:5173
 
 ---
 
-## 3. Pruebas Automatizadas (QA Suite)
+## 4. Pruebas Automatizadas (QA Suite)
 
 El proyecto cuenta con una suite completa de pruebas unitarias y de integración impulsada por **Vitest**:
 
@@ -62,7 +78,7 @@ Para más detalles sobre la arquitectura de pruebas, fixtures y creación de nue
 
 ---
 
-## 4. Despliegue y Producción
+## 5. Despliegue y Producción
 
 El proyecto está diseñado para desplegarse mediante contenedores Docker administrados en EasyPanel / VPS:
 - Backend: `Dockerfile` con Node.js 20+ y runner de migración tolerante a fallos (`scripts/migrate.js`).

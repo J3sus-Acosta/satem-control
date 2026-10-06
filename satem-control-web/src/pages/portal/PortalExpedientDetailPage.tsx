@@ -270,29 +270,69 @@ export const PortalExpedientDetailPage: React.FC = () => {
               No hay órdenes de trabajo registradas en este expediente.
             </div>
           ) : (
-            expedient.workOrders.map((wo: any) => (
-              <div key={wo.id} className="card" style={{ border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent-primary)' }}>{wo.code}</span>
-                  <span className="badge badge-info">{wo.status}</span>
-                </div>
-                <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-primary)' }}>{wo.title}</h4>
-                {wo.description && <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>{wo.description}</p>}
+            expedient.workOrders.map((wo: any) => {
+              const hasReception = Boolean(wo.receptionConformity);
+              const woDocInstanceId = wo.documentInstanceId || (documentInstances || []).find((d: any) => d.id === wo.id || d.documentNumber === wo.code)?.id;
+              const rcDocInstanceId = wo.receptionConformity?.documentInstanceId || (documentInstances || []).find((d: any) => d.id === wo.receptionConformity?.id || d.documentNumber === wo.receptionConformity?.code || d.category === 'RECEPTION_CONFORMITY' || d.template?.category === 'RECEPTION_CONFORMITY')?.id;
 
-                {wo.receptionConformity && (
-                  <div style={{ marginTop: '12px', padding: '10px', backgroundColor: 'var(--bg-input)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCircle2 size={14} /> Recepción Conforme Aceptada por: {wo.receptionConformity.acceptedByName}
+              return (
+                <div key={wo.id} className="card" style={{ border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent-primary)' }}>{wo.code}</span>
+                      <span className={`badge ${wo.status === 'CONFORMED' ? 'badge-success' : (wo.status === 'AUTHORIZED' || wo.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning')}`}>
+                        {wo.status}
+                      </span>
                     </div>
-                    {wo.receptionConformity.comments && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        Comentarios: {wo.receptionConformity.comments}
-                      </div>
-                    )}
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {woDocInstanceId && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPdf(woDocInstanceId)}
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <FileText size={14} /> Ver Orden de Trabajo (PDF)
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            ))
+
+                  <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-primary)' }}>{wo.title}</h4>
+                  {wo.description && <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>{wo.description}</p>}
+
+                  {hasReception && (
+                    <div style={{ marginTop: '12px', padding: '12px 14px', backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--success)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                      <div style={{ fontSize: '12.5px' }}>
+                        <div style={{ color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CheckCircle2 size={15} /> Recepción Conforme Firmada ({wo.receptionConformity.code})
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          Aprobada por: <strong>{wo.receptionConformity.acceptedByName}</strong> {wo.receptionConformity.acceptedByRole ? `(${wo.receptionConformity.acceptedByRole})` : ''} el {new Date(wo.receptionConformity.receptionDate).toLocaleDateString('es-CL')}
+                        </div>
+                        {wo.receptionConformity.comments && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
+                            "{wo.receptionConformity.comments}"
+                          </div>
+                        )}
+                      </div>
+
+                      {rcDocInstanceId && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenPdf(rcDocInstanceId)}
+                          className="btn btn-primary"
+                          style={{ fontSize: '11.5px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <FileText size={14} /> Ver Acta Firmada (PDF)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       )}
