@@ -157,12 +157,16 @@ React
 Angular
 TypeScript
 HTML
-CSS
+Vanilla CSS / CSS Variables (Sistema oficial de estilos)
+SATEM Design System (satem-design-system)
+Lucide React / Lucide Icons
 ```
 
 El agente debe detectar cuál framework utiliza realmente el proyecto antes de modificar código.
 
 No convertir React a Angular ni Angular a React salvo que sea explícitamente parte del requerimiento.
+
+**Regla de Estilos:** Salvo instrucción explícita del usuario, **no se introduce Tailwind CSS** ni librerías invasivas como MUI o Bootstrap. Todo proyecto nuevo o existente adopta el **SATEM Design System** basado en CSS Variables (`:root`) y Vanilla CSS puro.
 
 ---
 
@@ -212,8 +216,16 @@ La estructura esperada será:
 
 .agents/
 └── skills/
-    └── satem-code-review/
-        └── SKILL.md
+    ├── satem-code-review/
+    │   └── SKILL.md
+    └── satem-design-system/
+        ├── SKILL.md
+        ├── tokens.md
+        ├── components.md
+        ├── layouts.md
+        ├── branding.md
+        ├── responsive.md
+        └── migration.md
 
 openspec/
 ├── config.yaml
@@ -650,16 +662,20 @@ Desarrollar interfaces React cuando el proyecto utilice React.
 
 Debe:
 
-* reutilizar componentes;
+* consultar **`satem-design-system`** como fuente de verdad visual antes de crear componentes o layouts;
+* utilizar la paleta oficial Dark Mode (`--bg-primary: #0f172a`, `--bg-surface: #1e293b`, `--accent-primary: #00a896`);
+* utilizar tipografía dual: **Outfit** para encabezados y **Inter** para cuerpo/datos;
+* reutilizar componentes canónicos (`.btn`, `.badge`, `Modal.tsx`, `.card`, `.table-container`);
+* consumir los assets de marca oficiales (`/assets/logo-icon.png`, `/assets/logo-full.png`);
 * evitar duplicación;
 * separar UI de lógica compleja;
 * manejar estados correctamente;
 * validar estados loading/error/empty;
-* mantener responsive design;
+* mantener responsive design fluido;
 * respetar el sistema visual existente;
 * mantener accesibilidad razonable.
 
-No introducir librerías de UI nuevas sin necesidad.
+No introducir librerías de UI nuevas (como Tailwind o MUI) sin necesidad o requerimiento explícito.
 
 ---
 
@@ -690,6 +706,7 @@ según la arquitectura existente.
 
 Debe:
 
+* consultar **`satem-design-system`** para mantener coherencia de tokens, colores, tipografía e iconografía;
 * evitar lógica de negocio pesada dentro de componentes;
 * utilizar servicios apropiadamente;
 * mantener tipado fuerte;
@@ -1291,6 +1308,64 @@ Nunca modificar código durante una revisión salvo que el usuario lo solicite e
 
 ---
 
+# 25.1. SATEM Design System Skill
+
+Crear el conjunto modular de diseño en:
+
+```text
+.agents/skills/satem-design-system/
+├── SKILL.md
+├── tokens.md
+├── components.md
+├── layouts.md
+├── branding.md
+├── responsive.md
+└── migration.md
+```
+
+Y asegurar su disponibilidad global en `~/.gemini/config/skills/satem-design-system/` para que cualquier proyecto de Antigravity pueda consumirlo inmediatamente.
+
+### A. SKILL.md (Manifiesto de Orquestación)
+Define los principios de Dark Mode Premium, el uso de CSS nativo (sin Tailwind), la arquitectura No-Break y los dos protocolos de ejecución:
+1. **Creación de proyectos nuevos desde cero**: Configuración de fuentes en `index.html`, inyección de tokens en `index.css`, copia de assets y montaje del layout canónico.
+2. **Modernización de proyectos existentes**: Auditoría en 8 pasos, reemplazo de colores hardcodeados a variables CSS, estandarización de botones (`.btn`), modales (`<Modal>`) y tablas (`.table-container`) sin romper funcionalidad preexistente.
+
+### B. tokens.md (Tokens & Variables CSS)
+Declara las variables en `:root`:
+* **Fondos**: `--bg-primary` (`#0f172a`), `--bg-surface` / `--bg-card` (`#1e293b`), `--bg-card-hover` (`#334155`), `--bg-input` (`#0f172a`), `--bg-overlay` (`rgba(15, 23, 42, 0.85)`).
+* **Brand SATEM**: `--accent-primary` (`#00a896`), `--accent-primary-hover` (`#008f80`), `--accent-glow` (`rgba(0, 168, 150, 0.25)`).
+* **Bordes**: `--border-color` (`#334155`), `--border-light` (`#475569`).
+* **Textos**: `--text-primary` (`#f8fafc`), `--text-secondary` (`#94a3b8`), `--text-muted` (`#64748b`).
+* **Estados Semánticos**: `--success` (`#10b981`), `--warning` (`#f59e0b`), `--danger` (`#ef4444`), `--info` (`#3b82f6`) junto con sus fondos `-bg` (opacidad 15%).
+* **Tipografía**: `--font-heading` (`'Outfit'`) con escalado fluido `clamp()`, `--font-sans` (`'Inter'`).
+* **Radios y Sombras**: `--radius-sm` (6px), `--radius-md` (10px), `--radius-lg` (16px), `--shadow-sm`, `--shadow-md`, `--shadow-lg`.
+
+### C. components.md (Catálogo Canónico)
+* **Botones (`.btn`)**: `.btn-primary` (acento #00a896), `.btn-secondary` (superficie Slate), `.btn-danger` (#ef4444), `.btn-icon`. Altura táctil mínima de 38px.
+* **Badges (`.badge`)**: Formato píldora (`9999px`), borde 1px, fondo suave (`.badge-success`, `.badge-warning`, `.badge-danger`, `.badge-info`).
+* **Modales (`Modal.tsx`)**: Diálogo centrado (`max-width: 580px`), backdrop con blur (`backdrop-filter: blur(4px)`), tecla Escape y cierre al clickear fuera.
+* **Tablas Responsivas**: Envoltura obligatoria en `.table-container` con desplazamiento horizontal protegido y cabecera en `#0f172a`.
+* **Cards & KPIs**: `.card`, `.kpi-card` con animación en hover y resplandor brand.
+* **Formularios**: `.form-group`, `.form-label`, `.form-input`, `.form-select`, `.form-textarea` con focus glow `box-shadow: 0 0 0 2px var(--accent-glow)`.
+
+### D. layouts.md (Estructura de Navegación)
+* **AppLayout & PortalLayout**: `.app-container`, `.sidebar` (sticky en desktop, drawer flotante en móvil con backdrop), `.main-content`, `.header` (sticky con breadcrumbs y perfil), `.content-body` (ancho máximo 1600px).
+* **Rejillas**: `.grid-4`, `.grid-3`, `.grid-2`, `.grid-split`, `.grid-form-2`.
+* **Patrón Master-Detail**: Panel lateral de 300px + Detalle amplio 360°.
+
+### E. branding.md (Identidad Oficial)
+* **Assets**: Consumir exclusivamente `/public/assets/logo-icon.png` (isotipo), `logo-full.png` (logotipo horizontal institucional) y `satem-signature.png` (firma oficial).
+* **Regla estricta**: Prohibido crear logotipos artificiales o sustitutos SVG inventados.
+
+### F. responsive.md (Breakpoints & Anti-Overflow)
+* **Breakpoints**: Desktop Grande (≥1440px), Desktop (1024-1439px), Tablet (<1024px, drawer móvil activado), Mobile Estándar (<768px, 1 columna), Small Mobile (<480px).
+* **Reglas**: `min-width: 0` en elementos flex, contenedores de botones con `flex-wrap: wrap; gap: 8px;`, tablas con scroll horizontal.
+
+### G. migration.md (No-Break Guarantee)
+* Protocolo metódico de 5 principios para adaptar proyectos legados respetando handlers, hooks, tipos y modelos de datos. Tabla de reemplazo de colores hardcodeados a variables CSS.
+
+---
+
 # 26. Feature Orchestrator
 
 Crear:
@@ -1808,27 +1883,28 @@ Interfaces desactualizadas
 
 # 37. Responsive Design
 
-Toda aplicación web SATEM debe considerar:
+Toda aplicación web SATEM debe construirse bajo las reglas oficiales documentadas en **`satem-design-system/responsive.md`**:
 
 ```text
-Mobile
-Tablet
-Desktop
+Large Desktop (≥ 1440px)
+Desktop / Laptop (1024px – 1439px)
+Tablet (< 1024px)
+Mobile Estándar (< 768px)
+Small Mobile (< 480px)
 ```
 
 No se debe asumir que una interfaz desktop será suficiente.
 
-Al modificar una pantalla:
+Al modificar o crear una pantalla:
 
-1. revisar desktop;
-2. revisar tablet;
-3. revisar mobile;
-4. revisar navegación;
-5. revisar tablas;
-6. revisar formularios;
-7. revisar modales;
-8. revisar botones;
-9. revisar overflow horizontal.
+1. verificar comportamiento en desktop (≥ 1024px);
+2. verificar que en tablets (< 1024px) la barra lateral se transforme en drawer flotante con backdrop blur;
+3. verificar que en móviles (< 768px) las rejillas colapsen ordenadamente a 1 columna;
+4. asegurar que todo contenedor de botones y filtros use `display: flex; flex-wrap: wrap; gap: 8px;`;
+5. asegurar que toda tabla esté contenida en un `div.table-container` con desplazamiento horizontal protegido;
+6. asegurar que los elementos flex hijos utilicen `min-width: 0` para evitar overflow horizontal involuntario;
+7. verificar que los modales utilicen padding reducido (14-18px) y no se desborden en pantallas pequeñas;
+8. comprobar que los elementos interactivos cumplan con un área táctil mínima de 38px.
 
 ---
 
@@ -2310,6 +2386,7 @@ El Orchestrator debe terminar mostrando:
 ## Skills
 
 - [ ] satem-code-review
+- [ ] satem-design-system (tokens, components, layouts, branding, responsive, migration)
 
 ## OpenSpec
 
