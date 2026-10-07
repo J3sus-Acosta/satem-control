@@ -7,7 +7,7 @@ import path from 'path';
 import { Prisma, ExpedientOrigin, ExpedientStatus, ContractStatus, TaxTreatment } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { NotFoundError, AppError } from '../../common/errors/app-error.js';
-import { generateSequence } from '../../common/utils/sequence.js';
+import { generateSequence, SequencePrefix } from '../../common/utils/sequence.js';
 import { createAuditLog } from '../../common/utils/audit.js';
 import { resolveStoragePath } from '../../common/utils/storage-path.js';
 
@@ -197,8 +197,44 @@ export function unifyWorkOrders(rawWorkOrders: any[], docInstances: any[], exped
 
 export async function listExpedientsHandler(request: FastifyRequest, reply: FastifyReply) {
   try {
+    const { market } = (request.query as any) || {};
+
+    const whereClause: Prisma.ExpedientWhereInput = { deletedAt: null };
+
+    if (market === 'NAC') {
+      whereClause.OR = [
+        { code: { startsWith: 'NAC-' } },
+        {
+          AND: [
+            { NOT: { code: { startsWith: 'EXP-' } } },
+            {
+              OR: [
+                { taxTreatment: { in: [TaxTreatment.VAT_APPLIED, TaxTreatment.VAT_EXEMPT] } },
+                { customer: { countryCode: { in: ['CL', 'CHL'] } } },
+              ],
+            },
+          ],
+        },
+      ];
+    } else if (market === 'EXP') {
+      whereClause.OR = [
+        { code: { startsWith: 'EXP-' } },
+        {
+          AND: [
+            { NOT: { code: { startsWith: 'NAC-' } } },
+            {
+              OR: [
+                { taxTreatment: TaxTreatment.EXPORT_SERVICE },
+                { customer: { countryCode: { notIn: ['CL', 'CHL'] } } },
+              ],
+            },
+          ],
+        },
+      ];
+    }
+
     const rawExpedients = await prisma.expedient.findMany({
-      where: { deletedAt: null },
+      where: whereClause,
       include: {
         customer: { include: { country: true } },
         contract: true,
@@ -868,7 +904,15 @@ export async function createExpedientHandler(request: FastifyRequest, reply: Fas
   const userId = (request.user as any)?.userId;
 
   const expedient = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const code = await generateSequence(tx, 'EXP');
+    const customer = await tx.customer.findUnique({
+      where: { id: body.customerId },
+      select: { countryCode: true },
+    });
+    const isChilean = customer?.countryCode === 'CL' || customer?.countryCode === 'CHL';
+    const isExport = body.taxTreatment === TaxTreatment.EXPORT_SERVICE;
+    const isNational = (body.taxTreatment === TaxTreatment.VAT_APPLIED || body.taxTreatment === TaxTreatment.VAT_EXEMPT || isChilean) && !isExport;
+    const prefix: SequencePrefix = isNational ? 'NAC' : 'EXP';
+    const code = await generateSequence(tx, prefix);
 
     const created = await tx.expedient.create({
       data: {

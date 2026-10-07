@@ -147,7 +147,7 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
     });
 
     // Auto-crear el Expediente para este Contrato
-    const expCode = await generateSequence(tx, 'EXP');
+    const expCode = await generateSequence(tx, isNational ? 'NAC' : 'EXP');
     const createdExpedient = await tx.expedient.create({
       data: {
         code: expCode,

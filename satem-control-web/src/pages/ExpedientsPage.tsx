@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,10 +10,23 @@ import {
 } from 'lucide-react';
 import { SumUpCalculator } from '../components/SumUpCalculator';
 
-export const ExpedientsPage: React.FC = () => {
+export interface ExpedientsPageProps {
+  market?: 'NAC' | 'EXP';
+}
+
+export const ExpedientsPage: React.FC<ExpedientsPageProps> = ({ market: propMarket }) => {
   const { user } = useAuth();
   const isViewer = user?.role === 'VIEWER';
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const activeMarket: 'NAC' | 'EXP' | undefined = propMarket || (
+    location.pathname.includes('/expedients/nac')
+      ? 'NAC'
+      : location.pathname.includes('/expedients/exp')
+        ? 'EXP'
+        : undefined
+  );
 
   const [expedients, setExpedients] = useState<any[]>([]);
   const [selectedExpedient, setSelectedExpedient] = useState<any>(null);
@@ -117,10 +130,11 @@ export const ExpedientsPage: React.FC = () => {
   // ————————————————————————
   // Fetch expedients
   // ————————————————————————
-  const fetchExpedients = () => {
+  const fetchExpedients = (targetMarket = activeMarket) => {
     setLoading(true);
     setFetchError(null);
-    api.get('/expedients')
+    const url = targetMarket ? `/expedients?market=${targetMarket}` : '/expedients';
+    api.get(url)
       .then((res) => {
         const list = res.data.data || [];
         setExpedients(list);
@@ -178,7 +192,15 @@ export const ExpedientsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchExpedients();
+    fetchExpedients(activeMarket);
+    if (activeMarket === 'NAC') {
+      setTaxTreatment('VAT_APPLIED');
+    } else if (activeMarket === 'EXP') {
+      setTaxTreatment('EXPORT_SERVICE');
+    }
+  }, [activeMarket]);
+
+  useEffect(() => {
     api.get('/customers').then((res) => setCustomers(res.data.data)).catch(() => {});
     api.get('/work-orders/service-types').then((res) => setServiceTypes(res.data.data || [])).catch(() => {});
     api.get('/users').then((res) => setTechniciansList(res.data.data || [])).catch(() => {});
@@ -350,7 +372,7 @@ export const ExpedientsPage: React.FC = () => {
       setNewTitle('');
       setSelectedCustomer('');
       setSelectedContract('');
-      fetchExpedients();
+      fetchExpedients(activeMarket);
     } catch (err: any) {
       alert(err.response?.data?.error?.message || 'Error al crear expediente');
     }
@@ -627,15 +649,32 @@ export const ExpedientsPage: React.FC = () => {
       {/* Header */}
       <div className="page-header">
         <div className="page-header-info">
-          <h1>Gestión de Expedientes (EXP-YYYY-NNNNNN)</h1>
+          <h1>
+            {activeMarket === 'NAC'
+              ? 'Expedientes Nacionales (NAC)'
+              : activeMarket === 'EXP'
+                ? 'Expedientes de Exportación (EXP)'
+                : 'Gestión de Expedientes'}
+          </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
-            Unidad central de control operativo, facturación, integridad y snapshots de cierre SATEM.
+            {activeMarket === 'NAC'
+              ? 'Control operativo, facturación DTE SII en CLP, transferencias directas y contratos del mercado chileno.'
+              : activeMarket === 'EXP'
+                ? 'Control operativo transfronterizo, contratos SOW en USD, exención de exportación y cobros internacionales.'
+                : 'Unidad central de control operativo, facturación, integridad y snapshots de cierre SATEM.'}
           </p>
         </div>
         {!isViewer && (
           <div className="page-header-actions">
-            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
-              <Plus size={18} /> Nuevo Expediente
+            <button
+              onClick={() => {
+                if (activeMarket === 'NAC') setTaxTreatment('VAT_APPLIED');
+                else if (activeMarket === 'EXP') setTaxTreatment('EXPORT_SERVICE');
+                setShowCreateModal(true);
+              }}
+              className="btn btn-primary"
+            >
+              <Plus size={18} /> Nuevo Expediente {activeMarket ? activeMarket : ''}
             </button>
           </div>
         )}
@@ -647,7 +686,7 @@ export const ExpedientsPage: React.FC = () => {
           <div>
             <strong>Error al cargar expedientes:</strong> {fetchError}
           </div>
-          <button onClick={fetchExpedients} className="btn btn-secondary" style={{ fontSize: '12px', padding: '4px 10px' }}>
+          <button onClick={() => fetchExpedients(activeMarket)} className="btn btn-secondary" style={{ fontSize: '12px', padding: '4px 10px' }}>
             Reintentar
           </button>
         </div>
@@ -658,7 +697,7 @@ export const ExpedientsPage: React.FC = () => {
         <div className="expedients-sidebar">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '4px' }}>
             <h3 style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px', margin: 0 }}>
-              Expedientes ({expedients.length})
+              {activeMarket === 'NAC' ? 'Expedientes NAC' : activeMarket === 'EXP' ? 'Expedientes EXP' : 'Expedientes'} ({expedients.length})
             </h3>
             {sidebarLimit < expedients.length && (
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -734,7 +773,7 @@ export const ExpedientsPage: React.FC = () => {
                 </div>
                 <div style={{ fontSize: 'clamp(14px, 2vw, 16px)', fontWeight: 600, marginTop: '6px', wordBreak: 'break-word' }}>{selectedExpedient.title}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', wordBreak: 'break-word' }}>
-                  Cliente: <strong>{selectedExpedient.customer?.legalName}</strong> ({selectedExpedient.customer?.country?.name}) | Tax ID: {selectedExpedient.customer?.taxId}
+                  Cliente: <strong>{selectedExpedient.customer?.legalName}</strong> ({selectedExpedient.customer?.country?.name}) | {(selectedExpedient.customer?.countryCode === 'CL' || selectedExpedient.customer?.countryCode === 'CHL' || selectedExpedient.customer?.country?.code === 'CL' || selectedExpedient.customer?.country?.name === 'Chile') ? 'RUT' : 'Tax ID'}: {selectedExpedient.customer?.taxId}
                 </div>
               </div>
 
@@ -2238,12 +2277,28 @@ export const ExpedientsPage: React.FC = () => {
                 <select
                   className="form-select"
                   value={selectedCustomer}
-                  onChange={(e) => { setSelectedCustomer(e.target.value); setSelectedContract(''); fetchContractsByCustomer(e.target.value); }}
+                  onChange={(e) => {
+                    const custId = e.target.value;
+                    setSelectedCustomer(custId);
+                    setSelectedContract('');
+                    fetchContractsByCustomer(custId);
+                    const foundCust = customers.find(c => c.id === custId);
+                    if (foundCust) {
+                      const isChl = foundCust.countryCode === 'CHL' || foundCust.countryCode === 'CL';
+                      if (isChl || activeMarket === 'NAC') {
+                        setTaxTreatment('VAT_APPLIED');
+                      } else if (activeMarket === 'EXP') {
+                        setTaxTreatment('EXPORT_SERVICE');
+                      }
+                    }
+                  }}
                   required
                 >
                   <option value="">Seleccione un cliente...</option>
                   {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{c.legalName} ({c.taxId})</option>
+                    <option key={c.id} value={c.id}>
+                      {c.legalName} ({(c.countryCode === 'CHL' || c.countryCode === 'CL') ? 'RUT' : 'Tax ID'}: {c.taxId})
+                    </option>
                   ))}
                 </select>
               </div>

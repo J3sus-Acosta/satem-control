@@ -1,10 +1,6 @@
-# plantillas-documentales-nacionales Specification
+# plantillas-documentales-nacionales Specification Delta
 
-## Purpose
-
-Provee un conjunto de plantillas documentales oficiales para el mercado nacional chileno redactadas exclusivamente en idioma español, sin términos bilingües ni conversiones forzadas de tipo de cambio, adaptadas a contratos de servicios, órdenes de trabajo, actas de recepción y cotizaciones.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Plantillas Oficiales Institucionales en Español
 El motor de plantillas y bootstrap del sistema SHALL incluir versiones predeterminadas en idioma español (`language: "ES"`) para la emisión de contratos nacionales (`TPL-CONTRACT-NAC`), órdenes de trabajo (`TPL-WORK-ORDER-NAC`), actas de recepción conforme (`TPL-RECEPTION-NAC`) y propuestas comerciales (`TPL-PROPOSAL-NAC`), utilizando obligatoriamente la identificación "RUT" en lugar de "Tax ID" para clientes del mercado chileno.
@@ -17,12 +13,7 @@ El motor de plantillas y bootstrap del sistema SHALL incluir versiones predeterm
 - **WHEN** se emite una Orden de Trabajo (`TPL-WORK-ORDER-NAC`), Acta de Recepción Conforme (`TPL-RECEPTION-NAC`) o Propuesta Comercial (`TPL-PROPOSAL-NAC`) para un cliente del mercado chileno
 - **THEN** los encabezados y bloques de identificación del cliente MUST exhibir "RUT" y omitir fórmulas en inglés o referencias a "Tax ID"
 
-### Requirement: Supresión de Tipo de Cambio en Documentos en CLP
-Al compilar y renderizar cualquier plantilla documental con datos de contrato o expediente cuya moneda sea `CLP`, el motor de generación documental debe omitir automáticamente el bloque de tipo de cambio de dólar observado, tasas de conversión y cláusulas cambiarias que aplican a operaciones de exportación.
-
-#### Scenario: Contrato nacional sin conversión cambiaria
-- **WHEN** un contrato tiene configurada la moneda `CLP` y monto total pactado en pesos
-- **THEN** el PDF generado muestra el monto directo en pesos chilenos y no incluye leyendas de "T.C. Dólar Observado", "Equivalente en CLP", ni advertencias de tipo de cambio del Banco Central
+## ADDED Requirements
 
 ### Requirement: Variables de Plantilla con Identificación Tributaria Dinámica
 El motor de inyección de variables (`document-instances.controller.ts`) MUST proveer las variables `cliente.taxIdLabel` (que evalúa a "RUT" si el cliente pertenece a Chile o "Tax ID" en caso contrario) y `cliente.rut`, permitiendo que cualquier plantilla institucional o personalizada resuelva automáticamente la etiqueta apropiada según el país del cliente.

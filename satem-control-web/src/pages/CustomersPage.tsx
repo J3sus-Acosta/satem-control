@@ -303,7 +303,7 @@ export const CustomersPage: React.FC = () => {
             <thead>
               <tr>
                 <th>Código / Razón Social</th>
-                <th>País / Tax ID</th>
+                <th>País / RUT / Tax ID</th>
                 <th>Domicilio & Contacto</th>
                 <th>Acciones</th>
               </tr>
@@ -352,7 +352,7 @@ export const CustomersPage: React.FC = () => {
                         <td>
                           <span className="badge badge-info">{c.country?.name || c.countryCode}</span>
                           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            Tax ID: {c.taxId}
+                            {(c.countryCode === 'CHL' || c.countryCode === 'CL' || c.country?.name === 'Chile') ? 'RUT' : 'Tax ID'}: {c.taxId}
                           </div>
                         </td>
                         <td>
@@ -446,7 +446,7 @@ export const CustomersPage: React.FC = () => {
                                     {c.entities.map((ent: any) => (
                                       <div key={ent.id} style={{ fontSize: '12px', padding: '6px 8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
                                         <div style={{ fontWeight: 600 }}>{ent.name} {ent.isPrimary && <span className="badge badge-success" style={{ fontSize: '9px' }}>Principal</span>}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ent.taxId ? `Tax ID: ${ent.taxId}` : ''} {ent.address ? `• ${ent.address}` : ''}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ent.taxId ? `${(c.countryCode === 'CHL' || c.countryCode === 'CL' || c.country?.name === 'Chile') ? 'RUT' : 'Tax ID'}: ${ent.taxId}` : ''} {ent.address ? `• ${ent.address}` : ''}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -566,8 +566,17 @@ export const CustomersPage: React.FC = () => {
               </div>
               <div className="grid-form-2">
                 <div className="form-group">
-                  <label className="form-label">Tax ID / Identificación Fiscal</label>
-                  <input type="text" className="form-input" value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="Ej: 93-2163996" required />
+                  <label className="form-label">
+                    {(countryCode === 'CHL' || countryCode === 'CL') ? 'RUT (Identificación Fiscal)' : 'Tax ID / Identificación Fiscal'}
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={taxId}
+                    onChange={(e) => setTaxId(e.target.value)}
+                    placeholder={(countryCode === 'CHL' || countryCode === 'CL') ? 'Ej: 76.123.456-7' : 'Ej: 93-2163996'}
+                    required
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">País</label>
@@ -648,7 +657,7 @@ export const CustomersPage: React.FC = () => {
                               {ent.isPrimary && <span className="badge badge-success" style={{ fontSize: '9.5px' }}>Casa Matriz</span>}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                              {ent.address || 'Sin dirección específica'} {ent.taxId ? `• Tax ID: ${ent.taxId}` : ''}
+                              {ent.address || 'Sin dirección específica'} {ent.taxId ? `• ${(editingCustomer.countryCode === 'CHL' || editingCustomer.countryCode === 'CL' || editingCustomer.country?.name === 'Chile') ? 'RUT' : 'Tax ID'}: ${ent.taxId}` : ''}
                             </div>
                           </div>
                           <button
@@ -687,8 +696,8 @@ export const CustomersPage: React.FC = () => {
                 <input type="text" className="form-input" value={entityName} onChange={(e) => setEntityName(e.target.value)} placeholder="Ej: Sede Miami Operaciones" required />
               </div>
               <div className="form-group">
-                <label className="form-label">Tax ID Local (Opcional)</label>
-                <input type="text" className="form-input" value={entityTaxId} onChange={(e) => setEntityTaxId(e.target.value)} placeholder="Tax ID específico" />
+                <label className="form-label">RUT / Tax ID Local (Opcional)</label>
+                <input type="text" className="form-input" value={entityTaxId} onChange={(e) => setEntityTaxId(e.target.value)} placeholder="RUT o Tax ID específico" />
               </div>
               <div className="form-group">
                 <label className="form-label">Dirección / Domicilio</label>

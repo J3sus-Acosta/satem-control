@@ -218,6 +218,8 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
     cliente: {
       nombreLegal: customer.legalName || sanitizeCustomVars.cliente?.nombreLegal || '',
       taxId: customer.taxId || sanitizeCustomVars.cliente?.taxId || '',
+      rut: customer.taxId || sanitizeCustomVars.cliente?.taxId || '',
+      taxIdLabel: (customer.countryCode === 'CL' || customer.countryCode === 'CHL' || isClp) ? 'RUT' : 'Tax ID',
       pais: customer.country?.name || customer.countryCode || sanitizeCustomVars.cliente?.pais || '',
       ciudad: customer.city || sanitizeCustomVars.cliente?.ciudad || '',
       direccion: customer.address || sanitizeCustomVars.cliente?.direccion || '',

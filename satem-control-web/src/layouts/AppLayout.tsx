@@ -143,12 +143,21 @@ export const AppLayout: React.FC = () => {
           </NavLink>
 
           <NavLink
-            to="/expedients"
+            to="/expedients/nac"
             onClick={closeSidebar}
             className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
             style={{ justifyContent: 'flex-start' }}
           >
-            <FolderKanban size={18} /> Expedientes
+            <FolderKanban size={18} /> Expedientes NAC
+          </NavLink>
+
+          <NavLink
+            to="/expedients/exp"
+            onClick={closeSidebar}
+            className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ justifyContent: 'flex-start' }}
+          >
+            <FolderKanban size={18} /> Expedientes EXP
           </NavLink>
 
           <NavLink

@@ -277,6 +277,8 @@ export const DocumentGeneratorPage: React.FC = () => {
       .replace(/\{\{empresa\.cargoRepresentante\}\}/g, companyConfig?.legalRepresentativeTitle || 'Gerente General')
       .replace(/\{\{cliente\.nombreLegal\}\}/g, customer.legalName || '[Nombre del Cliente]')
       .replace(/\{\{cliente\.taxId\}\}/g, customer.taxId || '[Tax ID / RUT]')
+      .replace(/\{\{cliente\.rut\}\}/g, customer.taxId || '[RUT]')
+      .replace(/\{\{cliente\.taxIdLabel\}\}/g, (customer.countryCode === 'CHL' || customer.countryCode === 'CL') ? 'RUT' : 'Tax ID')
       .replace(/\{\{cliente\.pais\}\}/g, customer.country?.name || customer.countryCode || '[País Cliente]')
       .replace(/\{\{cliente\.ciudad\}\}/g, customer.city || '[Ciudad Cliente]')
       .replace(/\{\{cliente\.direccion\}\}/g, customer.address || '[Dirección Cliente]')

@@ -87,7 +87,9 @@ export const App: React.FC = () => {
               >
                 <Route index element={<DashboardPage />} />
                 <Route path="control-center" element={<ControlCenterPage />} />
-                <Route path="expedients" element={<ExpedientsPage />} />
+                <Route path="expedients" element={<Navigate to="/expedients/nac" replace />} />
+                <Route path="expedients/nac" element={<ExpedientsPage market="NAC" />} />
+                <Route path="expedients/exp" element={<ExpedientsPage market="EXP" />} />
                 <Route path="customers" element={<CustomersPage />} />
                 <Route path="documents/generator" element={<DocumentGeneratorPage />} />
                 <Route path="billing" element={<BillingPage />} />

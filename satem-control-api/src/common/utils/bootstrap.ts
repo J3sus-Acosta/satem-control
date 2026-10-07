@@ -275,6 +275,15 @@ export async function ensureDefaultTemplates(): Promise<void> {
           },
         });
         console.log(`[BOOTSTRAP] 📄 Versión inicial agregada para plantilla: ${tpl.name} (${tpl.code})`);
+      } else if (tpl.code.endsWith('-NAC') && existing.versions.length > 0) {
+        const latestVersion = existing.versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
+        if (latestVersion && latestVersion.htmlTemplate !== tpl.html) {
+          await prisma.documentTemplateVersion.update({
+            where: { id: latestVersion.id },
+            data: { htmlTemplate: tpl.html },
+          });
+          console.log(`[BOOTSTRAP] 📄 Plantilla nacional actualizada con RUT: ${tpl.name} (${tpl.code})`);
+        }
       }
     }
   } catch (error) {
