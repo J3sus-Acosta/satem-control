@@ -517,5 +517,295 @@ export const OFFICIAL_DEFAULT_TEMPLATES = [
         <div class="sig-box"><strong>RECIBIDO POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Aprobación Cliente</div>
       </div>
     </body></html>`
+  },
+  {
+    code: 'TPL-CONTRACT-NAC',
+    name: 'Contrato de Prestación de Servicios (Mercado Nacional - CLP)',
+    category: TemplateCategory.CONTRACT,
+    language: 'ES',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${baseCss}</style></head><body>
+      <div class="header">
+        <div>
+          <img src="${LOGO_FULL_BASE64}" class="company-logo" alt="SATEM Soluciones Inteligentes" />
+          <div class="company-sub"><strong>{{empresa.nombre}}</strong> | RUT: {{empresa.rut}}</div>
+          <div class="company-sub">{{empresa.direccion}}, {{empresa.ciudad}}, {{empresa.pais}}</div>
+          <div class="company-sub">Email: {{empresa.email}} | Web: {{empresa.website}}</div>
+        </div>
+        <div class="header-meta">
+          <div class="doc-badge">CONTRATO DE SERVICIOS</div>
+          <div class="meta-line"><strong>Folio Contrato:</strong> {{contrato.codigo}}</div>
+          <div class="meta-line"><strong>Expediente:</strong> {{expediente.codigo}}</div>
+          <div class="meta-line"><strong>Fecha Emisión:</strong> {{contrato.fechaEmision}}</div>
+        </div>
+      </div>
+      <div class="doc-title-container">
+        <h1 class="doc-title">{{contrato.titulo}}</h1>
+        <div class="doc-subtitle">CONTRATO DE PRESTACIÓN DE SERVICIOS PROFESIONALES Y TECNOLÓGICOS</div>
+      </div>
+      <div class="section-title">1. INDIVIDUALIZACIÓN DE LAS PARTES</div>
+      <table class="grid-table">
+        <tr>
+          <th style="width: 50%;">PRESTADOR DE SERVICIOS</th>
+          <th style="width: 50%;">CLIENTE CONTRATANTE</th>
+        </tr>
+        <tr>
+          <td>
+            <strong>Razón Social:</strong> {{empresa.nombre}}<br>
+            <strong>RUT:</strong> {{empresa.rut}}<br>
+            <strong>Representante:</strong> {{empresa.representanteLegal}} ({{empresa.cargoRepresentante}})<br>
+            <strong>Domicilio:</strong> {{empresa.direccion}}, {{empresa.ciudad}}, {{empresa.pais}}<br>
+            <strong>Contacto:</strong> {{empresa.email}} | {{empresa.telefono}}
+          </td>
+          <td>
+            <strong>Razón Social:</strong> {{cliente.nombreLegal}}<br>
+            <strong>RUT:</strong> {{cliente.taxId}}<br>
+            <strong>Ciudad:</strong> {{cliente.ciudad}}<br>
+            <strong>Domicilio:</strong> {{cliente.direccion}}<br>
+            <strong>Contacto:</strong> {{cliente.email}} | {{cliente.telefono}}
+          </td>
+        </tr>
+      </table>
+      <div class="section-title">2. OBJETO Y ALCANCE DE LOS SERVICIOS</div>
+      <table class="grid-table">
+        <tr>
+          <td class="label">Tipo de Contrato:</td>
+          <td><strong>{{contrato.tipoNombre}}</strong> (Modalidad: {{contrato.modalidadNombre}})</td>
+        </tr>
+        <tr>
+          <td class="label">Título del Servicio:</td>
+          <td><strong>{{contrato.titulo}}</strong></td>
+        </tr>
+      </table>
+      <div style="font-weight: bold; margin-bottom: 4px; color: #0a2540; font-size: 11px;">Descripción Detallada del Alcance:</div>
+      <div class="scope-box">{{contrato.descripcion}}</div>
+      <div class="section-title">3. VIGENCIA Y PLAZOS DE EJECUCIÓN</div>
+      <table class="grid-table">
+        <tr>
+          <td class="label">Fecha de Inicio:</td>
+          <td>{{contrato.fechaInicio}}</td>
+          <td class="label">Fecha de Término / Vigencia:</td>
+          <td>{{contrato.fechaTermino}}</td>
+        </tr>
+        <tr>
+          <td class="label">Régimen de Ejecución:</td>
+          <td colspan="3">{{contrato.modalidadNombre}} — Conforme a requerimientos y órdenes de trabajo autorizadas.</td>
+        </tr>
+      </table>
+      <div class="section-title">4. HONORARIOS, VALOR Y FORMA DE PAGO</div>
+      <table class="grid-table">
+        <tr>
+          <td class="label">Moneda:</td>
+          <td><strong>{{contrato.moneda}}</strong></td>
+          <td class="label">Monto Total Pactado:</td>
+          <td><strong style="color: #00a896; font-size: 12px;">{{contrato.moneda}} {{contrato.valor}}</strong></td>
+        </tr>
+        <tr>
+          <td class="label">Horas Contratadas:</td>
+          <td>{{contrato.horas}} Horas</td>
+          <td class="label">Tarifa por Hora:</td>
+          <td>{{contrato.tarifaHora}}</td>
+        </tr>
+        <tr>
+          <td class="label">Forma y Condiciones de Pago:</td>
+          <td colspan="3"><strong>{{contrato.metodoPago}}</strong></td>
+        </tr>
+      </table>
+      <div class="section-title">5. TRIBUTACIÓN Y FACTURACIÓN</div>
+      <div class="legal-clause">
+        <strong>RÉGIMEN TRIBUTARIO NACIONAL:</strong><br>
+        {{contrato.clausulaTributaria}}
+      </div>
+      <div class="signatures">
+        <div class="sig-box">
+          <strong>POR: {{empresa.nombre}}</strong><br>
+          <span style="font-size: 9.5px; color: #64748b;">Prestador de Servicios</span>
+          <div class="sig-space"></div>
+          ____________________________________________<br>
+          <strong>{{empresa.representanteLegal}}</strong><br>
+          {{empresa.cargoRepresentante}}<br>
+          RUT: {{empresa.rut}}
+        </div>
+        <div class="sig-box">
+          <strong>POR: {{cliente.nombreLegal}}</strong><br>
+          <span style="font-size: 9.5px; color: #64748b;">Cliente Contratante</span>
+          <div class="sig-space"></div>
+          ____________________________________________<br>
+          <strong>Firma Autorizada</strong><br>
+          RUT: {{cliente.taxId}}
+        </div>
+      </div>
+    </body></html>`
+  },
+  {
+    code: 'TPL-WORK-ORDER-NAC',
+    name: 'Orden de Trabajo (Mercado Nacional)',
+    category: TemplateCategory.WORK_ORDER,
+    language: 'ES',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${baseCss}</style></head><body>
+      <div class="header">
+        <div>
+          <img src="${LOGO_FULL_BASE64}" class="company-logo" alt="SATEM Soluciones Inteligentes" />
+          <div class="company-sub"><strong>{{empresa.nombre}}</strong> | RUT: {{empresa.rut}}</div>
+          <div class="company-sub">{{empresa.direccion}}, {{empresa.ciudad}}, {{empresa.pais}}</div>
+        </div>
+        <div class="header-meta">
+          <div class="doc-badge">ORDEN DE TRABAJO (OT)</div>
+          <div class="meta-line"><strong>Folio OT:</strong> {{documento.codigo}}</div>
+          <div class="meta-line"><strong>Expediente:</strong> {{expediente.codigo}}</div>
+          <div class="meta-line"><strong>Contrato Ref.:</strong> {{contrato.codigo}}</div>
+          <div class="meta-line"><strong>Fecha Emisión:</strong> {{documento.fechaEmision}}</div>
+        </div>
+      </div>
+      <div class="doc-title-container">
+        <h1 class="doc-title">ORDEN DE TRABAJO AUTORIZADA</h1>
+        <div class="doc-subtitle">DIRECTIVA DE EJECUCIÓN Y ASIGNACIÓN DE RECURSOS TÉCNICOS</div>
+      </div>
+      <div class="section-title">1. ANTECEDENTES GENERALES</div>
+      <table class="grid-table">
+        <tr><td class="label">Cliente:</td><td><strong>{{cliente.nombreLegal}}</strong> (RUT: {{cliente.taxId}})</td><td class="label">Ciudad:</td><td>{{cliente.ciudad}}</td></tr>
+        <tr><td class="label">Contrato Ref.:</td><td>{{contrato.codigo}} — {{contrato.titulo}}</td><td class="label">Expediente:</td><td>{{expediente.codigo}}</td></tr>
+      </table>
+      <div class="section-title">2. ESPECIFICACIÓN DEL REQUERIMIENTO TÉCNICO</div>
+      <div class="scope-box">{{contrato.descripcion}}</div>
+      <div class="section-title">3. TIEMPO Y ASIGNACIÓN DE RECURSOS</div>
+      <table class="grid-table">
+        <tr><td class="label">Horas Asignadas:</td><td><strong>{{contrato.horas}} Horas</strong></td><td class="label">Tarifa Horaria:</td><td>{{contrato.tarifaHora}}</td></tr>
+        <tr><td class="label">Valor Total:</td><td><strong>{{contrato.moneda}} {{contrato.valor}}</strong></td><td class="label">Período Programado:</td><td>{{contrato.fechaInicio}} al {{contrato.fechaTermino}}</td></tr>
+      </table>
+      <div class="signatures">
+        <div class="sig-box"><strong>AUTORIZADO POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+        <div class="sig-box"><strong>CONFORMIDAD CLIENTE: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Aprobación Técnica Cliente</div>
+      </div>
+    </body></html>`
+  },
+  {
+    code: 'TPL-RECEPTION-NAC',
+    name: 'Acta de Recepción Conforme (Mercado Nacional)',
+    category: TemplateCategory.RECEPTION_CONFORMITY,
+    language: 'ES',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${baseCss}</style></head><body>
+      <div class="header">
+        <div>
+          <img src="${LOGO_FULL_BASE64}" class="company-logo" alt="SATEM Soluciones Inteligentes" />
+          <div class="company-sub"><strong>{{empresa.nombre}}</strong> | RUT: {{empresa.rut}}</div>
+          <div class="company-sub">{{empresa.direccion}}, {{empresa.ciudad}}, {{empresa.pais}}</div>
+          <div class="company-sub">Email: {{empresa.email}} | Web: {{empresa.website}}</div>
+        </div>
+        <div class="header-meta">
+          <div class="doc-badge">RECEPCIÓN CONFORME</div>
+          <div class="meta-line"><strong>Folio:</strong> {{documento.codigo}}</div>
+          <div class="meta-line"><strong>Expediente:</strong> {{expediente.codigo}}</div>
+          <div class="meta-line"><strong>Contrato Ref.:</strong> {{contrato.codigo}}</div>
+          <div class="meta-line"><strong>Fecha:</strong> {{documento.fechaEmision}}</div>
+        </div>
+      </div>
+      <div class="doc-title-container">
+        <h1 class="doc-title">ACTA DE RECEPCIÓN CONFORME DE SERVICIOS</h1>
+        <div class="doc-subtitle">CERTIFICADO DE CONFORMIDAD Y CUMPLIMIENTO DE ENTREGABLES</div>
+      </div>
+      <div class="section-title">1. INDIVIDUALIZACIÓN DE LAS PARTES</div>
+      <table class="grid-table">
+        <tr>
+          <th style="width: 50%;">PRESTADOR DE SERVICIOS</th>
+          <th style="width: 50%;">CLIENTE RECEPTOR</th>
+        </tr>
+        <tr>
+          <td>
+            <strong>Razón Social:</strong> {{empresa.nombre}}<br>
+            <strong>RUT:</strong> {{empresa.rut}}<br>
+            <strong>Representante:</strong> {{empresa.representanteLegal}} ({{empresa.cargoRepresentante}})<br>
+            <strong>Domicilio:</strong> {{empresa.direccion}}, {{empresa.ciudad}}, {{empresa.pais}}<br>
+            <strong>Contacto:</strong> {{empresa.email}} | {{empresa.telefono}}
+          </td>
+          <td>
+            <strong>Razón Social:</strong> {{cliente.nombreLegal}}<br>
+            <strong>RUT:</strong> {{cliente.taxId}}<br>
+            <strong>Ciudad:</strong> {{cliente.ciudad}}<br>
+            <strong>Domicilio:</strong> {{cliente.direccion}}<br>
+            <strong>Contacto:</strong> {{cliente.email}}
+          </td>
+        </tr>
+      </table>
+      <div class="section-title">2. REFERENCIA CONTRACTUAL Y EXPEDIENTE</div>
+      <table class="grid-table">
+        <tr>
+          <td class="label">Contrato Marco:</td>
+          <td><strong>{{contrato.codigo}}</strong> — {{contrato.titulo}}</td>
+          <td class="label">Expediente Operativo:</td>
+          <td><strong>{{expediente.codigo}}</strong></td>
+        </tr>
+        <tr>
+          <td class="label">Tipo & Modalidad:</td>
+          <td>{{contrato.tipoNombre}} ({{contrato.modalidadNombre}})</td>
+          <td class="label">Período de Ejecución:</td>
+          <td>{{contrato.fechaInicio}} al {{contrato.fechaTermino}}</td>
+        </tr>
+      </table>
+      <div class="section-title">3. SERVICIOS RECIBIDOS Y CONFORMIDAD</div>
+      <div style="font-weight: bold; margin-bottom: 4px; color: #0a2540; font-size: 11px;">Descripción de las Actividades y Servicios Prestados:</div>
+      <div class="scope-box">{{contrato.descripcion}}</div>
+      <div class="section-title">4. DECLARACIÓN DE CONFORMIDAD Y CIERRE</div>
+      <div class="legal-clause">
+        El Cliente declara haber recibido a entera satisfacción la totalidad de los servicios técnicos y profesionales descritos precedentemente, prestados de conformidad con los estándares y requerimientos acordados.
+      </div>
+      <div class="signatures">
+        <div class="sig-box">
+          <strong>ENTREGADO POR: {{empresa.nombre}}</strong><br>
+          <div class="sig-space"></div>
+          ____________________________________________<br>
+          <strong>{{empresa.representanteLegal}}</strong><br>
+          {{empresa.cargoRepresentante}}<br>
+          RUT: {{empresa.rut}}
+        </div>
+        <div class="sig-box">
+          <strong>RECEPCIONADO CONFORME POR: {{cliente.nombreLegal}}</strong><br>
+          <div class="sig-space"></div>
+          ____________________________________________<br>
+          <strong>Aprobación y Conformidad Cliente</strong><br>
+          RUT: {{cliente.taxId}}
+        </div>
+      </div>
+    </body></html>`
+  },
+  {
+    code: 'TPL-PROPOSAL-NAC',
+    name: 'Propuesta Comercial (Mercado Nacional - CLP)',
+    category: TemplateCategory.COMMERCIAL_PROPOSAL,
+    language: 'ES',
+    html: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${baseCss}</style></head><body>
+      <div class="header">
+        <div>
+          <img src="${LOGO_FULL_BASE64}" class="company-logo" alt="SATEM Soluciones Inteligentes" />
+          <div class="company-sub"><strong>{{empresa.nombre}}</strong> | RUT: {{empresa.rut}}</div>
+          <div class="company-sub">{{empresa.direccion}}, {{empresa.ciudad}}, {{empresa.pais}}</div>
+          <div class="company-sub">Email: {{empresa.email}} | Web: {{empresa.website}}</div>
+        </div>
+        <div class="header-meta">
+          <div class="doc-badge">PROPUESTA COMERCIAL</div>
+          <div class="meta-line"><strong>Folio:</strong> {{documento.codigo}}</div>
+          <div class="meta-line"><strong>Fecha:</strong> {{documento.fechaEmision}}</div>
+        </div>
+      </div>
+      <div class="doc-title-container">
+        <h1 class="doc-title">{{contrato.titulo}}</h1>
+        <div class="doc-subtitle">PROPUESTA TÉCNICA Y ECONÓMICA DE SERVICIOS TI</div>
+      </div>
+      <div class="section-title">1. DESTINATARIO Y CLIENTE</div>
+      <table class="grid-table">
+        <tr><td class="label">Cliente:</td><td><strong>{{cliente.nombreLegal}}</strong> (RUT: {{cliente.taxId}})</td><td class="label">Contacto:</td><td>{{cliente.contacto}}</td></tr>
+        <tr><td class="label">Email:</td><td>{{cliente.email}}</td><td class="label">Teléfono:</td><td>{{cliente.telefono}}</td></tr>
+      </table>
+      <div class="section-title">2. ALCANCE DE LA PROPUESTA</div>
+      <div class="scope-box">{{contrato.descripcion}}</div>
+      <div class="section-title">3. CONDICIONES ECONÓMICAS Y FORMA DE PAGO</div>
+      <table class="grid-table">
+        <tr><td class="label">Moneda:</td><td><strong>{{contrato.moneda}}</strong></td><td class="label">Total Propuesta:</td><td><strong style="color: #00a896; font-size: 12px;">{{contrato.moneda}} {{contrato.valor}}</strong></td></tr>
+        <tr><td class="label">Forma de Pago:</td><td colspan="3"><strong>{{contrato.metodoPago}}</strong></td></tr>
+      </table>
+      <div class="signatures">
+        <div class="sig-box"><strong>PRESENTADO POR: {{empresa.nombre}}</strong><div class="sig-space"></div>______________________________<br>{{empresa.representanteLegal}}</div>
+        <div class="sig-box"><strong>ACEPTADO POR: {{cliente.nombreLegal}}</strong><div class="sig-space"></div>______________________________<br>Firma Aprobación Cliente</div>
+      </div>
+    </body></html>`
   }
 ];

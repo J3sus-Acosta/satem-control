@@ -96,6 +96,14 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
   const body = createContractSchema.parse(request.body);
   const userId = (request.user as any)?.userId;
 
+  const customer = await prisma.customer.findUnique({
+    where: { id: body.customerId },
+  });
+
+  const isNational = customer?.countryCode === 'CL' || customer?.countryCode === 'CHL' || body.currency === 'CLP';
+  const defaultTaxTreatment = isNational ? TaxTreatment.VAT_APPLIED : TaxTreatment.EXPORT_SERVICE;
+  const defaultVatRate = isNational ? new Prisma.Decimal(19) : new Prisma.Decimal(0);
+
   const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const code = await generateSequence(tx, 'SOW');
 
@@ -147,10 +155,10 @@ export async function createContractHandler(request: FastifyRequest, reply: Fast
         customerEntityId: body.customerEntityId || null,
         contractId: created.id,
         origin: ExpedientOrigin.CONTRACT,
-        title: `Expediente SOW — ${body.title}`,
+        title: isNational ? `Expediente — ${body.title}` : `Expediente SOW — ${body.title}`,
         description: body.description || `Expediente generado automáticamente para el contrato ${code}`,
-        taxTreatment: TaxTreatment.EXPORT_SERVICE,
-        vatRate: new Prisma.Decimal(0),
+        taxTreatment: defaultTaxTreatment,
+        vatRate: defaultVatRate,
         status: ExpedientStatus.OPEN,
       },
     });

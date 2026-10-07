@@ -18,7 +18,7 @@ const createInvoiceSchema = z.object({
   currency: z.string().default('USD'),
   netAmount: z.coerce.number().positive(),
   vatAmount: z.coerce.number().default(0),
-  totalAmount: z.coerce.number().positive(),
+  totalAmount: z.coerce.number().optional(),
   taxTreatment: z.nativeEnum(TaxTreatment).default(TaxTreatment.EXPORT_SERVICE),
   pdfDocumentId: z.string().uuid().optional(),
   xmlDocumentId: z.string().uuid().optional(),
@@ -44,6 +44,22 @@ export async function createInvoiceHandler(request: FastifyRequest, reply: Fasti
   const body = createInvoiceSchema.parse(request.body);
   const userId = (request.user as any)?.userId;
 
+  let computedVat = body.vatAmount;
+  let computedTotal = body.totalAmount;
+
+  if (body.taxTreatment === TaxTreatment.VAT_APPLIED || body.siiDocType === 33) {
+    if (computedVat <= 0 && body.netAmount > 0) {
+      computedVat = Math.round(body.netAmount * 0.19);
+    }
+    if (!computedTotal || computedTotal <= 0) {
+      computedTotal = body.netAmount + computedVat;
+    }
+  } else {
+    if (!computedTotal || computedTotal <= 0) {
+      computedTotal = body.netAmount;
+    }
+  }
+
   const invoice = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const code = await generateSequence(tx, 'FAC');
 
@@ -56,8 +72,8 @@ export async function createInvoiceHandler(request: FastifyRequest, reply: Fasti
         issueDate: body.issueDate,
         currency: body.currency,
         netAmount: new Prisma.Decimal(body.netAmount),
-        vatAmount: new Prisma.Decimal(body.vatAmount),
-        totalAmount: new Prisma.Decimal(body.totalAmount),
+        vatAmount: new Prisma.Decimal(computedVat),
+        totalAmount: new Prisma.Decimal(computedTotal),
         taxTreatment: body.taxTreatment,
         status: InvoiceStatus.ISSUED,
         pdfDocumentId: body.pdfDocumentId || null,
@@ -179,9 +195,25 @@ export async function uploadInvoiceHandler(request: FastifyRequest, reply: Fasti
   const issueDate = fields.issueDate ? new Date(fields.issueDate) : new Date();
   const currency = fields.currency || 'USD';
   const netAmount = parseFloat(fields.netAmount || fields.netAmountUsd || fields.totalAmount || '0');
-  const vatAmount = parseFloat(fields.vatAmount || '0');
-  const totalAmount = parseFloat(fields.totalAmount || fields.netAmount || fields.netAmountUsd || '0');
+  let vatAmount = parseFloat(fields.vatAmount || '0');
+  let totalAmount = parseFloat(fields.totalAmount || '0');
   const taxTreatment = (fields.taxTreatment as TaxTreatment) || expedient.taxTreatment || TaxTreatment.EXPORT_SERVICE;
+
+  if (taxTreatment === TaxTreatment.VAT_APPLIED || siiDocType === 33) {
+    if (vatAmount <= 0 && netAmount > 0) {
+      vatAmount = Math.round(netAmount * 0.19);
+    }
+    if (totalAmount <= 0 && netAmount > 0) {
+      totalAmount = netAmount + vatAmount;
+    }
+  } else {
+    if (totalAmount <= 0) {
+      totalAmount = netAmount > 0 ? netAmount : parseFloat(fields.netAmountUsd || '1');
+    }
+  }
+
+  const finalNet = netAmount > 0 ? netAmount : (totalAmount > 0 ? totalAmount : 1);
+  const finalTotal = totalAmount > 0 ? totalAmount : finalNet;
 
   const fileSize = BigInt(rawBuffer.length);
   const sha256 = crypto.createHash('sha256').update(rawBuffer).digest('hex');
@@ -232,9 +264,9 @@ export async function uploadInvoiceHandler(request: FastifyRequest, reply: Fasti
         expedientId,
         issueDate,
         currency,
-        netAmount: new Prisma.Decimal(netAmount > 0 ? netAmount : 1),
+        netAmount: new Prisma.Decimal(finalNet),
         vatAmount: new Prisma.Decimal(vatAmount),
-        totalAmount: new Prisma.Decimal(totalAmount > 0 ? totalAmount : (netAmount > 0 ? netAmount : 1)),
+        totalAmount: new Prisma.Decimal(finalTotal),
         taxTreatment,
         status: InvoiceStatus.ISSUED,
         pdfDocumentId: document.id,

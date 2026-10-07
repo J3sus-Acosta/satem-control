@@ -10,18 +10,58 @@ export async function getDashboardMetricsHandler(request: FastifyRequest, reply:
     where: { status: 'ACTIVE', deletedAt: null },
   });
 
-  const totalInvoiced = await prisma.invoice.aggregate({
-    _sum: { netAmount: true, totalAmount: true },
-    where: { status: 'ISSUED', deletedAt: null },
+  // Facturación segregada por moneda
+  const invoicedUSD = await prisma.invoice.aggregate({
+    _sum: { netAmount: true, totalAmount: true, vatAmount: true },
+    where: {
+      status: 'ISSUED',
+      currency: 'USD',
+      deletedAt: null,
+    },
+  });
+
+  const invoicedCLP = await prisma.invoice.aggregate({
+    _sum: { netAmount: true, totalAmount: true, vatAmount: true },
+    where: { status: 'ISSUED', currency: 'CLP', deletedAt: null },
   });
 
   const totalInvoicesCount = await prisma.invoice.count({
     where: { deletedAt: null },
   });
 
-  const totalPayments = await prisma.payment.aggregate({
+  const nationalInvoicesCount = await prisma.invoice.count({
+    where: {
+      deletedAt: null,
+      OR: [
+        { currency: 'CLP' },
+        { siiDocType: { in: [33, 34] } },
+        { taxTreatment: { in: ['VAT_APPLIED', 'VAT_EXEMPT'] } },
+      ],
+    },
+  });
+
+  const exportInvoicesCount = await prisma.invoice.count({
+    where: {
+      deletedAt: null,
+      AND: [
+        { currency: 'USD' },
+        { taxTreatment: 'EXPORT_SERVICE' },
+      ],
+    },
+  });
+
+  const paymentsUSD = await prisma.payment.aggregate({
     _sum: { amount: true },
-    where: { status: 'CONFIRMED', deletedAt: null },
+    where: {
+      status: 'CONFIRMED',
+      currency: 'USD',
+      deletedAt: null,
+    },
+  });
+
+  const paymentsCLP = await prisma.payment.aggregate({
+    _sum: { amount: true },
+    where: { status: 'CONFIRMED', currency: 'CLP', deletedAt: null },
   });
 
   const openExceptions = await prisma.systemException.count({
@@ -40,11 +80,19 @@ export async function getDashboardMetricsHandler(request: FastifyRequest, reply:
         activeContracts,
         completeExpedients,
         totalInvoicesCount,
+        nationalInvoicesCount,
+        exportInvoicesCount,
       },
       financial: {
-        totalNetInvoicedUSD: Number(totalInvoiced._sum.netAmount || 0),
-        totalInvoicedUSD: Number(totalInvoiced._sum.totalAmount || 0),
-        totalPaymentsCollectedUSD: Number(totalPayments._sum.amount || 0),
+        totalNetInvoicedUSD: Number(invoicedUSD._sum.netAmount || 0),
+        totalInvoicedUSD: Number(invoicedUSD._sum.totalAmount || 0),
+        totalVatUSD: Number(invoicedUSD._sum.vatAmount || 0),
+        totalPaymentsCollectedUSD: Number(paymentsUSD._sum.amount || 0),
+
+        totalNetInvoicedCLP: Number(invoicedCLP._sum.netAmount || 0),
+        totalInvoicedCLP: Number(invoicedCLP._sum.totalAmount || 0),
+        totalVatCLP: Number(invoicedCLP._sum.vatAmount || 0),
+        totalPaymentsCollectedCLP: Number(paymentsCLP._sum.amount || 0),
       },
       control: {
         openExceptions,

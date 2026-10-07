@@ -185,6 +185,10 @@ export async function ensureCompanySignature(): Promise<void> {
           /(<strong>PRESENTADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
           `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
         );
+        updatedHtml = updatedHtml.replace(
+          /(<strong>ENTREGADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
+          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+        );
 
         if (updatedHtml !== v.htmlTemplate) {
           await prisma.documentTemplateVersion.update({
@@ -329,4 +333,35 @@ export async function ensureDefaultClientUsers(): Promise<void> {
     console.error('[BOOTSTRAP] ⚠️ Advertencia al verificar usuarios cliente iniciales:', error);
   }
 }
+
+/**
+ * Garantiza que existan los países base en la base de datos (CL, CHL, USA, etc.)
+ */
+export async function ensureDefaultCountries(): Promise<void> {
+  try {
+    const countries = [
+      { code: 'CHL', name: 'Chile' },
+      { code: 'CL', name: 'Chile' },
+      { code: 'USA', name: 'Estados Unidos' },
+      { code: 'US', name: 'Estados Unidos' },
+      { code: 'PER', name: 'Perú' },
+      { code: 'COL', name: 'Colombia' },
+      { code: 'MEX', name: 'México' },
+      { code: 'ARG', name: 'Argentina' },
+      { code: 'BRA', name: 'Brasil' },
+      { code: 'ESP', name: 'España' },
+    ];
+    for (const country of countries) {
+      await prisma.country.upsert({
+        where: { code: country.code },
+        update: { name: country.name },
+        create: country,
+      });
+    }
+    console.log('[BOOTSTRAP] 🌎 Catálogo de países base (CL/CHL, USA, etc.) sincronizado.');
+  } catch (error) {
+    console.warn('[BOOTSTRAP] ⚠️ Advertencia al sincronizar países:', error);
+  }
+}
+
 

@@ -66,6 +66,54 @@ export const ContractWizardPage: React.FC = () => {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
+  const isChileanCustomer = Boolean(
+    selectedCustomer &&
+    (selectedCustomer.countryCode?.toUpperCase() === 'CL' ||
+      selectedCustomer.country?.code?.toUpperCase() === 'CL' ||
+      selectedCustomer.countryCode?.toLowerCase() === 'chile' ||
+      selectedCustomer.country?.name?.toLowerCase() === 'chile')
+  );
+
+  const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    const customer = customers.find((c) => c.id === customerId);
+    if (!customer) return;
+
+    const isChilean =
+      customer.countryCode?.toUpperCase() === 'CL' ||
+      customer.country?.code?.toUpperCase() === 'CL' ||
+      customer.countryCode?.toLowerCase() === 'chile' ||
+      customer.country?.name?.toLowerCase() === 'chile';
+
+    if (isChilean) {
+      setCurrency('CLP');
+      setPaymentTerms('Transferencia electrónica directa a cuenta corriente Banco Santander');
+      setContractTitle('Contrato de Prestación de Servicios Profesionales');
+      setDescription('Servicios de desarrollo de software, consultoría técnica, mantención y soporte informático.');
+      setExportClause('Servicios profesionales y técnicos gravados con IVA 19% conforme al D.L. 825 de la Ley sobre Impuesto a las Ventas y Servicios.');
+      
+      const nationalTpl = templates.find(
+        (t) => t.code === 'TPL-CONTRACT-NAC' || (t.category === 'CONTRACT' && (t.language === 'ES' || t.name.toLowerCase().includes('nacional')))
+      );
+      if (nationalTpl) {
+        setSelectedTemplateId(nationalTpl.id);
+      }
+    } else {
+      setCurrency('USD');
+      setPaymentTerms('Zelle / SumUp / Wire Transfer en USD');
+      setContractTitle('Statement of Work - Servicios Internacionales 2026');
+      setDescription('Desarrollo de Software, Consultoría Técnica y Soporte Infraestructura Cloud');
+      setExportClause('Servicio prestado desde Chile y utilizado exclusivamente en el extranjero por el Cliente, exento de IVA conforme al Art. 12 letra E Nº 7 del D.L. 825 de la Ley sobre Impuesto a las Ventas y Servicios.');
+      
+      const intlTpl = templates.find(
+        (t) => t.code === 'TPL-SOW-2026' || (t.category === 'CONTRACT' && t.code !== 'TPL-CONTRACT-NAC')
+      );
+      if (intlTpl) {
+        setSelectedTemplateId(intlTpl.id);
+      }
+    }
+  };
+
   const handleGenerateContract = async () => {
     setSubmitting(true);
     try {
@@ -171,10 +219,10 @@ export const ContractWizardPage: React.FC = () => {
     <div style={{ maxWidth: '850px', margin: '0 auto' }}>
       <div style={{ marginBottom: '24px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '24px', marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          <FileSignature size={28} color="var(--accent-primary)" /> Wizard de Contrato SOW Bilingüe (ES/EN)
+          <FileSignature size={28} color="var(--accent-primary)" /> Wizard de Contrato & SOW (Nacional / Internacional)
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-          Generador asistido de Declaración de Trabajo (SOW), carga en plantilla oficial y creación automática de expediente.
+          Generador asistido de contratos en CLP para el Mercado Nacional o SOW en USD para Exportación, con carga en plantilla oficial y creación de expediente.
         </p>
       </div>
 
@@ -206,8 +254,8 @@ export const ContractWizardPage: React.FC = () => {
           <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Paso 1: Selección de Cliente Contratante</h3>
 
           <div className="form-group">
-            <label className="form-label">Cliente Extranjero</label>
-            <select className="form-select" value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} required>
+            <label className="form-label">Cliente Contratante (Nacional o Extranjero)</label>
+            <select className="form-select" value={selectedCustomerId} onChange={(e) => handleCustomerSelect(e.target.value)} required>
               <option value="">Seleccione un cliente registrado...</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -231,7 +279,14 @@ export const ContractWizardPage: React.FC = () => {
 
           {selectedCustomer && (
             <div style={{ padding: '14px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', marginBottom: '20px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Datos del Cliente en el SOW</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Datos del Cliente en el Contrato / SOW</div>
+                {isChileanCustomer ? (
+                  <span className="badge badge-success" style={{ fontSize: '11px' }}>🇨🇱 Mercado Nacional (Chile - CLP)</span>
+                ) : (
+                  <span className="badge badge-info" style={{ fontSize: '11px' }}>🌐 Exportación de Servicios (USD)</span>
+                )}
+              </div>
               <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)', fontSize: '14px' }}>{selectedCustomer.legalName}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                 <strong>Tax ID / RUT:</strong> {selectedCustomer.taxId} | <strong>País:</strong> {selectedCustomer.country?.name || selectedCustomer.countryCode}
@@ -371,7 +426,31 @@ export const ContractWizardPage: React.FC = () => {
             </div>
           )}
 
-          {/* Banner Dólar Observado Oficial */}
+          {/* Banner Mercado Nacional Chileno en CLP */}
+          {currency === 'CLP' && (
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: 'rgba(0, 168, 150, 0.08)',
+              border: '1px solid var(--accent-primary)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                  🇨🇱 Régimen de Mercado Nacional Chileno (CLP)
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Pago por transferencia electrónica directa a Banco Santander • Facturación SII DTE 33 (19% IVA) o DTE 34 (Exenta)
+                </div>
+              </div>
+              <span className="badge badge-success">✓ Sin Dólar Observado</span>
+            </div>
+          )}
+
+          {/* Banner Dólar Observado Oficial (Exportación USD) */}
           {currency === 'USD' && liveExchangeRate?.rate && (
             <div style={{
               padding: '12px 16px',
@@ -401,20 +480,20 @@ export const ContractWizardPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Cláusula de Exención de IVA (Exportación de Servicios)</label>
+            <label className="form-label">{currency === 'CLP' ? 'Cláusula Tributaria Nacional (IVA 19% D.L. 825)' : 'Cláusula de Exención de IVA (Exportación de Servicios)'}</label>
             <textarea className="form-textarea" rows={2} value={exportClause} onChange={(e) => setExportClause(e.target.value)} required />
           </div>
 
           {/* Resumen previo de datos cargados */}
           <div style={{ padding: '16px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Eye size={16} /> Resumen de Datos que se Plasmarán en el SOW:
+              <Eye size={16} /> Resumen de Datos que se Plasmarán en el Contrato / SOW:
             </div>
             <div className="grid-form-2" style={{ gap: '8px', fontSize: '12px' }}>
               <div><strong>Cliente:</strong> {selectedCustomer?.legalName} ({selectedCustomer?.taxId})</div>
               <div><strong>País:</strong> {selectedCustomer?.countryCode}</div>
-              <div><strong>Plantilla:</strong> {selectedTemplate?.name || 'SOW Oficial'}</div>
-              <div><strong>Monto:</strong> ${totalAmount} {currency} ({contractedHours} hrs)</div>
+              <div><strong>Plantilla:</strong> {selectedTemplate?.name || 'Contrato Oficial'}</div>
+              <div><strong>Monto:</strong> {currency === 'CLP' ? `$${Math.round(parseFloat(totalAmount || '0')).toLocaleString('es-CL')} CLP` : `$${totalAmount} USD`} ({contractedHours} hrs)</div>
               {liveExchangeRate?.rate && currency === 'USD' && (
                 <div style={{ gridColumn: 'span 2', color: 'var(--accent-primary)', fontWeight: 600 }}>
                   <strong>T.C. Observado Congelado:</strong> ${Number(liveExchangeRate.rate).toFixed(2)} CLP/USD → ${Math.round(parseFloat(totalAmount || '0') * Number(liveExchangeRate.rate)).toLocaleString('es-CL')} CLP
@@ -430,7 +509,7 @@ export const ContractWizardPage: React.FC = () => {
               <ArrowLeft size={18} /> Anterior
             </button>
             <button onClick={handleGenerateContract} className="btn btn-primary" disabled={submitting}>
-              <CheckCircle2 size={18} /> {submitting ? 'Generando SOW y Expediente...' : 'Generar Contrato SOW & Crear Expediente'}
+              <CheckCircle2 size={18} /> {submitting ? 'Generando Contrato y Expediente...' : 'Generar Contrato & Crear Expediente'}
             </button>
           </div>
         </div>
@@ -442,7 +521,7 @@ export const ContractWizardPage: React.FC = () => {
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <CheckCircle2 size={56} color="var(--success)" style={{ margin: '0 auto 12px' }} />
             <h2 style={{ fontSize: '22px', color: 'var(--success)', marginBottom: '6px' }}>
-              ¡Contrato SOW & Expediente Creados con Éxito!
+              ¡Contrato & Expediente Creados con Éxito!
             </h2>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', alignItems: 'center' }}>
               <span className="badge badge-info" style={{ fontSize: '13px' }}>Contrato: {generatedResult.contract.code}</span>
@@ -457,14 +536,14 @@ export const ContractWizardPage: React.FC = () => {
                 <Download size={18} /> 1. Descargar Documento
               </h4>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                Descarga el SOW generado en PDF con el formato oficial SATEM para revisarlo, firmarlo o enviarlo al cliente.
+                Descarga el documento oficial generado en PDF con el formato institucional SATEM para revisarlo, firmarlo o enviarlo al cliente.
               </p>
               <button
                 onClick={() => handleDownloadPdf()}
                 className="btn btn-primary"
                 style={{ width: '100%', justifyContent: 'center' }}
               >
-                <Download size={18} /> Descargar SOW (PDF)
+                <Download size={18} /> Descargar Contrato (PDF)
               </button>
             </div>
 

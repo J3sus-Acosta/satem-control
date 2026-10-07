@@ -123,13 +123,18 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
     OPEN_ENDED: 'Plazo Indefinido / Según Consumo',
   };
 
+  const isClp = (contract.currency || sanitizeCustomVars.contrato?.moneda) === 'CLP';
   const rawTotal = contract.totalAmount != null ? Number(contract.totalAmount) : (parseFloat(sanitizeCustomVars.contrato?.valor) || 0);
   const rawHours = contract.contractedHours != null ? Number(contract.contractedHours) : (parseFloat(sanitizeCustomVars.contrato?.horas) || 0);
   let calculatedRate = '';
   if (contract.rate != null) {
-    calculatedRate = `$${Number(contract.rate).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${contract.currency || 'USD'}/hr`;
+    calculatedRate = isClp
+      ? `$${Math.round(Number(contract.rate)).toLocaleString('es-CL')} CLP/hr`
+      : `$${Number(contract.rate).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${contract.currency || 'USD'}/hr`;
   } else if (rawHours > 0 && rawTotal > 0) {
-    calculatedRate = `$${(rawTotal / rawHours).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'}/hr`;
+    calculatedRate = isClp
+      ? `$${Math.round(rawTotal / rawHours).toLocaleString('es-CL')} CLP/hr`
+      : `$${(rawTotal / rawHours).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'}/hr`;
   }
 
   const formatDateStr = (d?: Date | string | null) => {
@@ -147,33 +152,50 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
   const startFormatted = contract.startDate ? formatDateStr(contract.startDate) : (sanitizeCustomVars.contrato?.fechaInicio ? formatDateStr(sanitizeCustomVars.contrato.fechaInicio) : todayFormatted);
   const endFormatted = contract.endDate ? formatDateStr(contract.endDate) : (sanitizeCustomVars.contrato?.fechaTermino ? formatDateStr(sanitizeCustomVars.contrato.fechaTermino) : 'Indefinida / Según horas consumidas');
 
-  const formattedAmount = rawTotal > 0 ? rawTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (sanitizeCustomVars.contrato?.valor || '0.00');
+  const formattedAmount = isClp
+    ? (rawTotal > 0 ? `$${Math.round(rawTotal).toLocaleString('es-CL')} CLP` : (sanitizeCustomVars.contrato?.valor || '$0 CLP'))
+    : (rawTotal > 0 ? rawTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (sanitizeCustomVars.contrato?.valor || '0.00'));
 
   const defaultExportClause = 'Servicio prestado desde Chile y aprovechado íntegramente en el extranjero por el Cliente, exento de IVA conforme al Art. 12 letra E Nº 7 del D.L. 825 de la Ley sobre Impuesto a las Ventas y Servicios.';
+  
+  // Cláusula tributaria nacional chilena
+  let nationalTaxClause = 'Servicios facturados electrónicamente conforme a las normas vigentes del Servicio de Impuestos Internos (SII).';
+  const expedientTaxTreatment = (expedient as any)?.taxTreatment;
+  if (expedientTaxTreatment === 'VAT_APPLIED') {
+    nationalTaxClause = 'Servicios profesionales y técnicos gravados con Impuesto al Valor Agregado (IVA 19%) conforme a las normas de la Ley sobre Impuesto a las Ventas y Servicios (D.L. 825).';
+  } else if (expedientTaxTreatment === 'VAT_EXEMPT') {
+    nationalTaxClause = 'Servicios profesionales exentos de Impuesto al Valor Agregado (IVA) conforme a las disposiciones del D.L. 825.';
+  }
 
-  // Obtener Dólar Observado congelado del día (Banco Central de Chile)
+  // Obtener Dólar Observado congelado del día (Banco Central de Chile) sólo si es USD
   let exchangeRateInfo: any = null;
-  try {
-    exchangeRateInfo = await getUsdToClpExchangeRate();
-  } catch (err: any) {
-    console.warn('No se pudo obtener tipo de cambio para documento:', err.message);
+  if (!isClp) {
+    try {
+      exchangeRateInfo = await getUsdToClpExchangeRate();
+    } catch (err: any) {
+      console.warn('No se pudo obtener tipo de cambio para documento:', err.message);
+    }
   }
 
   const rateVal = exchangeRateInfo?.rate ? Number(exchangeRateInfo.rate) : null;
   const rateDateFormatted = exchangeRateInfo?.rateDate ? formatDateStr(exchangeRateInfo.rateDate) : todayFormatted;
   const rateFormatted = rateVal ? `$${rateVal.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CLP/USD` : '';
-  const totalClp = (rateVal && rawTotal > 0) ? Math.round(rawTotal * rateVal) : 0;
+  const totalClp = (rateVal && rawTotal > 0) ? Math.round(rawTotal * rateVal) : (isClp ? rawTotal : 0);
   const totalClpFormatted = totalClp > 0 ? `$${totalClp.toLocaleString('es-CL')} CLP` : '';
-  const hourlyRateClp = (rateVal && rawHours > 0 && rawTotal > 0) ? Math.round((rawTotal / rawHours) * rateVal) : 0;
+  const hourlyRateClp = (rateVal && rawHours > 0 && rawTotal > 0) ? Math.round((rawTotal / rawHours) * rateVal) : (isClp && rawHours > 0 ? Math.round(rawTotal / rawHours) : 0);
   const hourlyRateClpFormatted = hourlyRateClp > 0 ? `$${hourlyRateClp.toLocaleString('es-CL')} CLP/hr` : '';
 
-  const valorConEquivalente = totalClpFormatted
-    ? `${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'} ${formattedAmount} (Equivalente: ${totalClpFormatted} al T.C. ${rateFormatted})`
-    : `${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'} ${formattedAmount}`;
+  const valorConEquivalente = isClp
+    ? formattedAmount
+    : (totalClpFormatted
+        ? `${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'} ${formattedAmount} (Equivalente: ${totalClpFormatted} al T.C. ${rateFormatted})`
+        : `${contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD'} ${formattedAmount}`);
 
-  const tarifaHoraConEquivalente = hourlyRateClpFormatted
-    ? `${calculatedRate || 'Según acuerdo'} (Ref. ${hourlyRateClpFormatted})`
-    : (calculatedRate || 'Según acuerdo');
+  const tarifaHoraConEquivalente = isClp
+    ? (calculatedRate || 'Según acuerdo')
+    : (hourlyRateClpFormatted
+        ? `${calculatedRate || 'Según acuerdo'} (Ref. ${hourlyRateClpFormatted})`
+        : (calculatedRate || 'Según acuerdo'));
 
   const variables: Record<string, any> = {
     ...sanitizeCustomVars,
@@ -205,29 +227,32 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
     },
     contrato: {
       codigo: contract.code || finalDocNumber,
-      titulo: contract.title || sanitizeCustomVars.contrato?.titulo || 'Statement of Work — Servicios Internacionales',
+      titulo: contract.title || sanitizeCustomVars.contrato?.titulo || (isClp ? 'Contrato de Prestación de Servicios' : 'Statement of Work — Servicios Internacionales'),
       descripcion: contract.description || sanitizeCustomVars.contrato?.descripcion || '',
       tipo: contract.type || sanitizeCustomVars.contrato?.tipo || 'HOURLY',
       tipoNombre: typeLabels[contract.type || sanitizeCustomVars.contrato?.tipo] || 'Bolsa de Horas (Hourly)',
       modalidad: contract.modality || sanitizeCustomVars.contrato?.modalidad || 'RECURRING',
       modalidadNombre: modalityLabels[contract.modality || sanitizeCustomVars.contrato?.modalidad] || 'Recurrente / Periódico',
       horas: rawHours > 0 ? String(rawHours) : sanitizeCustomVars.contrato?.horas || '0',
-      valor: formattedAmount,
-      moneda: contract.currency || sanitizeCustomVars.contrato?.moneda || 'USD',
+      valor: isClp ? formattedAmount : (rawTotal > 0 ? rawTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (sanitizeCustomVars.contrato?.valor || '0.00')),
+      moneda: contract.currency || sanitizeCustomVars.contrato?.moneda || (isClp ? 'CLP' : 'USD'),
       tarifaHora: calculatedRate || 'Según acuerdo',
       tarifaHoraConEquivalente,
       valorConEquivalente,
-      tipoCambio: rateFormatted || 'Consultar Banco Central',
-      tipoCambioValor: rateVal ? String(rateVal) : '',
-      tipoCambioFecha: rateDateFormatted,
-      tipoCambioInfo: rateVal ? `${rateFormatted} (al ${rateDateFormatted} - Banco Central de Chile)` : 'N/A',
+      tipoCambio: isClp ? 'No aplica (Moneda Nacional)' : (rateFormatted || 'Consultar Banco Central'),
+      tipoCambioValor: isClp ? '' : (rateVal ? String(rateVal) : ''),
+      tipoCambioFecha: isClp ? '' : rateDateFormatted,
+      tipoCambioInfo: isClp ? 'No aplica (Operación en Pesos Chilenos - CLP)' : (rateVal ? `${rateFormatted} (al ${rateDateFormatted} - Banco Central de Chile)` : 'N/A'),
       montoEquivalenteClp: totalClpFormatted || 'N/A',
-      metodoPago: contract.paymentTerms || sanitizeCustomVars.contrato?.metodoPago || 'Zelle / SumUp / Wire Transfer en USD',
+      metodoPago: contract.paymentTerms || sanitizeCustomVars.contrato?.metodoPago || (isClp ? 'Transferencia electrónica directa a cuenta corriente Banco Santander' : 'Zelle / SumUp / Wire Transfer en USD'),
       fechaEmision: todayFormatted,
       fechaInicio: startFormatted,
       fechaTermino: endFormatted,
-      clausulaExportacion: sanitizeCustomVars.contrato?.clausulaExportacion || defaultExportClause,
-      clausulaTipoCambio: rateVal ? `El tipo de cambio del dólar observado queda congelado a la fecha de emisión del presente instrumento (T.C. ${rateFormatted} al ${rateDateFormatted}) para efectos contables, referenciales y de facturación de exportación conforme a los registros del Banco Central de Chile.` : '',
+      clausulaExportacion: isClp ? 'No aplica (Operación en mercado nacional)' : (sanitizeCustomVars.contrato?.clausulaExportacion || defaultExportClause),
+      clausulaTributaria: isClp ? nationalTaxClause : defaultExportClause,
+      clausulaTipoCambio: isClp
+        ? 'Operación acordada directamente en Pesos Chilenos (CLP), no sujeta a conversión cambiaria.'
+        : (rateVal ? `El tipo de cambio del dólar observado queda congelado a la fecha de emisión del presente instrumento (T.C. ${rateFormatted} al ${rateDateFormatted}) para efectos contables, referenciales y de facturación de exportación conforme a los registros del Banco Central de Chile.` : ''),
     },
     documento: {
       codigo: finalDocNumber,

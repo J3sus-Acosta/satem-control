@@ -709,6 +709,20 @@ export async function getExpedientHandler(request: FastifyRequest<{ Params: { id
             });
             needsIntegrityReload = true;
           }
+        } else {
+          // Si no hay comprobante manual pero la conciliación bancaria Santander está completada
+          const reconItem = (expedient.integrityItems || []).find((it) => it.code === 'RECONCILIATION_COMPLETED');
+          if (reconItem?.status === 'COMPLETED' && item.status !== 'COMPLETED') {
+            await prisma.expedientIntegrityItem.update({
+              where: { id: item.id },
+              data: {
+                status: 'COMPLETED',
+                observation: 'Validado mediante conciliación de transferencia bancaria directa Banco Santander',
+                completedAt: reconItem.completedAt || new Date(),
+              },
+            });
+            needsIntegrityReload = true;
+          }
         }
       } else if (item.code === 'RECONCILIATION_COMPLETED') {
         let totalReconciledClp = 0;

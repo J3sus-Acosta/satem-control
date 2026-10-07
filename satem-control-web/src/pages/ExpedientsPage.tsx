@@ -30,10 +30,23 @@ export const ExpedientsPage: React.FC = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invFolio, setInvFolio] = useState('');
   const [invDocType, setInvDocType] = useState('110');
+  const [invCurrency, setInvCurrency] = useState('USD');
   const [invAmount, setInvAmount] = useState('');
   const [invDate, setInvDate] = useState(new Date().toISOString().split('T')[0]);
   const [invFile, setInvFile] = useState<File | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
+
+  const handleOpenInvoiceModal = () => {
+    const isNational = selectedExpedient?.taxTreatment === 'VAT_APPLIED' || selectedExpedient?.contract?.currency === 'CLP';
+    if (isNational) {
+      setInvCurrency('CLP');
+      setInvDocType('33');
+    } else {
+      setInvCurrency('USD');
+      setInvDocType('110');
+    }
+    setShowInvoiceModal(true);
+  };
 
   // Form Comprobante de Pago / Informe SumUp
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -210,10 +223,22 @@ export const ExpedientsPage: React.FC = () => {
     formData.append('siiFolio', invFolio);
     formData.append('siiDocType', invDocType);
     formData.append('issueDate', invDate);
-    formData.append('currency', 'USD');
-    formData.append('netAmount', invAmount);
-    formData.append('totalAmount', invAmount);
-    formData.append('taxTreatment', selectedExpedient.taxTreatment || 'EXPORT_SERVICE');
+    formData.append('currency', invCurrency);
+
+    const gross = parseFloat(invAmount) || 0;
+    if (invDocType === '33') {
+      const net = Math.round(gross / 1.19);
+      const vat = gross - net;
+      formData.append('netAmount', String(net));
+      formData.append('vatAmount', String(vat));
+      formData.append('totalAmount', String(gross));
+    } else {
+      formData.append('netAmount', String(gross));
+      formData.append('vatAmount', '0');
+      formData.append('totalAmount', String(gross));
+    }
+
+    formData.append('taxTreatment', selectedExpedient.taxTreatment || (invCurrency === 'CLP' ? 'VAT_APPLIED' : 'EXPORT_SERVICE'));
     formData.append('invoiceFile', invFile);
 
     try {
@@ -852,7 +877,12 @@ export const ExpedientsPage: React.FC = () => {
                 <h3 style={{ fontSize: '15px', marginBottom: '12px' }}>Cadena Operativa & Documental</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                   {[
-                    { label: 'Contrato / SOW', value: selectedExpedient.contract ? selectedExpedient.contract.code : 'Sin contrato específico' },
+                    {
+                      label: 'Contrato / SOW',
+                      value: selectedExpedient.contract
+                        ? `${selectedExpedient.contract.code} (${selectedExpedient.contract.currency === 'CLP' ? `$${Math.round(selectedExpedient.contract.totalAmount || 0).toLocaleString('es-CL')} CLP` : `$${Number(selectedExpedient.contract.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`})`
+                        : 'Sin contrato específico'
+                    },
                     {
                       label: 'Órdenes de Trabajo (OT)',
                       value: `${(selectedExpedient.workOrders?.length || 0) + (selectedExpedient.documentInstances?.filter((d: any) => d.category === 'WORK_ORDER' || d.template?.category === 'WORK_ORDER').length || 0)} registrada(s)`
@@ -861,7 +891,18 @@ export const ExpedientsPage: React.FC = () => {
                       label: 'Atenciones Técnicas SATEM',
                       value: `${selectedExpedient.documentInstances?.filter((d: any) => d.category === 'ATTENTION_REPORT' || d.template?.category === 'ATTENTION_REPORT').length || 0} ejecutada(s)`
                     },
-                    { label: 'Facturas SII Registradas', value: `${selectedExpedient.invoices?.length || 0} emitidas` },
+                    {
+                      label: 'Facturas SII Registradas',
+                      value: (() => {
+                        const invs = selectedExpedient.invoices || [];
+                        const clpSum = invs.filter((i: any) => i.currency === 'CLP').reduce((s: number, i: any) => s + Number(i.totalAmount || 0), 0);
+                        const usdSum = invs.filter((i: any) => i.currency === 'USD').reduce((s: number, i: any) => s + Number(i.totalAmount || 0), 0);
+                        const parts = [];
+                        if (clpSum > 0) parts.push(`$${clpSum.toLocaleString('es-CL')} CLP`);
+                        if (usdSum > 0) parts.push(`$${usdSum.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`);
+                        return `${invs.length} emitidas${parts.length > 0 ? ` (${parts.join(' + ')})` : ''}`;
+                      })()
+                    },
                     {
                       label: 'Comprobantes de Pago',
                       value: `${(selectedExpedient.payments?.length || 0) + (selectedExpedient.documentLinks?.filter((l: any) => l.document?.category === 'PAYMENT_RECEIPT').length || 0)} registrado(s)`
@@ -1073,16 +1114,18 @@ export const ExpedientsPage: React.FC = () => {
                   <h3 style={{ fontSize: '15px', margin: 0 }}>Checklist de Integridad Operativa y Auditoría</h3>
                   {!isViewer && (
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {selectedExpedient.contract?.currency !== 'CLP' && selectedExpedient.taxTreatment !== 'VAT_APPLIED' && (
+                        <button
+                          onClick={() => setShowSumUpModal(true)}
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
+                          title="Calcular cobro SumUp en CLP con Dólar Observado en vivo"
+                        >
+                          <Calculator size={14} /> Calculadora SumUp
+                        </button>
+                      )}
                       <button
-                        onClick={() => setShowSumUpModal(true)}
-                        className="btn btn-secondary"
-                        style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
-                        title="Calcular cobro SumUp en CLP con Dólar Observado en vivo"
-                      >
-                        <Calculator size={14} /> Calculadora SumUp
-                      </button>
-                      <button
-                        onClick={() => setShowInvoiceModal(true)}
+                        onClick={handleOpenInvoiceModal}
                         className="btn btn-secondary"
                         style={{ fontSize: '12px', padding: '6px 12px' }}
                       >
@@ -1130,13 +1173,13 @@ export const ExpedientsPage: React.FC = () => {
                                 const match = item.observation?.match(/Progreso:\s*(\d+)%/) || item.observation?.match(/Pagado y Conciliado:\s*(\d+)%/);
                                 const reconPct = match ? parseInt(match[1], 10) : (isCompleted ? 100 : 0);
                                 return (
-                                  <>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '5px', flexWrap: 'wrap', gap: '4px' }}>
-                                      <span style={{ color: 'var(--text-secondary)' }}>Progreso de Cobro del Contrato (USD)</span>
-                                      <span style={{ fontWeight: 'bold', color: reconPct >= 100 ? 'var(--success)' : (reconPct > 0 ? 'var(--warning)' : 'var(--text-muted)') }}>
-                                        {reconPct}% {reconPct >= 100 ? '(Totalmente Pagado)' : (reconPct > 0 ? '(Abono Parcial Recibido)' : '(Pendiente de Abono)')}
-                                      </span>
-                                    </div>
+                                    <>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '5px', flexWrap: 'wrap', gap: '4px' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Progreso de Cobro del Contrato ({selectedExpedient.contract?.currency || 'USD'})</span>
+                                        <span style={{ fontWeight: 'bold', color: reconPct >= 100 ? 'var(--success)' : (reconPct > 0 ? 'var(--warning)' : 'var(--text-muted)') }}>
+                                          {reconPct}% {reconPct >= 100 ? '(Totalmente Pagado)' : (reconPct > 0 ? '(Abono Parcial Recibido)' : '(Pendiente de Abono)')}
+                                        </span>
+                                      </div>
                                     <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
                                       <div
                                         style={{
@@ -1453,7 +1496,7 @@ export const ExpedientsPage: React.FC = () => {
                               })()}
                               {!isViewer && (
                                 <button
-                                  onClick={() => setShowInvoiceModal(true)}
+                                  onClick={handleOpenInvoiceModal}
                                   className={`btn ${isCompleted ? 'btn-secondary' : 'btn-primary'}`}
                                   style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                 >
@@ -1602,7 +1645,7 @@ export const ExpedientsPage: React.FC = () => {
                         <FilePlus size={14} /> + Generar Documento / OT
                       </button>
                       <button
-                        onClick={() => setShowInvoiceModal(true)}
+                        onClick={handleOpenInvoiceModal}
                         className="btn btn-secondary"
                         style={{ fontSize: '12px', padding: '6px 12px' }}
                       >
@@ -1790,6 +1833,29 @@ export const ExpedientsPage: React.FC = () => {
                                     <span className={`badge ${isPayment ? 'badge-success' : isInvoice ? 'badge-info' : 'badge-secondary'}`}>
                                       {doc.category}
                                     </span>
+                                    {(() => {
+                                      if (isInvoice) {
+                                        const inv = (selectedExpedient.invoices || []).find((i: any) => i.pdfDocumentId === doc.id || i.xmlDocumentId === doc.id);
+                                        if (inv) {
+                                          return (
+                                            <span className="badge badge-info" style={{ fontWeight: 600 }}>
+                                              {inv.currency === 'CLP' ? `$${Math.round(inv.totalAmount).toLocaleString('es-CL')} CLP` : `$${Number(inv.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`} • DTE {inv.siiDocType || '110'} (Folio {inv.siiFolio})
+                                            </span>
+                                          );
+                                        }
+                                      }
+                                      if (isPayment) {
+                                        const pay = (selectedExpedient.payments || []).find((p: any) => p.proofDocumentId === doc.id);
+                                        if (pay) {
+                                          return (
+                                            <span className="badge badge-success" style={{ fontWeight: 600 }}>
+                                              {pay.currency === 'CLP' ? `$${Math.round(pay.amount).toLocaleString('es-CL')} CLP` : `$${Number(pay.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD`} • {pay.paymentMethod || 'Pago'}
+                                            </span>
+                                          );
+                                        }
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                   <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
                                     SHA-256: <code>{doc.sha256?.substring(0, 20)}...</code> | Tamaño: {((Number(doc.fileSize) || 0) / 1024).toFixed(1)} KB | Subido: {doc.createdAt ? new Date(doc.createdAt).toLocaleString('es-CL') : 'N/A'}
@@ -1815,7 +1881,7 @@ export const ExpedientsPage: React.FC = () => {
                                   )}
                                   {!isViewer && isInvoice && (
                                     <button
-                                      onClick={() => setShowInvoiceModal(true)}
+                                      onClick={handleOpenInvoiceModal}
                                       className="btn btn-secondary"
                                       style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                                       title="Reemplazar Factura SII"
@@ -1944,23 +2010,71 @@ export const ExpedientsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid-form-2">
+              <div className="grid-form-3">
                 <div className="form-group">
                   <label className="form-label">Tipo Documento SII</label>
-                  <select className="form-select" value={invDocType} onChange={(e) => setInvDocType(e.target.value)}>
+                  <select
+                    className="form-select"
+                    value={invDocType}
+                    onChange={(e) => {
+                      const nextType = e.target.value;
+                      setInvDocType(nextType);
+                      if (nextType === '33' || nextType === '34') {
+                        setInvCurrency('CLP');
+                      } else if (nextType === '110') {
+                        setInvCurrency('USD');
+                      }
+                    }}
+                  >
                     <option value="110">Tipo 110 (Exportación Sin IVA)</option>
-                    <option value="33">Tipo 33 (Factura Electrónica)</option>
-                    <option value="34">Tipo 34 (Factura No Afecta / Exenta)</option>
+                    <option value="33">Tipo 33 (Factura Afecta IVA 19%)</option>
+                    <option value="34">Tipo 34 (Factura Exenta / No Afecta)</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Monto Total (USD) *</label>
+                  <label className="form-label">Moneda</label>
+                  <select
+                    className="form-select"
+                    value={invCurrency}
+                    onChange={(e) => setInvCurrency(e.target.value)}
+                  >
+                    <option value="CLP">CLP (Pesos Chilenos)</option>
+                    <option value="USD">USD (Dólares)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Monto Total ({invCurrency}) *</label>
                   <input
-                    type="number" step="0.01" className="form-input" placeholder="Ej: 2500.00"
-                    value={invAmount} onChange={(e) => setInvAmount(e.target.value)} required
+                    type="number"
+                    step={invCurrency === 'CLP' ? '1' : '0.01'}
+                    className="form-input"
+                    placeholder={invCurrency === 'CLP' ? 'Ej: 1190000' : 'Ej: 2500.00'}
+                    value={invAmount}
+                    onChange={(e) => setInvAmount(e.target.value)}
+                    required
                   />
                 </div>
               </div>
+
+              {invDocType === '33' && parseFloat(invAmount) > 0 && (
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(0, 168, 150, 0.08)',
+                  border: '1px solid var(--accent-primary)',
+                  borderRadius: 'var(--radius-sm)',
+                  marginBottom: '16px',
+                  fontSize: '12px',
+                }}>
+                  <div style={{ color: 'var(--accent-primary)', fontWeight: 600, marginBottom: '2px' }}>
+                    Desglose Tributario DTE 33 (IVA 19%):
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)' }}>
+                    Neto: <strong>${Math.round((parseFloat(invAmount) || 0) / 1.19).toLocaleString('es-CL')} {invCurrency}</strong> + 
+                    IVA (19%): <strong>${Math.round((parseFloat(invAmount) || 0) - Math.round((parseFloat(invAmount) || 0) / 1.19)).toLocaleString('es-CL')} {invCurrency}</strong> = 
+                    Total: <strong>${Math.round(parseFloat(invAmount) || 0).toLocaleString('es-CL')} {invCurrency}</strong>
+                  </div>
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Fecha de Emisión SII *</label>

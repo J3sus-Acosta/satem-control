@@ -28,7 +28,10 @@ export const BillingPage: React.FC = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invFolio, setInvFolio] = useState('');
   const [invExpedientId, setInvExpedientId] = useState('');
-  const [invAmountUsd, setInvAmountUsd] = useState('');
+  const [invCurrency, setInvCurrency] = useState<'CLP' | 'USD'>('CLP');
+  const [invDocType, setInvDocType] = useState<number>(33);
+  const [invTaxTreatment, setInvTaxTreatment] = useState<string>('VAT_APPLIED');
+  const [invAmountNet, setInvAmountNet] = useState('');
   const [invIssuedAt, setInvIssuedAt] = useState(new Date().toISOString().split('T')[0]);
   const [invFile, setInvFile] = useState<File | null>(null);
   const [submittingInvoice, setSubmittingInvoice] = useState(false);
@@ -46,6 +49,42 @@ export const BillingPage: React.FC = () => {
     api.get('/expedients').then((res) => setExpedients(res.data.data || [])).catch(() => {});
   }, []);
 
+  const handleExpedientChange = (expId: string) => {
+    setInvExpedientId(expId);
+    const exp = expedients.find((e) => e.id === expId);
+    if (exp) {
+      const isChile = exp.customer?.countryCode === 'CL' || exp.customer?.country?.code === 'CL' || exp.contract?.currency === 'CLP';
+      if (isChile) {
+        setInvCurrency('CLP');
+        setInvDocType(33);
+        setInvTaxTreatment('VAT_APPLIED');
+      } else {
+        setInvCurrency('USD');
+        setInvDocType(110);
+        setInvTaxTreatment('EXPORT_SERVICE');
+      }
+      if (exp.contract?.totalAmount) {
+        setInvAmountNet(String(exp.contract.totalAmount));
+      }
+    }
+  };
+
+  const handleDocTypeChange = (docType: number) => {
+    setInvDocType(docType);
+    if (docType === 33) {
+      setInvTaxTreatment('VAT_APPLIED');
+    } else if (docType === 34) {
+      setInvTaxTreatment('VAT_EXEMPT');
+    } else if (docType === 110) {
+      setInvTaxTreatment('EXPORT_SERVICE');
+      setInvCurrency('USD');
+    }
+  };
+
+  const netVal = parseFloat(invAmountNet) || 0;
+  const vatVal = (invTaxTreatment === 'VAT_APPLIED' || invDocType === 33) ? Math.round(netVal * 0.19) : 0;
+  const totalVal = netVal + vatVal;
+
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!invExpedientId) {
@@ -59,11 +98,13 @@ export const BillingPage: React.FC = () => {
         const formData = new FormData();
         formData.append('expedientId', invExpedientId);
         formData.append('siiFolio', invFolio);
+        formData.append('siiDocType', String(invDocType));
         formData.append('issueDate', invIssuedAt);
-        formData.append('currency', 'USD');
-        formData.append('netAmount', invAmountUsd);
-        formData.append('totalAmount', invAmountUsd);
-        formData.append('taxTreatment', 'EXPORT_SERVICE');
+        formData.append('currency', invCurrency);
+        formData.append('netAmount', String(netVal));
+        formData.append('vatAmount', String(vatVal));
+        formData.append('totalAmount', String(totalVal));
+        formData.append('taxTreatment', invTaxTreatment);
         formData.append('invoiceFile', invFile);
 
         await api.post('/invoices/upload', formData, {
@@ -72,18 +113,20 @@ export const BillingPage: React.FC = () => {
       } else {
         await api.post('/invoices', {
           siiFolio: parseInt(invFolio, 10),
+          siiDocType: invDocType,
           expedientId: invExpedientId,
-          netAmount: parseFloat(invAmountUsd),
-          totalAmount: parseFloat(invAmountUsd),
+          netAmount: netVal,
+          vatAmount: vatVal,
+          totalAmount: totalVal,
           issueDate: new Date(invIssuedAt).toISOString(),
-          taxTreatment: 'EXPORT_SERVICE',
-          currency: 'USD',
+          taxTreatment: invTaxTreatment,
+          currency: invCurrency,
         });
       }
 
-      alert('Factura SII registrada e integrada exitosamente.');
+      alert(`Factura SII N° ${invFolio} (${invCurrency}) registrada exitosamente.`);
       setShowInvoiceModal(false);
-      setInvFolio(''); setInvExpedientId(''); setInvAmountUsd(''); setInvFile(null);
+      setInvFolio(''); setInvExpedientId(''); setInvAmountNet(''); setInvFile(null);
       fetchInvoices();
     } catch (err: any) {
       const msg = err.response?.data?.error?.message || err.response?.data?.message;
@@ -235,9 +278,10 @@ export const BillingPage: React.FC = () => {
               <thead>
                 <tr>
                   <th>Folio SII / Código</th>
+                  <th>Tipo DTE</th>
                   <th>Expediente</th>
                   <th>Cliente</th>
-                  <th>Monto Neto (USD)</th>
+                  <th>Monto Total</th>
                   <th>Fecha Emisión</th>
                   <th>Estado</th>
                   <th>Documento PDF</th>
@@ -247,7 +291,7 @@ export const BillingPage: React.FC = () => {
               <tbody>
                 {pagedInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={isViewer ? 7 : 8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
+                    <td colSpan={isViewer ? 8 : 9} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
                       <FileText size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
                       No hay facturas registradas.
                       {!isViewer && (
@@ -261,6 +305,8 @@ export const BillingPage: React.FC = () => {
                   pagedInvoices.map((inv) => {
                     const docId = inv.pdfDocumentId || inv.pdfDocument?.id;
                     const folioDisplay = inv.siiFolio ? `Folio ${inv.siiFolio}` : (inv.code || inv.folio || inv.id?.slice(0, 8));
+                    const isClpInv = inv.currency === 'CLP';
+                    const invAmt = parseFloat(inv.totalAmount || inv.netAmount || 0);
 
                     return (
                       <tr key={inv.id}>
@@ -270,10 +316,20 @@ export const BillingPage: React.FC = () => {
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>{inv.code}</div>
                           )}
                         </td>
+                        <td>
+                          {inv.siiDocType === 33 && <span className="badge badge-success" style={{ fontSize: '10px' }}>DTE 33 (Afecta 19%)</span>}
+                          {inv.siiDocType === 34 && <span className="badge badge-warning" style={{ fontSize: '10px' }}>DTE 34 (Exenta)</span>}
+                          {(inv.siiDocType === 110 || !inv.siiDocType) && <span className="badge badge-info" style={{ fontSize: '10px' }}>DTE 110 (Exportación)</span>}
+                        </td>
                         <td style={{ fontSize: '13px' }}>{inv.expedient?.code || inv.expedientCode || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                         <td>{inv.expedient?.customer?.legalName || inv.customer?.legalName || inv.customerName || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                         <td style={{ fontWeight: 'bold', color: 'var(--success)' }}>
-                          ${parseFloat(inv.totalAmount || inv.netAmount || inv.totalAmountUsd || inv.netAmountUsd || 0).toLocaleString()} USD
+                          {isClpInv ? `$${invAmt.toLocaleString('es-CL')} CLP` : `$${invAmt.toLocaleString()} USD`}
+                          {Number(inv.vatAmount || 0) > 0 && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                              (IVA: ${Number(inv.vatAmount).toLocaleString(isClpInv ? 'es-CL' : undefined)})
+                            </div>
+                          )}
                         </td>
                         <td style={{ fontSize: '13px' }}>
                           {inv.issueDate || inv.issuedAt || inv.createdAt ? new Date(inv.issueDate || inv.issuedAt || inv.createdAt).toLocaleDateString('es-CL') : '—'}
@@ -351,7 +407,7 @@ export const BillingPage: React.FC = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Calculator size={18} color="var(--accent-primary)" />
-            <span style={{ fontWeight: 700, fontSize: '14px' }}>Calculadora Dinámica de Cobros SumUp</span>
+            <span style={{ fontWeight: 700, fontSize: '14px' }}>Calculadora Dinámica de Cobros SumUp (Exportación USD)</span>
             <span className="badge badge-success" style={{ fontSize: '11px' }}>Dólar en Tiempo Real</span>
           </div>
           {showCalc ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
@@ -367,41 +423,93 @@ export const BillingPage: React.FC = () => {
       {/* Modal Registrar Folio SII */}
       {showInvoiceModal && (
         <div className="modal-overlay">
-          <div className="modal-dialog" style={{ maxWidth: '480px' }}>
+          <div className="modal-dialog" style={{ maxWidth: '520px' }}>
             <h3 style={{ fontSize: '18px', marginBottom: '4px' }}>Registrar Folio SII</h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              La factura se emite externamente en el portal SII (Tipo 110). Aquí se registra el folio y se adjunta el PDF para trazabilidad y auditoría.
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Registra el folio emitido externamente en el portal SII (DTE 33 Afecta, DTE 34 Exenta o DTE 110 Exportación) y adjunta el PDF para auditoría.
             </p>
             <form onSubmit={handleCreateInvoice}>
               <div className="form-group">
-                <label className="form-label">Número de Folio SII *</label>
-                <input type="number" className="form-input" placeholder="Ej: 12345" value={invFolio} onChange={(e) => setInvFolio(e.target.value)} required />
-              </div>
-              <div className="form-group">
                 <label className="form-label">Expediente Asociado *</label>
-                <select className="form-select" value={invExpedientId} onChange={(e) => setInvExpedientId(e.target.value)} required>
+                <select className="form-select" value={invExpedientId} onChange={(e) => handleExpedientChange(e.target.value)} required>
                   <option value="">Seleccione un expediente...</option>
                   {expedients.map((exp) => (
                     <option key={exp.id} value={exp.id}>{exp.code} — {exp.title}</option>
                   ))}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label">Monto Neto (USD) *</label>
-                <input type="number" step="0.01" className="form-input" placeholder="Ej: 2500.00" value={invAmountUsd} onChange={(e) => setInvAmountUsd(e.target.value)} required />
+
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Número de Folio SII *</label>
+                  <input type="number" className="form-input" placeholder="Ej: 12345" value={invFolio} onChange={(e) => setInvFolio(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tipo de Documento SII *</label>
+                  <select className="form-select" value={invDocType} onChange={(e) => handleDocTypeChange(parseInt(e.target.value, 10))}>
+                    <option value={33}>DTE 33 — Factura Electrónica (19% IVA)</option>
+                    <option value={34}>DTE 34 — Factura Exenta Nacional</option>
+                    <option value={110}>DTE 110 — Factura de Exportación</option>
+                  </select>
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Fecha de Emisión *</label>
-                <input type="date" className="form-input" value={invIssuedAt} onChange={(e) => setInvIssuedAt(e.target.value)} required />
+
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Moneda *</label>
+                  <select className="form-select" value={invCurrency} onChange={(e) => setInvCurrency(e.target.value as any)}>
+                    <option value="CLP">CLP (Pesos Chilenos)</option>
+                    <option value="USD">USD (Dólares)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Fecha de Emisión *</label>
+                  <input type="date" className="form-input" value={invIssuedAt} onChange={(e) => setInvIssuedAt(e.target.value)} required />
+                </div>
               </div>
+
+              <div className="form-group">
+                <label className="form-label">Monto Neto ({invCurrency}) *</label>
+                <input
+                  type="number"
+                  step={invCurrency === 'CLP' ? '1' : '0.01'}
+                  className="form-input"
+                  placeholder={invCurrency === 'CLP' ? 'Ej: 1500000' : 'Ej: 2500.00'}
+                  value={invAmountNet}
+                  onChange={(e) => setInvAmountNet(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Desglose Tributario Interactivo */}
+              {invDocType === 33 ? (
+                <div style={{ padding: '12px 14px', backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid var(--success)', borderRadius: 'var(--radius-sm)', fontSize: '13px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Monto Neto:</span>
+                    <strong>${netVal.toLocaleString(invCurrency === 'CLP' ? 'es-CL' : undefined)} {invCurrency}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', color: 'var(--warning)' }}>
+                    <span>IVA (19%):</span>
+                    <strong>+ ${vatVal.toLocaleString(invCurrency === 'CLP' ? 'es-CL' : undefined)} {invCurrency}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px', color: 'var(--success)' }}>
+                    <span>Total Factura:</span>
+                    <strong style={{ fontSize: '14px' }}>${totalVal.toLocaleString(invCurrency === 'CLP' ? 'es-CL' : undefined)} {invCurrency}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ padding: '12px 14px', backgroundColor: 'rgba(0,168,150,0.08)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-sm)', fontSize: '13px', marginBottom: '16px', color: 'var(--accent-primary)' }}>
+                  🔒 {invDocType === 34 ? 'Factura Exenta Nacional (Sin IVA)' : 'Factura de Exportación (Sin IVA)'}:{' '}
+                  <strong>Total: ${totalVal.toLocaleString(invCurrency === 'CLP' ? 'es-CL' : undefined)} {invCurrency}</strong>
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Archivo PDF Oficial Factura SII <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(recomendado)</span></label>
                 <input type="file" accept="application/pdf" className="form-input" onChange={(e) => setInvFile(e.target.files?.[0] || null)} />
               </div>
-              <div style={{ padding: '10px 14px', backgroundColor: 'rgba(0,168,150,0.08)', border: '1px solid var(--accent-primary)', borderRadius: 'var(--radius-sm)', fontSize: '12px', marginBottom: '20px', color: 'var(--accent-primary)' }}>
-                🔒 Tratamiento tributario: <strong>EXPORT_SERVICE (Sin IVA)</strong> — normativa de exportación de servicios.
-              </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '16px' }}>
                 <button type="button" onClick={() => setShowInvoiceModal(false)} className="btn btn-secondary">Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={submittingInvoice}>
                   {submittingInvoice ? 'Guardando...' : 'Registrar Folio'}

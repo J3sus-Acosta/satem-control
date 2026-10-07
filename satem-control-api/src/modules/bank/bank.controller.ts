@@ -266,6 +266,22 @@ async function updateExpedientIntegrityReconciliation(
       completedById: userId,
     },
   });
+
+  // En transferencias directas, la conciliación bancaria también satisface el comprobante de pago si estaba pendiente
+  await tx.expedientIntegrityItem.updateMany({
+    where: {
+      expedientId,
+      code: 'PAYMENT_PROOF_PRESENT',
+      status: { not: 'COMPLETED' },
+    },
+    data: {
+      status: 'COMPLETED',
+      documentId: rawSourceFileId || undefined,
+      observation: `Validado mediante transferencia directa confirmada en Banco Santander (${receiptCode})`,
+      completedAt: new Date(),
+      completedById: userId,
+    },
+  });
 }
 
 export async function listBankReceiptsHandler(request: FastifyRequest, reply: FastifyReply) {

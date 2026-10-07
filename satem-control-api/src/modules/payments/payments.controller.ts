@@ -120,9 +120,15 @@ export async function createPaymentHandler(request: FastifyRequest, reply: Fasti
     if (body.currency === 'USD') {
       usdEquivalent = body.amount;
     } else if (body.currency === 'CLP') {
-      const rateData = await getUsdToClpExchangeRate();
-      exchangeRate = exchangeRate || rateData.rate;
-      usdEquivalent = Number((body.amount / exchangeRate).toFixed(2));
+      try {
+        const rateData = await getUsdToClpExchangeRate();
+        exchangeRate = exchangeRate || rateData.rate;
+        usdEquivalent = Number((body.amount / exchangeRate).toFixed(2));
+      } catch (err) {
+        // En mercado nacional, la tasa cambiaria es netamente referencial
+        usdEquivalent = null;
+        exchangeRate = null;
+      }
     }
   }
 

@@ -43,15 +43,23 @@ export const DashboardPage: React.FC = () => {
       title: 'Contratos Activos',
       value: metrics?.operations?.activeContracts || 0,
       color: 'var(--accent-primary)',
-      sub: 'SOWs y paquetes vigentes',
+      sub: 'SOWs y acuerdos vigentes',
       route: '/customers',
       icon: <FileSignature size={22} />,
     },
     {
-      title: 'Facturación Neta (USD)',
-      value: `$${(metrics?.financial?.totalNetInvoicedUSD || 0).toLocaleString()}`,
+      title: 'Facturación Neta (CLP)',
+      value: `$${(metrics?.financial?.totalNetInvoicedCLP || 0).toLocaleString('es-CL')} CLP`,
       color: 'var(--success)',
-      sub: 'Facturas SII de exportación registradas',
+      sub: 'Facturas SII nacionales (DTE 33/34)',
+      route: '/billing',
+      icon: <DollarSign size={22} />,
+    },
+    {
+      title: 'Facturación Neta (USD)',
+      value: `$${(metrics?.financial?.totalNetInvoicedUSD || 0).toLocaleString()} USD`,
+      color: '#38bdf8',
+      sub: 'Facturas SII exportación (DTE 110)',
       route: '/billing',
       icon: <FileSpreadsheet size={22} />,
     },
@@ -66,9 +74,9 @@ export const DashboardPage: React.FC = () => {
   ];
 
   const cycle = [
-    { step: '①', label: 'Clientes & Contratos', desc: 'Alta de cliente + generación de SOW con PDF', route: '/customers', icon: <Building2 size={18} />, color: 'var(--success)' },
+    { step: '①', label: 'Clientes & Contratos', desc: 'Alta de cliente + generación de contrato con PDF', route: '/customers', icon: <Building2 size={18} />, color: 'var(--success)' },
     { step: '②', label: 'Expedientes', desc: 'Ejecución del trabajo, OTs, documentos e integridad', route: '/expedients', icon: <FolderKanban size={18} />, color: 'var(--info)' },
-    { step: '③', label: 'Facturación SII', desc: 'Registro de folio SII Tipo 110 + cálculo SumUp', route: '/billing', icon: <FileSpreadsheet size={18} />, color: 'var(--warning)' },
+    { step: '③', label: 'Facturación SII', desc: 'Registro de folio SII (DTE 33/34 en CLP o 110 en USD)', route: '/billing', icon: <FileSpreadsheet size={18} />, color: 'var(--warning)' },
     { step: '④', label: 'Conciliación Bancaria', desc: 'Match del abono Santander con la factura emitida', route: '/bank', icon: <Landmark size={18} />, color: 'var(--success)' },
     { step: '⑤', label: 'Cierre de Expediente', desc: 'Cierre 100% o con excepción + snapshot inmutable', route: '/expedients', icon: <CheckCircle2 size={18} />, color: 'var(--accent-primary)' },
   ];
@@ -78,13 +86,13 @@ export const DashboardPage: React.FC = () => {
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', marginBottom: '6px' }}>Dashboard Operacional & Financiero</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-          Resumen en tiempo real de operaciones, exportaciones sin IVA, facturación y trazabilidad SATEM.
+          Resumen en tiempo real de operaciones, mercado nacional en CLP, exportaciones sin IVA, facturación y trazabilidad SATEM.
           <span style={{ color: 'var(--text-muted)', marginLeft: '8px', fontSize: '12px' }}>Haz clic en un KPI para ir al módulo.</span>
         </p>
       </div>
 
-      {/* KPI Cards Grid — clickeables */}
-      <div className="grid-4">
+      {/* KPI Cards Grid — adaptable y clickeable */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {kpis.map((kpi) => (
           <div
             key={kpi.title}
@@ -94,9 +102,9 @@ export const DashboardPage: React.FC = () => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
               <div className="kpi-title">{kpi.title}</div>
-              <div style={{ color: kpi.color, opacity: 0.7 }}>{kpi.icon}</div>
+              <div style={{ color: kpi.color, opacity: 0.8 }}>{kpi.icon}</div>
             </div>
-            <div className="kpi-value" style={{ color: kpi.color }}>{kpi.value}</div>
+            <div className="kpi-value" style={{ color: kpi.color, fontSize: 'clamp(1.1rem, 2vw, 1.45rem)' }}>{kpi.value}</div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>{kpi.sub}</span>
               <ArrowRight size={13} color="var(--text-muted)" />
@@ -132,15 +140,19 @@ export const DashboardPage: React.FC = () => {
       <div className="grid-2">
         <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
           <h3 style={{ fontSize: '16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileCheck2 size={20} color="var(--info)" /> Resumen Tributario Exportación
+            <FileCheck2 size={20} color="var(--info)" /> Resumen Tributario & DTEs SII
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
-              <span>Tratamiento Tributario Dominante:</span>
-              <span className="badge badge-info">EXPORT_SERVICE (Sin IVA)</span>
+              <span>Mercado Nacional (DTE 33 / 34):</span>
+              <span className="badge badge-success">{metrics?.operations?.nationalInvoicesCount ?? 0} facturas nacionales</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
-              <span>Facturas Folio SII Registradas:</span>
+              <span>Exportación sin IVA (DTE 110):</span>
+              <span className="badge badge-info">{metrics?.operations?.exportInvoicesCount ?? 0} facturas exportación</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: '#0f172a', borderRadius: 'var(--radius-sm)', flexWrap: 'wrap', gap: '8px' }}>
+              <span>Total Facturas Registradas:</span>
               <span style={{ fontWeight: 'bold' }}>{metrics?.operations?.totalInvoicesCount ?? 0} documentos</span>
             </div>
           </div>
