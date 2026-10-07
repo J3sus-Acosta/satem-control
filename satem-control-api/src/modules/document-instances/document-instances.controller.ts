@@ -213,7 +213,7 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
       logoFull: company.logoFullUrl || '',
       logoShort: company.logoShortUrl || '',
       signatureUrl: company.signatureUrl || SATEM_SIGNATURE_BASE64,
-      firma: `<img src="${company.signatureUrl || SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" style="max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px;" />`,
+      firma: `<img src="${company.signatureUrl || SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" style="max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: -12px;" />`,
     },
     cliente: {
       nombreLegal: customer.legalName || sanitizeCustomVars.cliente?.nombreLegal || '',
@@ -288,7 +288,16 @@ export async function generateDocumentInstanceHandler(request: FastifyRequest, r
     ? body.customHtml
     : compileTemplate(targetVersion.htmlTemplate, variables);
 
-  // Garantizar presencia de la firma de SATEM en cualquier plantilla antigua o personalizada
+  // Garantizar presencia y dimensiones de la firma oficial de SATEM en cualquier plantilla
+  rawCompiledHtml = rawCompiledHtml.replace(
+    /\.sig-space\s*\{[^}]*\}/g,
+    '.sig-space { height: 75px; display: flex; align-items: flex-end; justify-content: center; }'
+  );
+  rawCompiledHtml = rawCompiledHtml.replace(
+    /\.sig-img\s*\{[^}]*\}/g,
+    '.sig-img { max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: -12px; display: block; margin-left: auto; margin-right: auto; }'
+  );
+
   const effectiveSatemSig = company.signatureUrl || SATEM_SIGNATURE_BASE64;
   if (!rawCompiledHtml.includes('alt="Firma SATEM"') && !rawCompiledHtml.includes('class="sig-img"')) {
     const sigImgTag = `<img src="${effectiveSatemSig}" class="sig-img" alt="Firma SATEM" />`;
@@ -715,7 +724,7 @@ export async function regenerateAllUnsignedDocumentPdfs(logPrefix = '[REGENERATE
             signatureUrl: effectiveSatemSig,
             logoFull: company.logoFullUrl || existingSnapshot.empresa?.logoFull || '',
             logoShort: company.logoShortUrl || existingSnapshot.empresa?.logoShort || '',
-            firma: `<img src="${effectiveSatemSig}" class="sig-img" alt="Firma SATEM" style="max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px;" />`,
+            firma: `<img src="${effectiveSatemSig}" class="sig-img" alt="Firma SATEM" style="max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: -12px;" />`,
           },
         };
 

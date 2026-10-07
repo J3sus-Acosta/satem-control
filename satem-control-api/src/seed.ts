@@ -109,8 +109,8 @@ const baseCss = `
     page-break-inside: avoid;
     break-inside: avoid;
   }
-  .sig-space { height: 44px; display: flex; align-items: flex-end; justify-content: center; }
-  .sig-img { max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px; display: block; margin-left: auto; margin-right: auto; }
+  .sig-space { height: 75px; display: flex; align-items: flex-end; justify-content: center; }
+  .sig-img { max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: -12px; display: block; margin-left: auto; margin-right: auto; }
 `;
 
 const fieldsSchemaStandard = {

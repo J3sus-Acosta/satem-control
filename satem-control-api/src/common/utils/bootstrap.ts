@@ -150,67 +150,66 @@ export async function ensureCompanySignature(): Promise<void> {
       },
     });
 
-    // 2. Actualizar plantillas existentes en BD que no tengan la firma estampada en el área de SATEM
+    // 2. Actualizar plantillas existentes en BD con las proporciones oficiales de firma SATEM
     const versions = await prisma.documentTemplateVersion.findMany();
     for (const v of versions) {
-      if (!v.htmlTemplate.includes(SATEM_SIGNATURE_BASE64)) {
-        let updatedHtml = v.htmlTemplate;
+      let updatedHtml = v.htmlTemplate;
 
-        // Inyectar CSS de firma si no está
-        if (!updatedHtml.includes('.sig-img')) {
-          updatedHtml = updatedHtml.replace(
-            /\.sig-space\s*\{[^}]*\}/g,
-            '.sig-space { height: 44px; display: flex; align-items: flex-end; justify-content: center; }\n  .sig-img { max-height: 48px; max-width: 160px; object-fit: contain; margin-bottom: -6px; display: block; margin-left: auto; margin-right: auto; }'
-          );
-        }
+      // Inyectar o actualizar CSS de firma oficial ampliada con solapamiento
+      updatedHtml = updatedHtml.replace(
+        /\.sig-space\s*\{[^}]*\}/g,
+        '.sig-space { height: 75px; display: flex; align-items: flex-end; justify-content: center; }'
+      );
+      updatedHtml = updatedHtml.replace(
+        /\.sig-img\s*\{[^}]*\}/g,
+        '.sig-img { max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: -12px; display: block; margin-left: auto; margin-right: auto; }'
+      );
 
-        // Estampar firma en cajas de firma de SATEM
+      // Si no tenía .sig-img definido, inyectarlo en .sig-space
+      if (!updatedHtml.includes('.sig-img')) {
         updatedHtml = updatedHtml.replace(
-          /(<strong>POR \/ FOR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
-          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+          /\.sig-space\s*\{[^}]*\}/g,
+          '.sig-space { height: 75px; display: flex; align-items: flex-end; justify-content: center; }\n  .sig-img { max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: -12px; display: block; margin-left: auto; margin-right: auto; }'
         );
-        updatedHtml = updatedHtml.replace(
-          /(<strong>POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
-          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
-        );
-        updatedHtml = updatedHtml.replace(
-          /(<strong>EMITIDO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
-          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
-        );
-        updatedHtml = updatedHtml.replace(
-          /(<strong>AUTORIZADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
-          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
-        );
-        updatedHtml = updatedHtml.replace(
-          /(<strong>PRESENTADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
-          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
-        );
-        updatedHtml = updatedHtml.replace(
-          /(<strong>ENTREGADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(<\/div>)/gi,
-          `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
-        );
+      }
 
-        if (updatedHtml !== v.htmlTemplate) {
-          await prisma.documentTemplateVersion.update({
-            where: { id: v.id },
-            data: { htmlTemplate: updatedHtml },
-          });
-        }
+      // Estampar firma oficial en cajas de firma de SATEM
+      updatedHtml = updatedHtml.replace(
+        /(<strong>POR \/ FOR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(?:<img[^>]*>)?(<\/div>)/gi,
+        `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+      );
+      updatedHtml = updatedHtml.replace(
+        /(<strong>POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(?:<img[^>]*>)?(<\/div>)/gi,
+        `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+      );
+      updatedHtml = updatedHtml.replace(
+        /(<strong>EMITIDO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(?:<img[^>]*>)?(<\/div>)/gi,
+        `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+      );
+      updatedHtml = updatedHtml.replace(
+        /(<strong>AUTORIZADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(?:<img[^>]*>)?(<\/div>)/gi,
+        `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+      );
+      updatedHtml = updatedHtml.replace(
+        /(<strong>PRESENTADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(?:<img[^>]*>)?(<\/div>)/gi,
+        `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+      );
+      updatedHtml = updatedHtml.replace(
+        /(<strong>ENTREGADO POR: \{\{empresa\.nombre\}\}<\/strong>[\s\S]*?<div class="sig-space">)(?:<img[^>]*>)?(<\/div>)/gi,
+        `$1<img src="${SATEM_SIGNATURE_BASE64}" class="sig-img" alt="Firma SATEM" />$2`
+      );
+
+      if (updatedHtml !== v.htmlTemplate) {
+        await prisma.documentTemplateVersion.update({
+          where: { id: v.id },
+          data: { htmlTemplate: updatedHtml },
+        });
       }
     }
 
-    // 3. Regenerar automáticamente en disco todos los documentos existentes no firmados
-    try {
-      const { regenerateAllUnsignedDocumentPdfs } = await import('../../modules/document-instances/document-instances.controller.js');
-      const regenResult = await regenerateAllUnsignedDocumentPdfs('[BOOTSTRAP]');
-      if (regenResult.total > 0) {
-        console.log(`[BOOTSTRAP] 📑 Documentos existentes procesados: ${regenResult.regenerated} regenerados con firma oficial, ${regenResult.skipped} omitidos, ${regenResult.errors} errores.`);
-      }
-    } catch (regenErr) {
-      console.error('[BOOTSTRAP] ⚠️ Aviso al regenerar PDFs de instancias:', regenErr);
-    }
-
-    console.log('[BOOTSTRAP] ✅ Firma oficial de SATEM verificada y aplicada en todas las plantillas y documentos.');
+    // 3. Los documentos emitidos previos se conservan como fueron emitidos originalmente;
+    // la firma oficial ampliada aplica a cualquier documento nuevo que se emita en adelante.
+    console.log('[BOOTSTRAP] ✅ Firma oficial de SATEM actualizada y configurada para todos los nuevos documentos.');
   } catch (error) {
     console.error('[BOOTSTRAP] ⚠️ Advertencia al sincronizar firma corporativa de SATEM:', error);
   }
